@@ -37,7 +37,7 @@ It prints one line per source, `<id>: ok <n> items` or `<id>: FAIL <reason>`, an
    export ANTHROPIC_API_KEY=...   # your own key
    ```
 
-2. Preview the cost without spending anything. This collects, makes no model call and prints the number of candidates and a worst-case cost:
+2. Preview the cost without spending anything. This collects, makes no model call and prints the number of candidates and a cost estimate (an estimate, not a guaranteed maximum):
 
    ```bash
    uv run radar run --dry-run
@@ -50,7 +50,7 @@ It prints one line per source, `<id>: ok <n> items` or `<id>: FAIL <reason>`, an
    uv run radar budget
    ```
 
-Model calls are capped at $0.25 per day (change it with `RADAR_DAILY_CAP_USD`). The meter's prices are a snapshot; check them against Anthropic's pricing page. Stories are written to the local database only; nothing is published. Details: [agent.md](agent.md) and [methodology.md](methodology.md).
+A profile saved by the Anthropic CLI login works too; [agent.md](agent.md) lists exactly where Radar looks for a credential. Model calls are capped at $0.25 per Istanbul calendar day (change it with `RADAR_DAILY_CAP_USD`). The meter's prices are a snapshot; check them against Anthropic's pricing page. Stories are written to the local database only; nothing is published. Details: [agent.md](agent.md) and [methodology.md](methodology.md).
 
 ## Where the data lives
 
