@@ -9,6 +9,7 @@ dependencies = [
     "feedparser",
     "pydantic",
     "pyyaml",
+    "anthropic>=2.10.0",
 ]
 
 [dependency-groups]
