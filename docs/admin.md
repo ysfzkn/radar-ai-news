@@ -111,7 +111,7 @@ uv run radar push
 
 Before sending, `radar push` trims what it safely can to the ingest limits: at most 20 reasons of 300 characters; at most 30 `who`, `numbers` and `versions` entries of 200 characters; `what` to 1000 characters; at most 30 sources; and a `try_url` that is not an `http://` or `https://` link of at most 2000 characters is sent as no link. The texts and the source links are sent as stored.
 
-If the Worker still refuses a story (for example an empty or over-long text, or a source link it cannot parse), that story is skipped and the rest of its batch is sent again, so other stories are not held up. The skipped story's uid is listed under `rejected`, one line per skipped story on stderr names the field the Worker objected to, and the command exits 1. The story stays unpushed: it is tried again on every push until it is fixed or its cluster ages out.
+If the Worker still refuses a story (for example an empty or over-long text, or a source link it cannot parse), that story is skipped and the rest of its batch is sent again, so other stories are not held up. The skipped story's uid is listed under `rejected`, one line per skipped story on stderr names the field the Worker objected to, and the command exits 1. The story stays unpushed: it is sent again, and refused again, on every later push, so every later push exits 1 until the story is corrected or removed in the local database. There is no command for that yet.
 
 Checks: `npm run typecheck` and `npm test` in `admin/`.
 
