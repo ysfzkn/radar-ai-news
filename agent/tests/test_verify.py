@@ -205,7 +205,7 @@ def test_invented_number_routes_to_review():
 
 def test_number_must_equal_a_whole_source_token():
     d = draft(en=story(summary="Google 1."))
-    assert verify(d, doc(SRC.replace("1.0", "1.5"))) == ["en.summary: number '1' not in source"]
+    assert verify(d, doc(SRC.replace("19", "20"))) == ["en.summary: number '1' not in source"]
     d = draft(en=story(summary="Google 40."))
     assert verify(d, doc(SRC + " 40.5")) == ["en.summary: number '40' not in source"]
 
