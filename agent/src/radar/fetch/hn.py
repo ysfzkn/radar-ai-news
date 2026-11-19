@@ -4,9 +4,8 @@ from datetime import UTC, datetime
 
 import httpx
 
-from radar.fetch.common import limit_items
+from radar.fetch.common import limit_items, safe_canonical
 from radar.models import RawItem, Source
-from radar.urls import canonicalize
 
 
 def fetch_hn(source: Source, client: httpx.Client, now: datetime) -> list[RawItem]:
@@ -20,12 +19,13 @@ def fetch_hn(source: Source, client: httpx.Client, now: datetime) -> list[RawIte
             f"https://news.ycombinator.com/item?id={object_id}" if object_id else None
         )
         created = hit.get("created_at_i")
-        if not title or not url or created is None:
+        canonical = safe_canonical(url) if url else None
+        if not title or not canonical or created is None:
             continue
         items.append(
             RawItem(
                 source_id=source.id,
-                url=canonicalize(url),
+                url=canonical,
                 title=title,
                 published_at=datetime.fromtimestamp(created, tz=UTC),
                 points=hit.get("points") or 0,

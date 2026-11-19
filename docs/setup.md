@@ -27,7 +27,7 @@ To test the sources without writing anything to the database:
 uv run radar check-sources
 ```
 
-It prints one line per source, `ok <n> items` or `FAIL <reason>`, and always exits 0. A source that is `ok` with 0 items simply published nothing in the last 72 hours.
+It prints one line per source, `<id>: ok <n> items` or `<id>: FAIL <reason>`, and always exits 0. A source that is `ok` with 0 items simply published nothing in the last 72 hours.
 
 ## Where the data lives
 

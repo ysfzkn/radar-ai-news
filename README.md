@@ -102,7 +102,7 @@ uv run radar collect --show 5
 ```
 
 ```
-{"sources_ok": 19, "sources_failed": 0, "new_items": 156, "new_clusters": 148, "candidates": 30, "llm_calls": 0, "failed": []}
+{"sources_ok": 18, "sources_failed": 0, "new_items": 106, "new_clusters": 99, "candidates": 30, "llm_calls": 0, "failed": []}
  3.00  1  Accelerating development for massive Git repositories  https://developers.googleblog.com/accelerating-development-for-massive-git-repositories
  3.00  1  Gemini 4 Hydrogen: a faster model for general purpose robotics  https://developers.googleblog.com/gemini-hydrogen-for-robotics
  3.00  1  Build full-stack Android apps with Gemini in Google AI Studio  https://developers.googleblog.com/build-full-stack-android-apps-with-gemini-in-google-ai-studio

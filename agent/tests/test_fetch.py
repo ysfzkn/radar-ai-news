@@ -173,3 +173,28 @@ def test_well_formed_html_page_is_a_failed_source(now, body):
 def test_valid_empty_feed_is_not_a_failure(now, body):
     s = src("a")
     assert fetch_feed(s, client_for({s.url: body}), now) == []
+
+
+def feed_with_links(*links: str) -> bytes:
+    items = "".join(
+        f"<item><title>t{i}</title><link>{link}</link><description>d</description></item>"
+        for i, link in enumerate(links)
+    )
+    return (
+        '<?xml version="1.0"?><rss version="2.0"><channel><title>t</title>'
+        f"<link>https://e.test</link><description>d</description>{items}</channel></rss>"
+    ).encode()
+
+
+def test_feed_skips_an_entry_with_a_malformed_port(now):
+    s = src("a")
+    body = feed_with_links("http://example.com:abc/x", "https://e.test/good")
+    items = fetch_feed(s, client_for({s.url: body}), now)
+    assert [i.url for i in items] == ["https://e.test/good"]
+
+
+def test_feed_skips_an_entry_with_a_relative_link(now):
+    s = src("a")
+    body = feed_with_links("/relative/path", "https://e.test/good")
+    items = fetch_feed(s, client_for({s.url: body}), now)
+    assert [i.url for i in items] == ["https://e.test/good"]

@@ -114,3 +114,4 @@ sources:
     kind: feed
     url: https://www.donanimhaber.com/rss/tum/
     lang: tr
+    enabled: false  # no AI-only feed as of 2026-11; all-news feed floods ranking

@@ -6,10 +6,9 @@ from datetime import UTC, datetime
 import feedparser
 import httpx
 
-from radar.fetch.common import limit_items
+from radar.fetch.common import limit_items, safe_canonical
 from radar.models import RawItem, Source
 from radar.text import clean_summary
-from radar.urls import canonicalize
 
 
 def _published(entry, now: datetime) -> datetime:
@@ -27,12 +26,13 @@ def fetch_feed(source: Source, client: httpx.Client, now: datetime) -> list[RawI
     for entry in parsed.entries:
         link = entry.get("link")
         title = (entry.get("title") or "").strip()
-        if not link or not title:
+        url = safe_canonical(link) if link else None
+        if not url or not title:
             continue
         items.append(
             RawItem(
                 source_id=source.id,
-                url=canonicalize(link),
+                url=url,
                 title=title,
                 summary=clean_summary(entry.get("summary") or ""),
                 published_at=_published(entry, now),

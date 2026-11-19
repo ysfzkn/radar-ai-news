@@ -1,3 +1,4 @@
+import io
 import json
 import sys
 from datetime import timedelta
@@ -113,3 +114,22 @@ def test_no_anthropic_import():
 def test_main_requires_a_command():
     with pytest.raises(SystemExit):
         main([])
+
+
+def test_show_output_is_utf8_even_on_a_cp1254_stdout(tmp_path, monkeypatch, now):
+    title = "GPT\u20116.2 Astra \u00e7\u0131\u011f\u015f\u00fc\u00f6"
+    body = (
+        '<?xml version="1.0" encoding="utf-8"?><rss version="2.0"><channel><title>t</title>'
+        f"<link>https://a.test</link><description>d</description><item><title>{title}</title>"
+        "<link>https://a.test/1</link><description>d</description>"
+        f"<pubDate>{format_datetime(now - timedelta(hours=1))}</pubDate></item></channel></rss>"
+    ).encode()
+    http = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(200, content=body)))
+    monkeypatch.setattr(cli, "make_client", lambda: http)
+    raw = io.BytesIO()
+    stream = io.TextIOWrapper(raw, encoding="cp1254")
+    monkeypatch.setattr(sys, "stdout", stream)
+    argv = ["collect", "--db", str(tmp_path / "r.db"), "--sources", write_sources(tmp_path)]
+    assert main([*argv, "--show", "3"]) == 0
+    stream.flush()
+    assert title in raw.getvalue().decode("utf-8")
