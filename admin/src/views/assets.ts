@@ -6,6 +6,7 @@ export const CSS = `:root {
   --fg: #1c1c1a;
   --muted: #5f5e59;
   --line: #e2e1dc;
+  --control-border: #858480;
   --field: #ffffff;
   --accent: #2c55c9;
   --accent-fg: #ffffff;
@@ -34,6 +35,7 @@ export const CSS = `:root {
     --fg: #ecebe6;
     --muted: #a4a39c;
     --line: #2e2e2b;
+    --control-border: #75746e;
     --field: #1d1d1b;
     --accent: #8eaeff;
     --accent-fg: #0b1430;
@@ -136,7 +138,7 @@ div.lang-group { margin-top: var(--space-4); }
 input[type="url"], select, textarea {
   display: block; width: 100%; min-height: var(--tap); padding: var(--space-2) var(--space-3);
   font: inherit; color: var(--fg); background: var(--field);
-  border: 1px solid var(--line); border-radius: var(--radius);
+  border: 1px solid var(--control-border); border-radius: var(--radius);
 }
 textarea { resize: vertical; line-height: 1.5; }
 input:focus-visible, select:focus-visible, textarea:focus-visible { border-color: var(--accent); }
@@ -156,7 +158,7 @@ button {
 }
 button:hover { opacity: 0.85; }
 .primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); width: 100%; }
-.secondary { border-color: var(--line); }
+.secondary { border-color: var(--control-border); }
 .danger { border-color: var(--muted); color: var(--fg); }
 .decide .destructive { margin-top: var(--space-6); padding-top: var(--space-5); border-top: 1px solid var(--line); }
 
