@@ -47,6 +47,7 @@ def _check_numbers(draft: Draft, source: str) -> list[str]:
     fields = _text_fields(draft) + [("fact_card.what", draft.fact_card.what)]
     fields += [("fact_card.numbers", t) for t in draft.fact_card.numbers]
     fields += [("fact_card.versions", t) for t in draft.fact_card.versions]
+    fields += [("fact_card.who", t) for t in draft.fact_card.who]
     issues: list[str] = []
     for where, text in fields:
         for raw in _NUMBER.findall(text):
@@ -97,22 +98,19 @@ def _in_source(name: str, folded_source: str) -> bool:
     return re.search(pattern, folded_source) is not None
 
 
-def _looks_like_name(part: str) -> bool:
-    return any(c.isalpha() for c in part) and (
-        part[0].isupper() or any(c.isupper() or c.isdigit() for c in part[1:])
-    )
+def _allowlisted_compound(token: str) -> bool:
+    """`AI-powered`, `API-first`: no digit, an allowlisted part, every other part a plain
+    lowercase word. Any other hyphenated token is a name and must occur whole."""
+    parts = token.split("-")
+    if len(parts) < 2 or any(c.isdigit() for c in token):
+        return False
+    allowed = [p for p in parts if _allowed(p)]
+    others = [p for p in parts if not _allowed(p)]
+    return bool(allowed) and all(p.isalpha() and p.islower() for p in others)
 
 
 def _name_ok(name: str, folded_source: str) -> bool:
-    if _allowed(name) or _in_source(name, folded_source):
-        return True
-    parts = [p for p in name.split("-") if p]
-    if len(parts) < 2:
-        return False
-    # AI-powered: every name-like part must pass on its own; plain words are not names
-    return all(
-        not _looks_like_name(p) or _allowed(p) or _in_source(p, folded_source) for p in parts
-    )
+    return _allowed(name) or _allowlisted_compound(name) or _in_source(name, folded_source)
 
 
 def _check_names(draft: Draft, source: str) -> list[str]:

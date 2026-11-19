@@ -213,11 +213,56 @@ def test_plural_allowlisted_acronyms_pass():
     ]
 
 
-def test_hyphenated_tokens_are_checked_part_by_part():
-    d = draft(en=story(summary="Google ships AI-powered and Google-backed LangGraph-ready tools."))
+def test_allowlisted_lowercase_compounds_pass():
+    d = draft(en=story(summary="Google ships AI-powered, API-first and LLMs-ready tools."))
     assert verify(d, doc()) == []
+
+
+def test_hyphenated_names_are_checked_whole():
     d = draft(en=story(summary="Google ships OpenAI-backed tools."))
     assert verify(d, doc()) == ["en.summary: name 'OpenAI-backed' not in source"]
+    d = draft(en=story(summary="Google ships Google-backed tools."))
+    assert verify(d, doc()) == ["en.summary: name 'Google-backed' not in source"]
+
+
+def plain(summary="New release.", who=()):
+    """A draft whose other texts carry no number or name, for custom sources."""
+    neutral = story(title="New release", summary="Yeni sürüm.", dev_line="Try it.")
+    return draft(tr=neutral, en=story("New release", summary, "Try it."), who=who)
+
+
+def test_invented_hyphenated_version_is_not_excused_by_its_parts():
+    src = "OpenAI released GPT-5 today."
+    d = plain("OpenAI ships GPT-6.2 now.")
+    assert "en.summary: name 'GPT-6.2' not in source" in verify(d, doc(src))
+    d = plain("Meta ships Llama-4 now.")
+    assert verify(d, doc("Meta updated Llama 3.")) == [
+        "en.summary: number '4' not in source",
+        "en.summary: name 'Llama-4' not in source",
+    ]
+    d = plain("Google ships Google-gemini now.")
+    assert verify(d, doc("Google shipped a model.")) == [
+        "en.summary: name 'Google-gemini' not in source"
+    ]
+
+
+def test_stray_source_number_does_not_excuse_an_invented_version():
+    src = "OpenAI rolled out GPT-5 to 4 regions."
+    d = plain("OpenAI released GPT-4 to users.")
+    assert verify(d, doc(src)) == ["en.summary: name 'GPT-4' not in source"]
+
+
+def test_hyphenated_version_passes_when_the_source_has_it():
+    d = plain("OpenAI ships GPT-6.2 now.", who=["GPT-6.2"])
+    assert verify(d, doc("OpenAI released GPT-6.2 today.")) == []
+
+
+def test_who_entries_are_number_checked():
+    src = "OpenAI rolled out GPT-5 to 4 regions."
+    assert verify(plain(who=["GPT-6.2"]), doc(src)) == [
+        "fact_card.who: number '6.2' not in source",
+        "fact_card.who: name 'GPT-6.2' not in source",
+    ]
 
 
 def candidate(has_primary=True):

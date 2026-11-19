@@ -26,7 +26,7 @@ The check is deterministic code, not another model. It checks the draft against 
 
 - **Length.** Title at most 90 characters, summary at most 320, developer line at most 200.
 - **Numbers.** Every number in the texts and in the fact card (its sentence, numbers and versions) must appear in the source. A decimal comma and a decimal point are treated alike (`1,5` and `1.5`), and a number is not accepted just because it sits inside a longer one (`40` inside `2040`).
-- **Names.** Capitalised words, words with inner capitals (`LangGraph`) and words mixing letters and digits, in the texts, the fact card's sentence and its list of names, must appear in the source as whole words, ignoring case (`Meta` does not match `metadata`; `Google's` in the source still matches `Google`). A hyphenated word passes when each name-like part does (`AI-powered`).
+- **Names.** Capitalised words, words with inner capitals (`LangGraph`) and words mixing letters and digits, in the texts, the fact card's sentence and its list of names, must appear in the source as whole words, ignoring case (`Meta` does not match `metadata`; `Google's` in the source still matches `Google`). A hyphenated word is one name and must appear whole (`GPT-4`, `Llama-4`); the only exception is a compound of an allowlisted term and plain lowercase words with no digit (`AI-powered`, `API-first`). The names in the fact card's list are also checked for numbers, so a version inside a name is checked like any other number.
 - **Link.** The "try it" link must be one of the links found in the primary article itself, not a URL of another item in the cluster.
 
 ## What it cannot check
@@ -37,8 +37,7 @@ The verifier is a safety net, not proof of accuracy. It does not:
 - check a plain word at the start of a sentence as a name, because ordinary sentences start with capitals; an invented product name in first position can pass;
 - understand meaning: a draft can reuse a real number or name from the source in a wrong claim and pass;
 - accept a number written with different grouping than the source (`10000` against `10,000`); such a story is sent to review rather than passed, which is safe but noisy;
-- check acronyms on a short allowlist (AI, API, SDK, CLI, UI, LLM and similar, and their plurals such as APIs) or month names, in either language, ever;
-- catch a hyphenated compound invented from real parts (`Google-Gemini` passes when both names are in the source).
+- check acronyms on a short allowlist (AI, API, SDK, CLI, UI, LLM and similar, and their plurals such as APIs) or month names, in either language, ever.
 
 A human reading remains the real check, which is why anything doubtful is routed to review.
 
