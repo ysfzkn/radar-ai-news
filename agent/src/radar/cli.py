@@ -28,7 +28,8 @@ def _collect(
     run_id = store.start_run("collect", now)
     report = fetch_all(sources, client, now)
     new_items = store.insert_items(report.items)
-    new_clusters = assign_clusters(store, new_items, now)
+    pending = [i for i in store.items_since(now - WINDOW) if i.cluster_id is None]
+    new_clusters = assign_clusters(store, pending, now)
     candidates = rank_candidates(store.clusters_since(now - WINDOW), sources, now)
     failed = [s.id for s in sources if s.id in report.errors]
     stats = {

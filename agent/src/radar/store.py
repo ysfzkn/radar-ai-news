@@ -51,10 +51,28 @@ class SqliteStore:
         for file in sorted(directory.glob("*.sql")):
             if file.name in applied:
                 continue
-            # executescript commits implicitly; the name row is recorded right after.
-            self._conn.executescript(file.read_text(encoding="utf-8"))
+            self._apply(file)
+
+    def _apply(self, file: Path) -> None:
+        """Run one migration file and record it in a single transaction."""
+        statements, buffer = [], ""
+        for line in file.read_text(encoding="utf-8").splitlines(keepends=True):
+            buffer += line
+            if sqlite3.complete_statement(buffer):
+                statements.append(buffer)
+                buffer = ""
+        if buffer.strip():
+            statements.append(buffer)  # incomplete tail: let SQLite report the error
+        try:
+            self._conn.execute("BEGIN")
+            for statement in statements:
+                self._conn.execute(statement)
             self._conn.execute("INSERT INTO schema_migrations (name) VALUES (?)", (file.name,))
-            self._conn.commit()
+            self._conn.execute("COMMIT")
+        except Exception:
+            if self._conn.in_transaction:
+                self._conn.execute("ROLLBACK")
+            raise
 
     def upsert_sources(self, sources: list[Source]) -> None:
         with self._conn:

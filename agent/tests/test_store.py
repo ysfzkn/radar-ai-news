@@ -1,5 +1,10 @@
-from datetime import timedelta
+import sqlite3
+from datetime import datetime, timedelta
 
+import pytest
+from pydantic import ValidationError
+
+from radar.models import RawItem
 from radar.store import SqliteStore
 
 
@@ -36,3 +41,31 @@ def test_migrations_apply_once(tmp_path):
     first.close()
     second = SqliteStore(path)  # second open must not raise
     second.close()
+
+
+def test_failed_migration_leaves_nothing_behind(tmp_path):
+    migrations = tmp_path / "migrations"
+    migrations.mkdir()
+    (migrations / "0001_ok.sql").write_text("CREATE TABLE a (x INTEGER);", encoding="utf-8")
+    bad = migrations / "0002_bad.sql"
+    bad.write_text("CREATE TABLE b (x INTEGER); THIS IS NOT SQL;", encoding="utf-8")
+    path = str(tmp_path / "m.db")
+    with pytest.raises(sqlite3.Error):
+        SqliteStore(path, str(migrations))
+    bad.unlink()
+    reopened = SqliteStore(path, str(migrations))
+    try:
+        rows = reopened._conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        tables = {r[0] for r in rows}
+        applied = {r[0] for r in reopened._conn.execute("SELECT name FROM schema_migrations")}
+    finally:
+        reopened.close()
+    assert "a" in tables and "b" not in tables
+    assert applied == {"0001_ok.sql"}
+
+
+def test_naive_datetime_is_rejected():
+    with pytest.raises(ValidationError):
+        RawItem(
+            source_id="x", url="https://e.com/a", title="t", published_at=datetime(2026, 11, 19)
+        )

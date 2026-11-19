@@ -9,7 +9,7 @@ import pytest
 
 from radar import cli
 from radar.cli import collect, main
-from radar.models import Source, Tier
+from radar.models import RawItem, Source, Tier
 from radar.store import SqliteStore
 
 
@@ -68,6 +68,25 @@ def test_collect_twice_adds_nothing(store, now):
     collect(store, sources, client(now), now)
     again = collect(store, sources, client(now), now)
     assert again["new_items"] == 0 and again["new_clusters"] == 0
+
+
+def test_collect_clusters_items_left_over_from_an_interrupted_run(store, now):
+    items = [
+        RawItem(
+            source_id="a",
+            url=f"https://a.test/{n}",
+            title=TOPICS["a"][n] + " launch",
+            published_at=now - timedelta(hours=1 + n),
+        )
+        for n in range(2)
+    ]
+    store.upsert_sources([src("a")])
+    store.insert_items(items)  # inserted, never clustered
+    empty = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(500)))
+    stats = collect(store, [src("a")], empty, now)
+    window = store.items_since(now - timedelta(hours=72))
+    assert len(window) == 2 and all(i.cluster_id is not None for i in window)
+    assert stats["new_items"] == 0 and stats["new_clusters"] > 0
 
 
 def run_collect(tmp_path, monkeypatch, now, broken, capsys):

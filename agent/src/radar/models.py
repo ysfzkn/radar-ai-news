@@ -1,8 +1,7 @@
-from datetime import datetime
 from enum import IntEnum
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import AwareDatetime, BaseModel
 
 
 class Tier(IntEnum):
@@ -28,7 +27,7 @@ class RawItem(BaseModel):
     url: str
     title: str
     summary: str = ""
-    published_at: datetime
+    published_at: AwareDatetime
     points: int = 0
 
 
@@ -40,7 +39,7 @@ class StoredItem(RawItem):
 class Cluster(BaseModel):
     id: int
     title: str
-    first_seen: datetime
+    first_seen: AwareDatetime
     items: list[StoredItem]
 
 
