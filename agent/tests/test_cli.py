@@ -508,10 +508,32 @@ def test_cli_run_reports_metered_usage_and_budget_agrees(tmp_path, monkeypatch, 
     assert stats["llm_calls"] == 2 and len(calls) == 2
     assert stats["tokens_today"] == 3400 and stats["cost_today_usd"] == 0.0062
     assert stats["failed"] == [] and stats["stories_failed"] == 0 and stats["written"] == 1
+    assert stats["scoring_failed"] is False
     assert main(["budget", "--db", str(tmp_path / "r.db")]) == 0
     budget = json.loads(capsys.readouterr().out)
     assert budget["spent_usd"] == 0.0062 and budget["tokens"] == 3400 and budget["calls"] == 2
     assert budget["by_step"]["score"]["calls"] == 1 and budget["by_step"]["write"]["calls"] == 1
+
+
+def test_cli_run_records_an_unexpected_error_and_reraises(tmp_path, monkeypatch, now, capsys):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "dummy")
+    monkeypatch.setattr(cli, "make_client", lambda: run_client(now))
+
+    class Broken:
+        def parse(self, **kwargs):
+            raise RuntimeError("boom")
+
+    monkeypatch.setattr(cli, "_make_llm", lambda meter: Broken())
+    with pytest.raises(RuntimeError, match="boom"):
+        main(run_args(tmp_path))
+    assert capsys.readouterr().out == ""
+    store = SqliteStore(str(tmp_path / "r.db"))
+    try:
+        run = store.last_run()
+    finally:
+        store.close()
+    assert run["kind"] == "run" and run["finished_at"] is not None
+    assert run["stats"]["error"] == "RuntimeError" and run["stats"]["sources_ok"] == 2
 
 
 def test_cli_budget_stop_keeps_exit_0_and_records_it(tmp_path, monkeypatch, now, capsys):

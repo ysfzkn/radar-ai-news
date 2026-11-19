@@ -95,6 +95,7 @@ def test_run_agent_happy_path(store, now, run_id):
         "review": 1,
         "skipped_thin": 0,
         "failed": 0,
+        "scoring_failed": False,
         "budget_stopped": False,
     }
     stories = store.stories_since(now)
@@ -198,8 +199,16 @@ def test_scoring_error_scores_nothing_but_uses_cached(store, now, run_id):
     store.save_scores([score(candidates[0].cluster_id)], now - timedelta(days=1))
     llm = FakeLLM({"score": [LLMError("x")], "write": [draft()]})
     stats = run_agent(store, candidates, llm, http(), now, run_id)
-    assert stats["failed"] == 1 and stats["written"] == 1 and stats["scored"] == 0
+    assert stats["scoring_failed"] is True and stats["failed"] == 0
+    assert stats["written"] == 1 and stats["scored"] == 0
     assert store.scores_for([c.cluster_id for c in candidates]).keys() == {candidates[0].cluster_id}
+
+
+def test_scoring_refusal_is_reported_as_scoring_failed(store, now, run_id):
+    candidates = world(store, now, count=1)
+    llm = FakeLLM({"score": [Refused("no")]})
+    stats = run_agent(store, candidates, llm, http(), now, run_id)
+    assert stats["scoring_failed"] is True and stats["failed"] == 0 and stats["written"] == 0
 
 
 def test_budget_stop_keeps_finished_stories(store, now, run_id):

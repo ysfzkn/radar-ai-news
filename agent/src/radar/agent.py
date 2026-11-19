@@ -42,6 +42,7 @@ def run_agent(
         "review": 0,
         "skipped_thin": 0,
         "failed": 0,
+        "scoring_failed": False,
         "budget_stopped": False,
     }
     # The edition is per Istanbul day: stories already written today count against it.
@@ -56,7 +57,7 @@ def run_agent(
             stats["budget_stopped"] = True
             return stats
         except (Refused, LLMError):
-            stats["failed"] += 1
+            stats["scoring_failed"] = True
         else:
             stats["scored"] = len(to_score)
             store.save_scores(new, now)

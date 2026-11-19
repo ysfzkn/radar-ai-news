@@ -197,20 +197,25 @@ def _run_agent_command(args: argparse.Namespace) -> int:
     store = _open_store(args)
     client = make_client()
     now = datetime.now(UTC)
+    stats: dict = {}
     try:
         run_id = store.start_run("run", now)
-        stats, candidates = _collect_in_run(store, sources, client, now)
-        meter = Meter(store, run_id, cap, clock=lambda: datetime.now(UTC))
-        agent = run_agent(
-            store, candidates, _make_llm(meter), client, now, run_id, args.max_stories
-        )
-        agent["stories_failed"] = agent.pop("failed")
-        stats |= agent
-        tokens = meter.tokens_today()
-        stats["llm_calls"] = meter.calls
-        stats["tokens_today"] = tokens
-        stats["cost_today_usd"] = round(meter.spent_today(), 4)
-        stats["over_token_target"] = tokens > DAILY_TOKEN_TARGET
+        try:
+            stats, candidates = _collect_in_run(store, sources, client, now)
+            meter = Meter(store, run_id, cap, clock=lambda: datetime.now(UTC))
+            agent = run_agent(
+                store, candidates, _make_llm(meter), client, now, run_id, args.max_stories
+            )
+            agent["stories_failed"] = agent.pop("failed")
+            stats |= agent
+            tokens = meter.tokens_today()
+            stats["llm_calls"] = meter.calls
+            stats["tokens_today"] = tokens
+            stats["cost_today_usd"] = round(meter.spent_today(), 4)
+            stats["over_token_target"] = tokens > DAILY_TOKEN_TARGET
+        except BaseException as exc:
+            store.finish_run(run_id, datetime.now(UTC), {**stats, "error": type(exc).__name__})
+            raise
         store.finish_run(run_id, datetime.now(UTC), stats)
         written = [s for s in store.stories_since(now) if s.run_id == run_id]
     finally:
