@@ -1,0 +1,102 @@
+{
+  "version": 1,
+  "stories": [
+    {
+      "uid": "d0000000000000000000000000000001",
+      "category": "framework",
+      "status": "review",
+      "age_hours": 2,
+      "reasons": ["en.summary: number 3x not in source"],
+      "score": {"relevance": 4, "novelty": 4, "usefulness": 5, "total": 4.3, "risk_flags": []},
+      "fact_card": {
+        "what": "Demo data: the invented Lumenkit 2.0 framework ships a rewritten task scheduler.",
+        "who": ["Lumenkit Labs"],
+        "numbers": ["3x"],
+        "versions": ["2.0"],
+        "try_url": "https://example.com/lumenkit/try"
+      },
+      "source_url": "https://example.com/lumenkit/2-0",
+      "source_count": 2,
+      "sources": [
+        {"name": "Example Blog", "url": "https://example.com/blog/lumenkit-2-0", "tier": 2},
+        {"name": "Example Releases", "url": "https://example.com/lumenkit/releases", "tier": 1}
+      ],
+      "texts": {
+        "tr": {
+          "title": "Demo: Lumenkit 2.0 yeniden yazılmış zamanlayıcıyla geldi",
+          "summary": "Uydurma Lumenkit 2.0, görev zamanlayıcısını baştan yazdı. Bu bir deneme verisidir; gerçek bir haber değildir.",
+          "dev_line": "Örnek projeyi çalıştırıp yeni zamanlayıcıyı kendi iş akışınızda deneyin."
+        },
+        "en": {
+          "title": "Demo: Lumenkit 2.0 ships a rewritten scheduler",
+          "summary": "The invented Lumenkit 2.0 rewrote its task scheduler. This is demo data, not real news.",
+          "dev_line": "Run the sample project and try the new scheduler in your own workflow."
+        }
+      }
+    },
+    {
+      "uid": "d0000000000000000000000000000002",
+      "category": "security",
+      "status": "review",
+      "age_hours": 68,
+      "reasons": ["risk flag: security_incident"],
+      "score": {"relevance": 5, "novelty": 3, "usefulness": 4, "total": 4.0, "risk_flags": ["security_incident"]},
+      "fact_card": {
+        "what": "Demo data: a vulnerability is reported in the invented Bulutkapi 3 gateway.",
+        "who": ["Kuzeyruzgar"],
+        "numbers": [],
+        "versions": ["3.0"],
+        "try_url": null
+      },
+      "source_url": "https://example.com/bulutkapi/advisory",
+      "source_count": 1,
+      "sources": [
+        {"name": "Example Advisory", "url": "https://example.com/bulutkapi/advisory", "tier": 1}
+      ],
+      "texts": {
+        "tr": {
+          "title": "Kuzeyrüzgar Bulutkapı 3 için güvenlik açığı bildirildi; kullanıcılar güncellemeyi bekleyip önlem al.",
+          "summary": "Uydurma Bulutkapı 3 ağ geçidinde bir açık bildirildi. Bu bir deneme verisidir; gerçek bir haber değildir.",
+          "dev_line": "Üretimde kullanıyorsanız duyuruyu okuyup geçici önlemleri uygulayın."
+        },
+        "en": {
+          "title": "Vulnerability reported in the invented Bulutkapi 3 gateway",
+          "summary": "A flaw was reported in the invented Bulutkapi 3 gateway. This is demo data, not real news.",
+          "dev_line": "If you run it in production, read the advisory and apply the interim steps."
+        }
+      }
+    },
+    {
+      "uid": "d0000000000000000000000000000003",
+      "category": "tooling",
+      "status": "published",
+      "age_hours": 5,
+      "reasons": [],
+      "score": {"relevance": 4, "novelty": 3, "usefulness": 4, "total": 3.8, "risk_flags": []},
+      "fact_card": {
+        "what": "Demo data: the invented Pinbord CLI adds a replay command for agent traces.",
+        "who": ["Pinbord"],
+        "numbers": [],
+        "versions": ["0.9"],
+        "try_url": "https://example.com/pinbord"
+      },
+      "source_url": "https://example.com/pinbord/0-9",
+      "source_count": 3,
+      "sources": [
+        {"name": "Example Blog", "url": "https://example.com/blog/pinbord-0-9", "tier": 2}
+      ],
+      "texts": {
+        "tr": {
+          "title": "Demo: Pinbord CLI ajan izlerini yeniden oynatıyor",
+          "summary": "Uydurma Pinbord CLI 0.9, ajan izlerini yeniden oynatan bir komut ekledi. Bu bir deneme verisidir.",
+          "dev_line": "Kendi izlerinizden birini yeniden oynatıp farkları karşılaştırın."
+        },
+        "en": {
+          "title": "Demo: Pinbord CLI replays agent traces",
+          "summary": "The invented Pinbord CLI 0.9 added a command that replays agent traces. This is demo data.",
+          "dev_line": "Replay one of your own traces and compare the differences."
+        }
+      }
+    }
+  ]
+}

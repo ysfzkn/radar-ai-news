@@ -201,7 +201,9 @@ app.post("/admin/stories/:uid/unpublish", async (c) => {
   return afterResult(c, uid, result, storyPath(uid));
 });
 
-// Hourly cron (see wrangler.jsonc). Expiry of old reviews arrives in a later task.
-async function scheduled(_controller: ScheduledController, _env: Env, _ctx: ExecutionContext): Promise<void> {}
+// Hourly cron (see wrangler.jsonc): expires review stories aged 72 hours or more.
+async function scheduled(controller: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
+  await expireStale(env.DB, new Date(controller.scheduledTime));
+}
 
 export default { fetch: app.fetch, scheduled };

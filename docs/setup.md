@@ -6,6 +6,7 @@ This page covers running Radar on your own machine. The collector (`radar collec
 
 - Python 3.12
 - [uv](https://docs.astral.sh/uv/)
+- Node 22, only for [Review and publish](#review-and-publish)
 
 ## Run it
 
@@ -51,6 +52,10 @@ It prints one line per source, `<id>: ok <n> items` or `<id>: FAIL <reason>`, an
    ```
 
 A profile saved by the Anthropic CLI login works too; [agent.md](agent.md) lists exactly where Radar looks for a credential. Model calls are capped at $0.25 per Istanbul calendar day (change it with `RADAR_DAILY_CAP_USD`). The meter's prices are a snapshot; check them against Anthropic's pricing page. Stories are written to the local database only; nothing is published. Details: [agent.md](agent.md) and [methodology.md](methodology.md).
+
+## Review and publish
+
+Stories the agent is unsure about wait in a review queue in the admin service (`admin/`, a Cloudflare Worker). `radar push` sends finished stories there; a person edits, approves or rejects them. You can try the whole screen on your machine with demo data, with no account and no paid call. See [admin.md](admin.md).
 
 ## Where the data lives
 

@@ -5,7 +5,8 @@
     "dev": "wrangler dev",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "db:migrate:local": "wrangler d1 migrations apply radar --local"
+    "db:migrate:local": "wrangler d1 migrations apply radar --local",
+    "seed": "node scripts/seed.mjs"
   },
   "dependencies": {
     "hono": "^4.13.19",

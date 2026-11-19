@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Repository scaffold, community files and CI.
 
+## [0.3.0] - 2026-11-20
+
+### Added
+
+- Admin service (`admin/`, a Cloudflare Worker with D1): ingest endpoint, review queue and story screens in Turkish, edit, approve, reject and unpublish, Cloudflare Access sign-in verified by the Worker, hourly expiry of review stories after 72 hours.
+- `radar push` sends finished stories to the admin service.
+- `npm run seed` loads three invented demo stories into a local server; the local trial needs no account.
+- Documentation: `docs/admin.md`.
+
 ## [0.2.0] - 2026-11-19
 
 ### Added
