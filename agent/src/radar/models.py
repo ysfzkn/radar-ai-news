@@ -1,7 +1,7 @@
 from enum import IntEnum
 from typing import Literal
 
-from pydantic import AwareDatetime, BaseModel
+from pydantic import AwareDatetime, BaseModel, Field
 
 
 class Tier(IntEnum):
@@ -52,3 +52,66 @@ class Candidate(BaseModel):
     has_primary: bool
     is_turkey: bool
     score: float
+
+
+Category = Literal[
+    "protocol", "model", "framework", "tooling", "research", "security", "industry", "policy"
+]
+RiskFlag = Literal[
+    "security_incident", "accusation", "funding_figure", "third_party_benchmark", "regulation"
+]
+Status = Literal["published", "review"]
+
+
+class Score(BaseModel):
+    cluster_id: int
+    relevance: int = Field(ge=0, le=5)
+    novelty: int = Field(ge=0, le=5)
+    usefulness: int = Field(ge=0, le=5)
+    category: Category
+    risk_flags: list[RiskFlag] = []
+
+    @property
+    def total(self) -> float:
+        return round(0.4 * self.relevance + 0.3 * self.novelty + 0.3 * self.usefulness, 2)
+
+
+class FactCard(BaseModel):
+    what: str
+    who: list[str]
+    numbers: list[str]
+    versions: list[str]
+    try_url: str | None = None
+
+
+class StoryText(BaseModel):
+    title: str
+    summary: str
+    dev_line: str
+
+
+class Draft(BaseModel):
+    fact_card: FactCard
+    tr: StoryText
+    en: StoryText
+
+
+class SourceDoc(BaseModel):
+    url: str
+    text: str
+    links: list[str]
+
+
+class Story(BaseModel):
+    id: int
+    cluster_id: int
+    run_id: int
+    category: Category
+    status: Status
+    reasons: list[str]
+    score: Score
+    draft: Draft
+    source_url: str
+    source_count: int
+    created_at: AwareDatetime
+    published_at: AwareDatetime | None

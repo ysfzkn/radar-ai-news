@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from radar.models import RawItem, Source, Tier
+from radar.models import Draft, FactCard, RawItem, Score, Source, StoryText, Tier
 from radar.store import SqliteStore
 
 
@@ -54,3 +54,48 @@ def store(tmp_path):
     )
     yield s
     s.close()
+
+
+@pytest.fixture
+def cluster_id(store, now) -> int:
+    return store.create_cluster("A2UI 1.0", now)
+
+
+@pytest.fixture
+def run_id(store, now) -> int:
+    return store.start_run("agent", now)
+
+
+@pytest.fixture
+def score(cluster_id) -> Score:
+    return Score(
+        cluster_id=cluster_id,
+        relevance=5,
+        novelty=4,
+        usefulness=3,
+        category="protocol",
+        risk_flags=["regulation"],
+    )
+
+
+@pytest.fixture
+def draft() -> Draft:
+    return Draft(
+        fact_card=FactCard(
+            what="A2UI 1.0 was released.",
+            who=["GitHub"],
+            numbers=["1.0"],
+            versions=["1.0"],
+            try_url="https://github.com/a2ui",
+        ),
+        tr=StoryText(
+            title="A2UI 1.0 çıktı: İlk kararlı sürüm",
+            summary="Arayüz protokolü artık kararlı; öğrenmesi kolay, üretimde güvenli, şık.",
+            dev_line="Şimdi deneyin: örnek uygulamayı çalıştırın.",
+        ),
+        en=StoryText(
+            title="A2UI 1.0 ships",
+            summary="The UI protocol is now stable.",
+            dev_line="Try the sample app today.",
+        ),
+    )
