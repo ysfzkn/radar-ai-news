@@ -118,7 +118,94 @@ def test_fallback_model_is_priced_by_the_response_model(store):
     assert usage(store)[0]["model"] == "claude-sonnet-5"
 
 
-def _stub_anthropic(monkeypatch, exc, seen):
+def test_fallback_reserves_two_attempts(store):
+    # "sys" + "usr" = 6 bytes; one attempt:
+    # (ceil(6 / 2) + 1_000) * $2 / M + 500 * $10 / M = 0.002006 + 0.005 = 0.007006
+    # with a fallback: 2 * 0.007006 = 0.014012 > 0.012 >= 0.007006
+    llm, sent = make(store, reply(model="claude-sonnet-5-5"), cap=0.012)
+    with pytest.raises(BudgetExceeded):
+        call(llm, model="claude-sonnet-5-5", fallback=True)
+    assert sent == []
+    call(llm, model="claude-sonnet-5-5")
+    assert len(sent) == 1
+
+
+def test_reserve_counts_utf8_bytes_not_characters(store):
+    seen: list[tuple] = []
+
+    class Spy(Meter):
+        def reserve(self, model, input_bytes, max_tokens, attempts=1):
+            seen.append((model, input_bytes, max_tokens, attempts))
+
+    llm = AnthropicLLM(Spy(store, None, 0.25, clock=lambda: NOW), send=lambda **kw: reply())
+    call(llm, system="şş", user="İstanbul")  # 2 * 2 bytes + (2 + 7) bytes
+    call(llm, model="claude-sonnet-5-5", system="a", user="b", fallback=True)
+    assert seen == [
+        ("claude-haiku-5-5", 13, 500, 1),
+        ("claude-sonnet-5-5", 2, 500, 2),
+    ]
+
+
+def test_fallback_model_shares_the_write_model_price():
+    from radar.budget import PRICES
+    from radar.llm import FALLBACK_MODEL
+    from radar.write import WRITE_MODEL
+
+    assert FALLBACK_MODEL == "claude-sonnet-5"
+    assert PRICES[FALLBACK_MODEL] == PRICES[WRITE_MODEL]
+
+
+def iteration(kind, input_tokens, output_tokens, model=None):
+    entry = SimpleNamespace(type=kind, input_tokens=input_tokens, output_tokens=output_tokens)
+    if model is not None or kind == "message":
+        entry.model = model
+    return entry
+
+
+def test_iterations_are_recorded_one_row_each(store):
+    response = reply(model="claude-sonnet-5", input_tokens=900, output_tokens=150)
+    response.usage.iterations = [
+        iteration("message", 800, 40, model="claude-sonnet-5-5"),
+        iteration("fallback_message", 900, 150, model="claude-sonnet-5"),
+    ]
+    llm, _ = make(store, response)
+    call(llm, model="claude-sonnet-5-5", step="write", fallback=True)
+    rows = [(r["step"], r["model"], r["input_tokens"], r["output_tokens"]) for r in usage(store)]
+    assert rows == [
+        ("write", "claude-sonnet-5-5", 800, 40),
+        ("write", "claude-sonnet-5", 900, 150),
+    ]
+
+
+def test_iteration_without_a_model_is_priced_as_the_requested_model(store):
+    response = reply(model="claude-sonnet-5-5")
+    response.usage.iterations = [iteration("message", 700, 30)]
+    llm, _ = make(store, response)
+    call(llm, model="claude-sonnet-5-5")
+    assert [(r["model"], r["input_tokens"]) for r in usage(store)] == [("claude-sonnet-5-5", 700)]
+
+
+def test_empty_iterations_fall_back_to_top_level_usage(store):
+    response = reply(model="claude-sonnet-5")
+    response.usage.iterations = []
+    llm, _ = make(store, response)
+    call(llm, model="claude-sonnet-5-5", fallback=True)
+    assert [(r["model"], r["input_tokens"]) for r in usage(store)] == [("claude-sonnet-5", 1_000)]
+
+
+def test_refusal_after_iterations_still_records_every_hop(store):
+    response = reply(text="", stop_reason="refusal", model="claude-sonnet-5")
+    response.usage.iterations = [
+        iteration("message", 800, 40, model="claude-sonnet-5-5"),
+        iteration("message", 810, 20, model="claude-sonnet-5"),
+    ]
+    llm, _ = make(store, response)
+    with pytest.raises(Refused):
+        call(llm, model="claude-sonnet-5-5", fallback=True)
+    assert len(usage(store)) == 2
+
+
+def _stub_anthropic(monkeypatch, exc, seen, built=None):
     import anthropic
 
     class Messages:
@@ -127,7 +214,9 @@ def _stub_anthropic(monkeypatch, exc, seen):
             raise exc
 
     class Stub:
-        def __init__(self):
+        def __init__(self, **kwargs):
+            if built is not None:
+                built.append(kwargs)
             self.messages = Messages()
             self.beta = SimpleNamespace(messages=Messages())
 
@@ -168,6 +257,26 @@ def test_default_send_translates_sdk_errors(monkeypatch, kind):
     assert "output_format" not in seen[0]
 
 
+def test_client_is_built_with_one_retry_and_a_timeout(monkeypatch):
+    import anthropic
+
+    from radar.llm import _default_send
+
+    built: list[dict] = []
+    _stub_anthropic(monkeypatch, anthropic.AnthropicError("x"), [], built)
+    for _ in range(2):
+        with pytest.raises(LLMError):
+            _default_send(
+                model="m",
+                max_tokens=1,
+                system="s",
+                messages=[],
+                output_format=Out,
+                output_config={"effort": "low"},
+            )
+    assert built == [{"max_retries": 1, "timeout": 120}]
+
+
 def test_request_shape(store):
     llm, sent = make(store, reply())
     call(llm, system="S", user="U")
@@ -184,7 +293,7 @@ def test_request_shape(store):
     full = sent[1]
     assert full["thinking"] == {"type": "disabled"}
     assert full["betas"] == ["server-side-fallback-2026-07-01"]
-    assert full["fallbacks"] == "default"
+    assert full["fallbacks"] == [{"model": "claude-sonnet-5"}]
     assert full["output_config"] == {"effort": "high"}
 
 

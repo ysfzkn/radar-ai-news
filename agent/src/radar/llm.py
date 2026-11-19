@@ -8,6 +8,8 @@ from radar.budget import Meter
 T = TypeVar("T", bound=BaseModel)
 
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
+# Pinned so its price is known: the meter's table bills it like claude-sonnet-5-5.
+FALLBACK_MODEL = "claude-sonnet-5"
 
 
 class Refused(Exception):
@@ -49,7 +51,7 @@ def _default_send(**request: Any) -> Any:
     global _client
     try:
         if _client is None:
-            _client = anthropic.Anthropic()
+            _client = anthropic.Anthropic(max_retries=1, timeout=120)
         schema = request.pop("output_format")
         request["output_config"] = {
             **request["output_config"],
@@ -82,7 +84,9 @@ class AnthropicLLM:
         thinking_off: bool = False,
         fallback: bool = False,
     ) -> T:
-        self._meter.reserve(model, len(system) + len(user), max_tokens)
+        input_bytes = len(system.encode("utf-8")) + len(user.encode("utf-8"))
+        # A declined attempt and the fallback attempt can both be billed.
+        self._meter.reserve(model, input_bytes, max_tokens, attempts=2 if fallback else 1)
         request: dict[str, Any] = {
             "model": model,
             "max_tokens": max_tokens,
@@ -95,10 +99,9 @@ class AnthropicLLM:
             request["thinking"] = {"type": "disabled"}
         if fallback:
             request["betas"] = [FALLBACK_BETA]
-            request["fallbacks"] = "default"
+            request["fallbacks"] = [{"model": FALLBACK_MODEL}]
         response = self._send(**request)
-        usage = response.usage
-        self._meter.record(step, response.model, usage.input_tokens, usage.output_tokens)
+        self._record(step, model, response)
         if response.stop_reason == "refusal":
             category = getattr(response.stop_details, "category", None)
             raise Refused(f"{step}: model refused" + (f" ({category})" if category else ""))
@@ -109,3 +112,20 @@ class AnthropicLLM:
             return schema.model_validate_json(text)
         except ValidationError as exc:
             raise LLMError(f"{step}: reply is not a valid {schema.__name__}: {exc}") from exc
+
+    def _record(self, step: str, model: str, response: Any) -> None:
+        """One usage row per billed hop.
+
+        With a fallback the SDK lists each hop in `usage.iterations` (a declined attempt
+        as a `message` entry, the serving fallback as `fallback_message`); the top-level
+        counts may leave the declined hop out. An entry without a model is priced as the
+        requested model.
+        """
+        usage = response.usage
+        iterations = getattr(usage, "iterations", None)
+        if not iterations:
+            self._meter.record(step, response.model, usage.input_tokens, usage.output_tokens)
+            return
+        for entry in iterations:
+            hop_model = getattr(entry, "model", None) or model
+            self._meter.record(step, hop_model, entry.input_tokens, entry.output_tokens)

@@ -34,8 +34,10 @@ def cost_usd(model: str, input_tokens: int, output_tokens: int) -> float:
     return (input_tokens * rate_in + output_tokens * rate_out) / 1_000_000
 
 
-def worst_case_usd(model: str, input_chars: int, max_tokens: int) -> float:
-    return cost_usd(model, math.ceil(input_chars / 2), max_tokens)
+def worst_case_usd(model: str, input_bytes: int, max_tokens: int) -> float:
+    """Estimate for one attempt: one input token per two UTF-8 bytes plus a 1,000-token
+    margin, and the full `max_tokens` of output. An estimate, not a guaranteed maximum."""
+    return cost_usd(model, math.ceil(input_bytes / 2) + 1000, max_tokens)
 
 
 def day_start(now: datetime) -> datetime:
@@ -80,13 +82,15 @@ class Meter:
     def tokens_today(self) -> int:
         return sum(row["input_tokens"] + row["output_tokens"] for row in self._usage_today())
 
-    def reserve(self, model: str, input_chars: int, max_tokens: int) -> None:
-        worst = worst_case_usd(model, input_chars, max_tokens)
+    def reserve(self, model: str, input_bytes: int, max_tokens: int, attempts: int = 1) -> None:
+        """Refuse the request unless `attempts` billed attempts of it still fit under the cap."""
+        worst = attempts * worst_case_usd(model, input_bytes, max_tokens)
         spent = self.spent_today()
         if spent + worst > self._cap_usd:
             raise BudgetExceeded(
                 f"daily cap ${self._cap_usd:.4f} would be exceeded: "
-                f"spent ${spent:.4f} + worst case ${worst:.4f} for {model}"
+                f"spent ${spent:.4f} + worst case ${worst:.4f} for {model} "
+                f"({attempts} attempt{'s' if attempts != 1 else ''})"
             )
 
     def record(self, step: str, model: str, input_tokens: int, output_tokens: int) -> float:
