@@ -79,11 +79,51 @@ def _run_collect(args: argparse.Namespace) -> int:
     return 0 if stats["sources_ok"] > 0 else 1
 
 
+def _anthropic_config_dir() -> Path:
+    """Where the Anthropic SDK looks for profiles (mirrors its `_config_dir`)."""
+    configured = os.environ.get("ANTHROPIC_CONFIG_DIR")
+    if configured:
+        return Path(configured)
+    if sys.platform == "win32":
+        appdata = os.environ.get("APPDATA")
+        base = Path(appdata) if appdata else Path.home() / "AppData" / "Roaming"
+        return base / "Anthropic"
+    return Path.home() / ".config" / "anthropic"
+
+
+def _active_profile(config_dir: Path) -> str:
+    """`ANTHROPIC_PROFILE`, else the `active_config` pointer file, else `default`."""
+    named = os.environ.get("ANTHROPIC_PROFILE")
+    if named:
+        return named
+    try:
+        pointer = (config_dir / "active_config").read_text(encoding="utf-8").strip()
+    except OSError:
+        pointer = ""
+    return pointer or "default"
+
+
 def _has_credential() -> bool:
+    """True when the SDK's own credential lookup would find something to send.
+
+    Mirrors the SDK's chain: an API key or auth token in the environment, workload
+    identity federation variables, or the active profile's `configs/<profile>.json`
+    file in the SDK's config directory. A directory alone is not a credential.
+    """
     env = os.environ
     if env.get("ANTHROPIC_API_KEY") or env.get("ANTHROPIC_AUTH_TOKEN"):
         return True
-    return (Path.home() / ".config" / "anthropic").exists()
+    if env.get("ANTHROPIC_FEDERATION_RULE_ID") and env.get("ANTHROPIC_ORGANIZATION_ID"):
+        if env.get("ANTHROPIC_IDENTITY_TOKEN") or env.get("ANTHROPIC_IDENTITY_TOKEN_FILE"):
+            return True
+    config_dir = _anthropic_config_dir()
+    profile = _active_profile(config_dir)
+    bad_name = (
+        profile != profile.strip()
+        or profile.startswith(".")
+        or any(c in profile for c in ("/", "\\", "\x00"))
+    )
+    return not bad_name and (config_dir / "configs" / f"{profile}.json").is_file()
 
 
 def _make_llm(meter):

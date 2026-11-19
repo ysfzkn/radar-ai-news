@@ -237,10 +237,107 @@ def test_cli_second_run_makes_no_model_calls(tmp_path, monkeypatch, now, capsys)
     assert second.calls == [] and stats["scored"] == 0 and stats["written"] == 0
 
 
+CREDENTIAL_ENV = (
+    "ANTHROPIC_API_KEY",
+    "ANTHROPIC_AUTH_TOKEN",
+    "ANTHROPIC_CONFIG_DIR",
+    "ANTHROPIC_PROFILE",
+    "ANTHROPIC_FEDERATION_RULE_ID",
+    "ANTHROPIC_ORGANIZATION_ID",
+    "ANTHROPIC_IDENTITY_TOKEN",
+    "ANTHROPIC_IDENTITY_TOKEN_FILE",
+)
+
+
+def no_credentials(monkeypatch, tmp_path, platform="win32"):
+    for name in CREDENTIAL_ENV:
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("APPDATA", str(tmp_path / "appdata"))
+    monkeypatch.setattr(cli.Path, "home", lambda: tmp_path / "home")
+    monkeypatch.setattr(cli.sys, "platform", platform)
+
+
+def profile_file(config_dir, name="default"):
+    path = config_dir / "configs" / f"{name}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("{}", encoding="utf-8")
+    return path
+
+
+def test_credential_from_env(monkeypatch, tmp_path):
+    no_credentials(monkeypatch, tmp_path)
+    assert not cli._has_credential()
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "")
+    assert not cli._has_credential()
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "dummy")
+    assert cli._has_credential()
+    monkeypatch.delenv("ANTHROPIC_API_KEY")
+    monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "dummy")
+    assert cli._has_credential()
+
+
+def test_credential_from_federation_env(monkeypatch, tmp_path):
+    no_credentials(monkeypatch, tmp_path)
+    monkeypatch.setenv("ANTHROPIC_FEDERATION_RULE_ID", "r")
+    monkeypatch.setenv("ANTHROPIC_ORGANIZATION_ID", "o")
+    assert not cli._has_credential()
+    monkeypatch.setenv("ANTHROPIC_IDENTITY_TOKEN_FILE", str(tmp_path / "token"))
+    assert cli._has_credential()
+
+
+def test_windows_profile_lives_under_appdata(monkeypatch, tmp_path):
+    no_credentials(monkeypatch, tmp_path, platform="win32")
+    profile_file(tmp_path / "home" / ".config" / "anthropic")  # not where the SDK looks
+    assert not cli._has_credential()
+    (tmp_path / "appdata" / "Anthropic" / "configs").mkdir(parents=True)  # a bare directory
+    assert not cli._has_credential()
+    profile_file(tmp_path / "appdata" / "Anthropic")
+    assert cli._has_credential()
+
+
+def test_windows_without_appdata_uses_roaming_under_home(monkeypatch, tmp_path):
+    no_credentials(monkeypatch, tmp_path, platform="win32")
+    monkeypatch.delenv("APPDATA")
+    profile_file(tmp_path / "home" / "AppData" / "Roaming" / "Anthropic")
+    assert cli._has_credential()
+
+
+def test_posix_profile_lives_under_dot_config(monkeypatch, tmp_path):
+    no_credentials(monkeypatch, tmp_path, platform="linux")
+    profile_file(tmp_path / "appdata" / "Anthropic")  # ignored off Windows
+    assert not cli._has_credential()
+    profile_file(tmp_path / "home" / ".config" / "anthropic")
+    assert cli._has_credential()
+
+
+def test_config_dir_env_overrides_the_platform_default(monkeypatch, tmp_path):
+    no_credentials(monkeypatch, tmp_path)
+    profile_file(tmp_path / "appdata" / "Anthropic")
+    monkeypatch.setenv("ANTHROPIC_CONFIG_DIR", str(tmp_path / "custom"))
+    assert not cli._has_credential()
+    profile_file(tmp_path / "custom")
+    assert cli._has_credential()
+
+
+def test_active_profile_comes_from_env_then_pointer_file(monkeypatch, tmp_path):
+    no_credentials(monkeypatch, tmp_path)
+    config = tmp_path / "appdata" / "Anthropic"
+    profile_file(config, "default")
+    (config / "active_config").write_text("work\n", encoding="utf-8")
+    assert not cli._has_credential()  # the pointer names work, and work.json is missing
+    profile_file(config, "work")
+    assert cli._has_credential()
+    monkeypatch.setenv("ANTHROPIC_PROFILE", "dev")
+    assert not cli._has_credential()
+    profile_file(config, "dev")
+    assert cli._has_credential()
+    monkeypatch.setenv("ANTHROPIC_PROFILE", "../dev")  # the SDK rejects such a name
+    assert not cli._has_credential()
+
+
 def test_cli_run_without_credentials_exits_2(tmp_path, monkeypatch, capsys):
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
-    monkeypatch.setattr(cli.Path, "home", lambda: tmp_path / "nohome")
+    no_credentials(monkeypatch, tmp_path)
+    (tmp_path / "home" / ".config" / "anthropic").mkdir(parents=True)  # a bare directory
     called = []
     monkeypatch.setattr(cli, "make_client", lambda: called.append(1))
     assert main(run_args(tmp_path)) == 2
