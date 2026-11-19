@@ -46,7 +46,6 @@ def run_agent(
     }
     fresh, scores, to_score = plan_scoring(store, candidates)
     if to_score:
-        stats["scored"] = len(to_score)
         try:
             new = score_candidates(llm, to_score)
         except BudgetExceeded:
@@ -55,6 +54,7 @@ def run_agent(
         except (Refused, LLMError):
             stats["failed"] += 1
         else:
+            stats["scored"] = len(to_score)
             store.save_scores(new, now)
             scores = {**scores, **{s.cluster_id: s for s in new}}
     chosen = select(fresh, scores, max_stories)

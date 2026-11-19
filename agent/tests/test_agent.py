@@ -161,7 +161,7 @@ def test_scoring_error_scores_nothing_but_uses_cached(store, now, run_id):
     store.save_scores([score(candidates[0].cluster_id)], now - timedelta(days=1))
     llm = FakeLLM({"score": [LLMError("x")], "write": [draft()]})
     stats = run_agent(store, candidates, llm, http(), now, run_id)
-    assert stats["failed"] == 1 and stats["written"] == 1 and stats["scored"] == 1
+    assert stats["failed"] == 1 and stats["written"] == 1 and stats["scored"] == 0
     assert store.scores_for([c.cluster_id for c in candidates]).keys() == {candidates[0].cluster_id}
 
 
@@ -182,5 +182,5 @@ def test_scoring_blocked_by_budget_writes_nothing(store, now, run_id):
     candidates = world(store, now, count=2)
     llm = FakeLLM({"score": [BudgetExceeded("cap")]})
     stats = run_agent(store, candidates, llm, http(), now, run_id)
-    assert stats["budget_stopped"] is True and stats["written"] == 0
+    assert stats["budget_stopped"] is True and stats["written"] == 0 and stats["scored"] == 0
     assert [c["step"] for c in llm.calls] == ["score"]

@@ -159,9 +159,11 @@ def _run_agent_command(args: argparse.Namespace) -> int:
         run_id = store.start_run("run", now)
         stats, candidates = _collect_in_run(store, sources, client, now)
         meter = Meter(store, run_id, cap, clock=lambda: datetime.now(UTC))
-        stats |= run_agent(
+        agent = run_agent(
             store, candidates, _make_llm(meter), client, now, run_id, args.max_stories
         )
+        agent["stories_failed"] = agent.pop("failed")
+        stats |= agent
         tokens = meter.tokens_today()
         stats["llm_calls"] = meter.calls
         stats["tokens_today"] = tokens

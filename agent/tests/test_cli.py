@@ -323,3 +323,78 @@ def test_collect_still_does_not_import_anthropic_or_agent_modules():
         "sys.exit(1 if bad else 0)"
     )
     assert subprocess.run([sys.executable, "-c", code]).returncode == 0
+
+
+def metered_send(calls: list[dict]):
+    from types import SimpleNamespace
+
+    from radar.models import Draft, FactCard, Score, StoryText
+    from radar.score import ScoreBatch
+
+    text = StoryText(
+        title="Quantum robots launch", summary="Quantum robots launch today.", dev_line="Try it."
+    )
+    draft = Draft(
+        fact_card=FactCard(what="Launch.", who=[], numbers=[], versions=[]), tr=text, en=text
+    )
+
+    def send(**request):
+        calls.append(request)
+        if request["output_format"] is ScoreBatch:
+            ids = [int(ln[1 : ln.index("]")]) for ln in request["messages"][0]["content"].splitlines()]
+            scores = [
+                Score(cluster_id=i, relevance=5, novelty=5, usefulness=5, category="tooling")
+                for i in ids
+            ]
+            body, usage = ScoreBatch(scores=scores).model_dump_json(), (1000, 200)
+        else:
+            body, usage = draft.model_dump_json(), (2000, 200)
+        return SimpleNamespace(
+            model=request["model"],
+            usage=SimpleNamespace(input_tokens=usage[0], output_tokens=usage[1]),
+            stop_reason="end_turn",
+            stop_details=None,
+            content=[SimpleNamespace(type="text", text=body)],
+        )
+
+    return send
+
+
+def use_metered_llm(monkeypatch, now, calls):
+    from radar.llm import AnthropicLLM
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "dummy")
+    monkeypatch.setattr(cli, "make_client", lambda: run_client(now))
+    monkeypatch.setattr(cli, "_make_llm", lambda meter: AnthropicLLM(meter, send=metered_send(calls)))
+
+
+def test_cli_run_reports_metered_usage_and_budget_agrees(tmp_path, monkeypatch, now, capsys):
+    calls: list[dict] = []
+    use_metered_llm(monkeypatch, now, calls)
+    assert main(run_args(tmp_path, "--max-stories", "1")) == 0
+    stats = json.loads(capsys.readouterr().out.splitlines()[0])
+    # score: 1000 in / 200 out on haiku = 0.0002; write: 2000 in / 200 out on sonnet = 0.006
+    assert stats["llm_calls"] == 2 and len(calls) == 2
+    assert stats["tokens_today"] == 3400 and stats["cost_today_usd"] == 0.0062
+    assert stats["failed"] == [] and stats["stories_failed"] == 0 and stats["written"] == 1
+    assert main(["budget", "--db", str(tmp_path / "r.db")]) == 0
+    budget = json.loads(capsys.readouterr().out)
+    assert budget["spent_usd"] == 0.0062 and budget["tokens"] == 3400 and budget["calls"] == 2
+    assert budget["by_step"]["score"]["calls"] == 1 and budget["by_step"]["write"]["calls"] == 1
+
+
+def test_cli_budget_stop_keeps_exit_0_and_records_it(tmp_path, monkeypatch, now, capsys):
+    calls: list[dict] = []
+    use_metered_llm(monkeypatch, now, calls)
+    monkeypatch.setenv("RADAR_DAILY_CAP_USD", "0.01")  # scoring fits, a writer call does not
+    assert main(run_args(tmp_path, "--max-stories", "1")) == 0
+    stats = json.loads(capsys.readouterr().out.splitlines()[0])
+    assert stats["budget_stopped"] is True and stats["written"] == 0 and stats["llm_calls"] == 1
+    store = SqliteStore(str(tmp_path / "r.db"))
+    try:
+        run = store.last_run()
+        steps = {row["step"] for row in store.usage_since(now - timedelta(days=3650))}
+    finally:
+        store.close()
+    assert run["kind"] == "run" and run["stats"]["budget_stopped"] is True
+    assert steps == {"score"} and [c["output_format"].__name__ for c in calls] == ["ScoreBatch"]

@@ -45,9 +45,9 @@ uv run radar budget              # today's spend
 
 `radar run` needs an Anthropic credential: the environment variable `ANTHROPIC_API_KEY` (or `ANTHROPIC_AUTH_TOKEN`), or a login stored by the Anthropic CLI. Without one it prints a message and exits 2 before collecting. The key is read only by the SDK from the environment; Radar never stores or logs it.
 
-`radar run` prints one JSON line: the collector's statistics plus `scored`, `selected`, `written`, `published`, `review`, `skipped_thin`, `failed` (refusals and API errors), `budget_stopped`, `llm_calls`, `tokens_today`, `cost_today_usd` and `over_token_target`. Then it prints one line per story written: `<status>  <category>  <English title>`. Exit codes: 0 normally (also after a budget stop), 1 when every source failed, 2 for a missing credential or an invalid cap.
+`radar run` prints one JSON line: the collector's statistics (where `failed` lists the failed source ids) plus `scored`, `selected`, `written`, `published`, `review`, `skipped_thin`, `stories_failed` (refusals and API errors), `budget_stopped`, `llm_calls`, `tokens_today`, `cost_today_usd` and `over_token_target`. Then it prints one line per story written: `<status>  <category>  <English title>`. Exit codes: 0 normally (also after a budget stop), 1 when every source failed, 2 for a missing credential or an invalid cap.
 
-`--dry-run` collects, makes no model call and prints `would_score` (candidates that would be sent to the scorer), `worst_case_usd` (scoring them plus `--max-stories` writer calls at full source length) and `cap_usd`. That figure is a ceiling, not a forecast; real runs cost a small fraction of it.
+`--dry-run` collects, makes no model call and prints `would_score` (candidates that would be sent to the scorer), `worst_case_usd` (scoring them plus `--max-stories` writer calls at full source length) and `cap_usd`. That figure is a worst case, not a forecast. Real cost has not been measured yet.
 
 `radar budget` prints one JSON line for the current Istanbul day: `cap_usd`, `spent_usd`, `left_usd`, `tokens`, `calls` and a `by_step` breakdown.
 

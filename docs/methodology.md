@@ -53,4 +53,4 @@ Nothing leaves the local database in this version, so `published` means "passed 
 
 ## How stories are labelled
 
-Every story keeps its category, its status and reasons, the scores, the primary source URL and the number of sources that covered it, and both language versions. The wording is plain, with no hype words, emojis or first person. A story is AI-assisted: it is written by a model from the cited source and checked by the rules above.
+Every story keeps its category, its status and reasons, the scores, the primary source URL and the number of sources that covered it, and both language versions. The writer is instructed to avoid hype words, emojis and the first person, but the verifier does not check that. No separate "AI-assisted" label is stored; the stored data is what is listed above.
