@@ -43,16 +43,15 @@ def _check_lengths(draft: Draft) -> list[str]:
 
 
 def _check_numbers(draft: Draft, source: str) -> list[str]:
-    source = source.replace(",", ".")
+    source_numbers = set(_NUMBER.findall(source.replace(",", ".")))
     fields = _text_fields(draft)
     fields += [("fact_card.numbers", t) for t in draft.fact_card.numbers]
     fields += [("fact_card.versions", t) for t in draft.fact_card.versions]
     issues: list[str] = []
     for where, text in fields:
         for raw in _NUMBER.findall(text):
-            pattern = r"(?<![\d.])" + re.escape(raw.replace(",", ".")) + r"(?!\d)"
             issue = f"{where}: number '{raw}' not in source"
-            if not re.search(pattern, source) and issue not in issues:
+            if raw.replace(",", ".") not in source_numbers and issue not in issues:
                 issues.append(issue)
     return issues
 

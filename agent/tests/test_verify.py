@@ -201,3 +201,20 @@ def test_route_sends_issues_risk_and_missing_primary_to_review():
 def test_invented_number_routes_to_review():
     issues = verify(draft(en=story(summary="Up 40%.")), doc())
     assert route(candidate(), score_with(), issues)[0] == "review"
+
+
+def test_number_must_equal_a_whole_source_token():
+    d = draft(en=story(summary="Google 1."))
+    assert verify(d, doc(SRC.replace("1.0", "1.5"))) == ["en.summary: number '1' not in source"]
+    d = draft(en=story(summary="Google 40."))
+    assert verify(d, doc(SRC + " 40.5")) == ["en.summary: number '40' not in source"]
+
+
+def test_number_at_end_of_source_sentence_matches():
+    d = draft(en=story(summary="Google 7."))
+    assert verify(d, doc(SRC + " Released 7.")) == []
+
+
+def test_thousands_separator_matches_same_form():
+    d = draft(en=story(summary="Google 10,000."))
+    assert verify(d, doc(SRC + " Over 10,000 users.")) == []
