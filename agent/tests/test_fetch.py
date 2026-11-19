@@ -147,3 +147,29 @@ def test_make_client_defaults():
         assert c.timeout.read == 15
         assert c.headers["user-agent"] == "radar-bot/0.1 (+https://radar.ozkanyusuf.com)"
         assert c.follow_redirects is True
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        b"<html><head><title>503</title></head><body><h1>503</h1></body></html>",
+        b"<!DOCTYPE html><html><body><p>Service unavailable</p></body></html>",
+        b'<html xmlns="http://www.w3.org/1999/xhtml"><body><h1>503</h1></body></html>',
+    ],
+)
+def test_well_formed_html_page_is_a_failed_source(now, body):
+    s = src("a")
+    with pytest.raises(ValueError, match="not a feed"):
+        fetch_feed(s, client_for({s.url: body}), now)
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        b'<?xml version="1.0"?><rss version="2.0"><channel><title>t</title></channel></rss>',
+        b'<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><title>t</title></feed>',
+    ],
+)
+def test_valid_empty_feed_is_not_a_failure(now, body):
+    s = src("a")
+    assert fetch_feed(s, client_for({s.url: body}), now) == []

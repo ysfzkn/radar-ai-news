@@ -38,6 +38,7 @@ def fetch_feed(source: Source, client: httpx.Client, now: datetime) -> list[RawI
                 published_at=_published(entry, now),
             )
         )
-    if not items and parsed.get("bozo"):  # HTML error page or truncated/malformed XML
+    # Unrecognised document (even well-formed HTML has an empty version) or broken XML.
+    if not items and (parsed.get("bozo") or not parsed.get("version")):
         raise ValueError("not a feed")
     return limit_items(items, now)
