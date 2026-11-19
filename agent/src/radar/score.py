@@ -33,6 +33,10 @@ def _line(c: Candidate) -> str:
     )
 
 
+def score_user_message(candidates: list[Candidate]) -> str:
+    return "\n".join(_line(c) for c in candidates)
+
+
 def score_candidates(llm: LLM, candidates: list[Candidate]) -> list[Score]:
     if not candidates:
         return []
@@ -40,7 +44,7 @@ def score_candidates(llm: LLM, candidates: list[Candidate]) -> list[Score]:
         step="score",
         model=SCORE_MODEL,
         system=SYSTEM,
-        user="\n".join(_line(c) for c in candidates),
+        user=score_user_message(candidates),
         schema=ScoreBatch,
         max_tokens=4000,
         effort="low",

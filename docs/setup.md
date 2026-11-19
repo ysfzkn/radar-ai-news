@@ -1,6 +1,6 @@
 # Setup
 
-This page covers running the Radar collector on your own machine. It needs no API key and no account, and it makes no model calls.
+This page covers running Radar on your own machine. The collector (`radar collect`) needs no API key and no account and makes no model calls. The agent (`radar run`) calls the Anthropic API and needs a key; see [Run the agent](#run-the-agent).
 
 ## Prerequisites
 
@@ -28,6 +28,29 @@ uv run radar check-sources
 ```
 
 It prints one line per source, `<id>: ok <n> items` or `<id>: FAIL <reason>`, and always exits 0. A source that is `ok` with 0 items simply published nothing in the last 72 hours.
+
+## Run the agent
+
+1. Create an Anthropic API key in the Anthropic Console and put it in your environment (copy `.env.example` to `.env` for reference). Never commit it:
+
+   ```bash
+   export ANTHROPIC_API_KEY=...   # your own key
+   ```
+
+2. Preview the cost without spending anything. This collects, makes no model call and prints the number of candidates and a worst-case cost:
+
+   ```bash
+   uv run radar run --dry-run
+   ```
+
+3. Make the first paid run small:
+
+   ```bash
+   uv run radar run --max-stories 2
+   uv run radar budget
+   ```
+
+Model calls are capped at $0.25 per day (change it with `RADAR_DAILY_CAP_USD`). The meter's prices are a snapshot; check them against Anthropic's pricing page. Stories are written to the local database only; nothing is published. Details: [agent.md](agent.md) and [methodology.md](methodology.md).
 
 ## Where the data lives
 

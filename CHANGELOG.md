@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Repository scaffold, community files and CI.
 
+## [0.2.0] - 2026-11-19
+
+### Added
+
+- `radar run`: scores candidates, writes bilingual (Turkish and English) stories with a fact card, verifies them against the source and routes each one to `published` or `review`. Results are stored locally only.
+- `radar run --dry-run` (collect and show the worst-case cost, no model call) and `radar budget` (today's spend per step).
+- Hard daily spend cap of $0.25 (override with `RADAR_DAILY_CAP_USD`), per-call usage records and a 30,000-token daily target report.
+- Deterministic verifier (length, numbers, names, link) and risk routing.
+- Documentation: `docs/agent.md` and `docs/methodology.md`.
+
 ## [0.1.0] - 2026-11-19
 
 ### Added
