@@ -341,7 +341,8 @@ def metered_send(calls: list[dict]):
     def send(**request):
         calls.append(request)
         if request["output_format"] is ScoreBatch:
-            ids = [int(ln[1 : ln.index("]")]) for ln in request["messages"][0]["content"].splitlines()]
+            lines = request["messages"][0]["content"].splitlines()
+            ids = [int(ln[1 : ln.index("]")]) for ln in lines]
             scores = [
                 Score(cluster_id=i, relevance=5, novelty=5, usefulness=5, category="tooling")
                 for i in ids
@@ -365,7 +366,8 @@ def use_metered_llm(monkeypatch, now, calls):
 
     monkeypatch.setenv("ANTHROPIC_API_KEY", "dummy")
     monkeypatch.setattr(cli, "make_client", lambda: run_client(now))
-    monkeypatch.setattr(cli, "_make_llm", lambda meter: AnthropicLLM(meter, send=metered_send(calls)))
+    send = metered_send(calls)
+    monkeypatch.setattr(cli, "_make_llm", lambda meter: AnthropicLLM(meter, send=send))
 
 
 def test_cli_run_reports_metered_usage_and_budget_agrees(tmp_path, monkeypatch, now, capsys):
