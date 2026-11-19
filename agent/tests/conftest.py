@@ -42,6 +42,14 @@ def store(tmp_path):
                 kind="hn",
                 url="https://hacker-news.firebaseio.com/v0",
             ),
+            Source(
+                id="webrazzi-ai",
+                name="Webrazzi AI",
+                tier=Tier.TURKEY,
+                kind="feed",
+                url="https://webrazzi.com/feed/",
+                lang="tr",
+            ),
         ]
     )
     yield s
