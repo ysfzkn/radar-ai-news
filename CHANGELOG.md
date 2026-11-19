@@ -16,7 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Admin service (`admin/`, a Cloudflare Worker with D1): ingest endpoint, review queue and story screens in Turkish, edit, approve, reject and unpublish, Cloudflare Access sign-in verified by the Worker, hourly expiry of review stories after 72 hours.
-- `radar push` sends finished stories to the admin service.
+- `radar push` sends finished stories to the admin service. A story the admin service refuses is skipped and listed under `rejected` (exit code 1) without holding up the others; it stays unpushed.
+- `radar run` reports `unavailable`: write requests that got no reply from the API (connection error, timeout, HTTP error status). They are not counted as attempts, so an outage or a rate limit does not use up a story's retries.
 - `npm run seed` loads three invented demo stories into a local server; the local trial needs no account.
 - Documentation: `docs/admin.md`.
 

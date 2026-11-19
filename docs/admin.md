@@ -71,7 +71,7 @@ You need Node 22 and no Cloudflare account. Nothing here calls a paid API.
 ```bash
 cd admin
 cp .dev.vars.example .dev.vars    # PowerShell: Copy-Item .dev.vars.example .dev.vars
-npm install
+npm ci
 npm run db:migrate:local
 npm run dev                       # leave it running; serves http://localhost:8787
 ```
@@ -105,7 +105,13 @@ uv run radar push
 
 `radar push` only sends stories that exist in the local agent database. Normally that means `radar run` (which calls the paid Anthropic API) has written some; with none, it prints zeros.
 
-`radar push` sends every story it has not pushed yet and prints `{"pushed": N, "duplicates": N, "batches": N}`. Running it again right away pushes nothing. It sends the token only to `https://` addresses, or to `http://` on `localhost`, `127.0.0.1` or `[::1]`, and it does not follow redirects.
+`radar push` sends every story it has not pushed yet and prints `{"pushed": N, "duplicates": N, "batches": N, "rejected": [...]}`. Running it again right away pushes nothing. It sends the token only to `https://` addresses, or to `http://` on `localhost`, `127.0.0.1` or `[::1]`, and it does not follow redirects.
+
+### When a push is refused
+
+Before sending, `radar push` trims what it safely can to the ingest limits: at most 20 reasons of 300 characters; at most 30 `who`, `numbers` and `versions` entries of 200 characters; `what` to 1000 characters; at most 30 sources; and a `try_url` that is not an `http://` or `https://` link of at most 2000 characters is sent as no link. The texts and the source links are sent as stored.
+
+If the Worker still refuses a story (for example an empty or over-long text, or a source link it cannot parse), that story is skipped and the rest of its batch is sent again, so other stories are not held up. The skipped story's uid is listed under `rejected`, one line per skipped story on stderr names the field the Worker objected to, and the command exits 1. The story stays unpushed: it is tried again on every push until it is fixed or its cluster ages out.
 
 Checks: `npm run typecheck` and `npm test` in `admin/`.
 
@@ -125,6 +131,6 @@ These steps were written from Cloudflare's documentation and have not been run. 
    }
    ```
 
-   Both must be set. With only one of them set, or neither, sign-in answers 503 and nothing gets in. Optionally add `ADMIN_EMAILS` the same way. Do not set `DEV_NO_AUTH`. You can set variables in the Cloudflare dashboard instead, but by default `wrangler deploy` treats `wrangler.jsonc` as the source of truth and overwrites dashboard variables, unless `keep_vars` is set to `true` (this is described in the installed wrangler's config schema; I did not run it).
+   Both must be set. With only one of them set, or neither, sign-in answers 503 and nothing gets in. Optionally add `ADMIN_EMAILS` the same way. Do not set `DEV_NO_AUTH`. You can set variables in the Cloudflare dashboard instead, but by default `wrangler deploy` treats `wrangler.jsonc` as the source of truth and overwrites dashboard variables, unless `keep_vars` is set to `true` (this is described in the installed wrangler's config schema).
 5. Deploy: `npx wrangler deploy`. The hourly expiry cron (`17 * * * *`) in `wrangler.jsonc` is registered by the deploy.
 6. Check that `/healthz` answers `ok` and that `/admin` asks you to sign in.

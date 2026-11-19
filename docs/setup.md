@@ -55,7 +55,7 @@ A profile saved by the Anthropic CLI login works too; [agent.md](agent.md) lists
 
 ## Review and publish
 
-Stories the agent is unsure about wait in a review queue in the admin service (`admin/`, a Cloudflare Worker). `radar push` sends finished stories there; a person edits, approves or rejects them. You can try the whole screen on your machine with demo data, with no account and no paid call. See [admin.md](admin.md).
+Stories the agent is unsure about wait in a review queue in the admin service (`admin/`, a Cloudflare Worker). `radar push` sends finished stories there; a person edits, approves or rejects them. You can try the whole screen on your machine with demo data, with no account and no paid call. This part needs Node 22 as well as Python. See [admin.md](admin.md).
 
 ## Where the data lives
 

@@ -6,7 +6,7 @@
       "category": "framework",
       "status": "review",
       "age_hours": 2,
-      "reasons": ["en.summary: number 3x not in source"],
+      "reasons": ["verify: fact_card.numbers: number '3' not in source"],
       "score": {"relevance": 4, "novelty": 4, "usefulness": 5, "total": 4.3, "risk_flags": []},
       "fact_card": {
         "what": "Demo data: the invented Lumenkit 2.0 framework ships a rewritten task scheduler.",
@@ -39,7 +39,7 @@
       "category": "security",
       "status": "review",
       "age_hours": 68,
-      "reasons": ["risk flag: security_incident"],
+      "reasons": ["verify: tr.title: too long (100 > 90)", "risk: security_incident"],
       "score": {"relevance": 5, "novelty": 3, "usefulness": 4, "total": 4.0, "risk_flags": ["security_incident"]},
       "fact_card": {
         "what": "Demo data: a vulnerability is reported in the invented Bulutkapi 3 gateway.",
@@ -55,7 +55,7 @@
       ],
       "texts": {
         "tr": {
-          "title": "Kuzeyrüzgar Bulutkapı 3 için güvenlik açığı bildirildi; kullanıcılar güncellemeyi bekleyip önlem al.",
+          "title": "Kuzeyrüzgar Bulutkapı 3 için güvenlik açığı bildirildi; kullanıcılar yama çıkana kadar önlem almalı.",
           "summary": "Uydurma Bulutkapı 3 ağ geçidinde bir açık bildirildi. Bu bir deneme verisidir; gerçek bir haber değildir.",
           "dev_line": "Üretimde kullanıyorsanız duyuruyu okuyup geçici önlemleri uygulayın."
         },
