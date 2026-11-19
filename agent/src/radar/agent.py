@@ -6,7 +6,7 @@ import httpx
 
 from radar.budget import BudgetExceeded, day_start
 from radar.cluster import WINDOW
-from radar.llm import LLM, LLMError, Refused
+from radar.llm import LLM, LLMError, LLMUnavailable, Refused
 from radar.models import Candidate, Score
 from radar.score import MAX_EDITION, score_candidates, select
 from radar.source import build_source, is_thin
@@ -58,6 +58,7 @@ def run_agent(
         "skipped_thin": 0,
         "skipped_retry": 0,
         "failed": 0,
+        "unavailable": 0,
         "scoring_failed": False,
         "budget_stopped": False,
     }
@@ -98,6 +99,10 @@ def run_agent(
         except BudgetExceeded:
             stats["budget_stopped"] = True
             break
+        except LLMUnavailable:
+            # No reply came back, so nothing was paid: not an attempt (ruling R7).
+            stats["unavailable"] += 1
+            continue
         except (Refused, LLMError) as exc:
             stats["failed"] += 1
             outcome = "refused" if isinstance(exc, Refused) else "failed"

@@ -20,6 +20,11 @@ class LLMError(Exception):
     """API, connection or validation failure after the SDK's own retries."""
 
 
+class LLMUnavailable(LLMError):
+    """The request itself failed (connection, timeout or an HTTP error status): no reply came
+    back to record, so the story was not attempted."""
+
+
 class LLM(Protocol):
     def parse(
         self,
@@ -62,6 +67,9 @@ def _default_send(**request: Any) -> Any:
         }
         namespace = _client.beta.messages if "betas" in request else _client.messages
         return namespace.create(**request)
+    except (anthropic.APIConnectionError, anthropic.APIStatusError) as exc:
+        # APIConnectionError covers APITimeoutError; APIStatusError covers every 4xx/5xx.
+        raise LLMUnavailable(f"{type(exc).__name__}: {exc}") from exc
     except anthropic.AnthropicError as exc:
         raise LLMError(f"{type(exc).__name__}: {exc}") from exc
 

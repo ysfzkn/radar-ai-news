@@ -257,6 +257,66 @@ def test_default_send_translates_sdk_errors(monkeypatch, kind):
     assert "output_format" not in seen[0]
 
 
+def _send_raising(monkeypatch, exc):
+    from radar.llm import _default_send
+
+    _stub_anthropic(monkeypatch, exc, [])
+    _default_send(
+        model="m",
+        max_tokens=1,
+        system="s",
+        messages=[],
+        output_format=Out,
+        output_config={"effort": "low"},
+    )
+
+
+@pytest.mark.parametrize("kind", ["connection", "timeout", "429", "500", "400"])
+def test_request_that_got_no_reply_is_llm_unavailable(monkeypatch, kind):
+    import anthropic
+    import httpx
+
+    from radar.llm import LLMUnavailable
+
+    req = httpx.Request("POST", "https://example.invalid")
+
+    def status(code):
+        return anthropic.APIStatusError(
+            "bad", response=httpx.Response(code, request=req), body=None
+        )
+
+    exc = {
+        "connection": lambda: anthropic.APIConnectionError(request=req),
+        "timeout": lambda: anthropic.APITimeoutError(request=req),
+        "429": lambda: status(429),
+        "500": lambda: status(500),
+        "400": lambda: status(400),
+    }[kind]()
+    with pytest.raises(LLMUnavailable):
+        _send_raising(monkeypatch, exc)
+
+
+def test_other_sdk_error_is_plain_llm_error(monkeypatch):
+    import anthropic
+
+    from radar.llm import LLMUnavailable
+
+    with pytest.raises(LLMError) as info:
+        _send_raising(monkeypatch, anthropic.AnthropicError("no key"))
+    assert not isinstance(info.value, LLMUnavailable)
+
+
+@pytest.mark.parametrize("bad", [dict(text='{"other": 1}'), dict(stop_reason="max_tokens")])
+def test_bad_reply_after_a_response_is_not_llm_unavailable(store, bad):
+    from radar.llm import LLMUnavailable
+
+    llm, _ = make(store, reply(**bad))
+    with pytest.raises(LLMError) as info:
+        call(llm)
+    assert not isinstance(info.value, LLMUnavailable)
+    assert len(usage(store)) == 1
+
+
 def test_client_is_built_with_one_retry_and_a_timeout(monkeypatch):
     import anthropic
 

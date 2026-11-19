@@ -5,7 +5,7 @@ import httpx
 from fakes import FakeLLM
 from radar.agent import run_agent
 from radar.budget import BudgetExceeded
-from radar.llm import LLMError, Refused
+from radar.llm import LLMError, LLMUnavailable, Refused
 from radar.models import Candidate, Draft, FactCard, RawItem, Score, StoryText
 from radar.score import ScoreBatch
 
@@ -96,6 +96,7 @@ def test_run_agent_happy_path(store, now, run_id):
         "skipped_thin": 0,
         "skipped_retry": 0,
         "failed": 0,
+        "unavailable": 0,
         "scoring_failed": False,
         "budget_stopped": False,
     }
@@ -269,6 +270,27 @@ def test_failed_story_is_retried_the_next_day_and_given_up_after_three(store, no
     llm = FakeLLM({"write": [draft()]})
     stats = run_agent(store, candidates, llm, http(), at, store.start_run("run", at))
     assert llm.calls == [] and stats["skipped_retry"] == 1 and stats["written"] == 0
+
+
+def test_unavailable_api_records_no_attempt_and_moves_on(store, now, run_id):
+    candidates = world(store, now, count=2)
+    first, second = (c.cluster_id for c in candidates)
+    llm = FakeLLM(
+        {
+            "score": [ScoreBatch(scores=[score(first), score(second)])],
+            "write": [LLMUnavailable("APIConnectionError"), draft()],
+        }
+    )
+    stats = run_agent(store, candidates, llm, http(), now, run_id)
+    assert stats["unavailable"] == 1 and stats["failed"] == 0 and stats["written"] == 1
+    assert _attempts(store, first) == []
+    assert [s.cluster_id for s in store.stories_since(now)] == [second]
+    later = now + timedelta(hours=1)
+    llm2 = FakeLLM({"write": [draft()]})
+    again = run_agent(store, candidates, llm2, http(), later, store.start_run("run", later))
+    assert again["skipped_retry"] == 0 and again["written"] == 1
+    assert [c["step"] for c in llm2.calls] == ["write"]
+    assert sorted(s.cluster_id for s in store.stories_since(now)) == sorted([first, second])
 
 
 def test_refusal_and_thin_source_are_recorded_with_their_own_outcome(store, now, run_id):
