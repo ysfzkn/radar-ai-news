@@ -152,7 +152,7 @@ def _run_dry(args: argparse.Namespace, cap: float) -> int:
     client = make_client()
     try:
         stats, candidates = _collect(store, sources, client, datetime.now(UTC))
-        to_score = plan_scoring(store, candidates)[2]
+        to_score = plan_scoring(store, candidates, datetime.now(UTC))[2]
     finally:
         client.close()
         store.close()

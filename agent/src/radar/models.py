@@ -61,6 +61,7 @@ RiskFlag = Literal[
     "security_incident", "accusation", "funding_figure", "third_party_benchmark", "regulation"
 ]
 Status = Literal["published", "review"]
+Outcome = Literal["thin", "failed", "refused"]
 
 
 class Score(BaseModel):
@@ -105,6 +106,7 @@ class SourceDoc(BaseModel):
 
 class Story(BaseModel):
     id: int
+    uid: str
     cluster_id: int
     run_id: int
     category: Category
@@ -116,3 +118,4 @@ class Story(BaseModel):
     source_count: int
     created_at: AwareDatetime
     published_at: AwareDatetime | None
+    pushed_at: AwareDatetime | None = None

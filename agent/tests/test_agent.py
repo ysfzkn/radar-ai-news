@@ -94,6 +94,7 @@ def test_run_agent_happy_path(store, now, run_id):
         "published": 1,
         "review": 1,
         "skipped_thin": 0,
+        "skipped_retry": 0,
         "failed": 0,
         "scoring_failed": False,
         "budget_stopped": False,
@@ -230,3 +231,57 @@ def test_scoring_blocked_by_budget_writes_nothing(store, now, run_id):
     stats = run_agent(store, candidates, llm, http(), now, run_id)
     assert stats["budget_stopped"] is True and stats["written"] == 0 and stats["scored"] == 0
     assert [c["step"] for c in llm.calls] == ["score"]
+
+
+def _attempts(store, cluster_id):
+    return store._conn.execute(
+        "SELECT outcome FROM story_attempts WHERE cluster_id = ? ORDER BY id", (cluster_id,)
+    ).fetchall()
+
+
+def test_failed_story_is_not_retried_the_same_day(store, now, run_id):
+    candidates = world(store, now, count=1)
+    cid = candidates[0].cluster_id
+    llm = FakeLLM({"score": [ScoreBatch(scores=[score(cid)])], "write": [LLMError("x")]})
+    first = run_agent(store, candidates, llm, http(), now, run_id)
+    assert first["failed"] == 1
+    assert [r["outcome"] for r in _attempts(store, cid)] == ["failed"]
+    llm2 = FakeLLM({"write": [draft()]})
+    later = now + timedelta(hours=1)
+    again = run_agent(store, candidates, llm2, http(), later, store.start_run("run", later))
+    assert again["written"] == 0 and again["skipped_retry"] == 1
+    assert llm2.calls == []
+
+
+def test_failed_story_is_retried_the_next_day_and_given_up_after_three(store, now, run_id):
+    candidates = world(store, now, count=1)
+    cid = candidates[0].cluster_id
+    llm = FakeLLM({"score": [ScoreBatch(scores=[score(cid)])], "write": [LLMError("x")]})
+    run_agent(store, candidates, llm, http(), now, run_id)
+    for days in (1, 2):
+        at = now + timedelta(days=days)
+        llm = FakeLLM({"write": [LLMError("x")]})
+        stats = run_agent(store, candidates, llm, http(), at, store.start_run("run", at))
+        assert [c["step"] for c in llm.calls] == ["write"]
+        assert stats["failed"] == 1 and stats["skipped_retry"] == 0
+    assert len(_attempts(store, cid)) == 3
+    at = now + timedelta(days=3)
+    llm = FakeLLM({"write": [draft()]})
+    stats = run_agent(store, candidates, llm, http(), at, store.start_run("run", at))
+    assert llm.calls == [] and stats["skipped_retry"] == 1 and stats["written"] == 0
+
+
+def test_refusal_and_thin_source_are_recorded_with_their_own_outcome(store, now, run_id):
+    candidates = world(store, now, count=2)
+    llm = FakeLLM(
+        {
+            "score": [ScoreBatch(scores=[score(candidates[0].cluster_id)])],
+            "write": [Refused("no")],
+        }
+    )
+    run_agent(store, candidates[:1], llm, http(), now, run_id)
+    assert [r["outcome"] for r in _attempts(store, candidates[0].cluster_id)] == ["refused"]
+    llm2 = FakeLLM({"score": [ScoreBatch(scores=[score(candidates[1].cluster_id)])]})
+    later = now + timedelta(days=1)
+    run_agent(store, candidates[1:], llm2, http(ok=False), later, store.start_run("run", later))
+    assert [r["outcome"] for r in _attempts(store, candidates[1].cluster_id)] == ["thin"]

@@ -14,15 +14,30 @@ from radar.store import SqliteStore
 from radar.verify import route, verify
 from radar.write import write_story
 
+MAX_ATTEMPTS = 3
+
 
 def plan_scoring(
-    store: SqliteStore, candidates: list[Candidate]
-) -> tuple[list[Candidate], dict[int, Score], list[Candidate]]:
-    """Return (fresh candidates, cached scores for them, candidates still to score)."""
+    store: SqliteStore, candidates: list[Candidate], now: datetime
+) -> tuple[list[Candidate], dict[int, Score], list[Candidate], int]:
+    """Return (fresh candidates, their cached scores, still to score, skipped_retry).
+
+    A cluster that already failed is left out once it has MAX_ATTEMPTS attempts, or when it
+    was attempted today (Istanbul day).
+    """
     written = store.story_cluster_ids([c.cluster_id for c in candidates])
-    fresh = [c for c in candidates if c.cluster_id not in written]
+    unwritten = [c for c in candidates if c.cluster_id not in written]
+    attempts = store.attempts_for([c.cluster_id for c in unwritten])
+    today = day_start(now)
+
+    def blocked(c: Candidate) -> bool:
+        tries = attempts.get(c.cluster_id, [])
+        return len(tries) >= MAX_ATTEMPTS or any(at >= today for at in tries)
+
+    fresh = [c for c in unwritten if not blocked(c)]
     cached = store.scores_for([c.cluster_id for c in fresh])
-    return fresh, cached, [c for c in fresh if c.cluster_id not in cached]
+    to_score = [c for c in fresh if c.cluster_id not in cached]
+    return fresh, cached, to_score, len(unwritten) - len(fresh)
 
 
 def run_agent(
@@ -41,6 +56,7 @@ def run_agent(
         "published": 0,
         "review": 0,
         "skipped_thin": 0,
+        "skipped_retry": 0,
         "failed": 0,
         "scoring_failed": False,
         "budget_stopped": False,
@@ -49,7 +65,7 @@ def run_agent(
     limit = max(0, max_stories - len(store.stories_since(day_start(now))))
     if limit == 0:
         return stats
-    fresh, scores, to_score = plan_scoring(store, candidates)
+    fresh, scores, to_score, stats["skipped_retry"] = plan_scoring(store, candidates, now)
     if to_score:
         try:
             new = score_candidates(llm, to_score)
@@ -72,6 +88,9 @@ def run_agent(
         doc = build_source(candidate, cluster, client)
         if is_thin(doc):
             stats["skipped_thin"] += 1
+            store.record_attempt(
+                cluster_id=candidate.cluster_id, run_id=run_id, outcome="thin", at=now
+            )
             continue
         score = scores[candidate.cluster_id]
         try:
@@ -79,8 +98,12 @@ def run_agent(
         except BudgetExceeded:
             stats["budget_stopped"] = True
             break
-        except (Refused, LLMError):
+        except (Refused, LLMError) as exc:
             stats["failed"] += 1
+            outcome = "refused" if isinstance(exc, Refused) else "failed"
+            store.record_attempt(
+                cluster_id=candidate.cluster_id, run_id=run_id, outcome=outcome, at=now
+            )
             continue
         status, reasons = route(candidate, score, verify(draft, doc))
         store.insert_story(

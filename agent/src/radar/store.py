@@ -1,5 +1,6 @@
 import json
 import sqlite3
+import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -7,6 +8,7 @@ from radar.models import (
     Cluster,
     Draft,
     FactCard,
+    Outcome,
     RawItem,
     Score,
     Source,
@@ -249,8 +251,8 @@ class SqliteStore:
         with self._conn:
             cur = self._conn.execute(
                 "INSERT INTO stories (cluster_id, run_id, category, status, reasons, score, "
-                "fact_card, source_url, source_count, created_at, published_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "fact_card, source_url, source_count, created_at, published_at, uid) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     cluster_id,
                     run_id,
@@ -263,6 +265,7 @@ class SqliteStore:
                     source_count,
                     _iso(created_at),
                     published_at,
+                    uuid.uuid4().hex,
                 ),
             )
             story_id = cur.lastrowid
@@ -283,6 +286,59 @@ class SqliteStore:
             sql += " AND status = ?"
             params.append(status)
         sql += " ORDER BY created_at, id"
+        return self._stories(sql, params)
+
+    def unpushed_stories(self) -> list[Story]:
+        return self._stories(
+            "SELECT * FROM stories WHERE pushed_at IS NULL ORDER BY created_at, id", []
+        )
+
+    def mark_pushed(self, uids: list[str], at: datetime) -> None:
+        with self._conn:
+            self._conn.executemany(
+                "UPDATE stories SET pushed_at = ? WHERE uid = ?", [(_iso(at), uid) for uid in uids]
+            )
+
+    def story_sources(self, cluster_id: int) -> list[dict]:
+        rows = self._conn.execute(
+            "SELECT s.name AS name, s.tier AS tier, i.url AS url FROM items i "
+            "JOIN sources s ON s.id = i.source_id WHERE i.cluster_id = ? "
+            "ORDER BY s.tier, i.published_at, i.id",
+            (cluster_id,),
+        )
+        seen: set[str] = set()
+        result = []
+        for r in rows:
+            if r["url"] in seen:
+                continue
+            seen.add(r["url"])
+            result.append({"name": r["name"], "url": r["url"], "tier": r["tier"]})
+        return result
+
+    def record_attempt(
+        self, *, cluster_id: int, run_id: int | None, outcome: Outcome, at: datetime
+    ) -> None:
+        with self._conn:
+            self._conn.execute(
+                "INSERT INTO story_attempts (cluster_id, run_id, outcome, at) VALUES (?, ?, ?, ?)",
+                (cluster_id, run_id, outcome, _iso(at)),
+            )
+
+    def attempts_for(self, cluster_ids: list[int]) -> dict[int, list[datetime]]:
+        if not cluster_ids:
+            return {}
+        marks = ",".join("?" * len(cluster_ids))
+        rows = self._conn.execute(
+            f"SELECT cluster_id, at FROM story_attempts WHERE cluster_id IN ({marks}) "
+            "ORDER BY at, id",
+            cluster_ids,
+        )
+        result: dict[int, list[datetime]] = {}
+        for r in rows:
+            result.setdefault(r["cluster_id"], []).append(_parse(r["at"]))
+        return result
+
+    def _stories(self, sql: str, params: list) -> list[Story]:
         stories = []
         for r in self._conn.execute(sql, params).fetchall():
             texts = {
@@ -294,6 +350,7 @@ class SqliteStore:
             stories.append(
                 Story(
                     id=r["id"],
+                    uid=r["uid"],
                     cluster_id=r["cluster_id"],
                     run_id=r["run_id"],
                     category=r["category"],
@@ -309,6 +366,7 @@ class SqliteStore:
                     source_count=r["source_count"],
                     created_at=_parse(r["created_at"]),
                     published_at=_parse(r["published_at"]) if r["published_at"] else None,
+                    pushed_at=_parse(r["pushed_at"]) if r["pushed_at"] else None,
                 )
             )
         return stories
