@@ -84,8 +84,9 @@ def test_system_prompt_asks_for_sentence_case_titles():
 def test_no_links_are_marked_none():
     llm = FakeLLM({"write": [_draft()]})
     write_story(llm, _candidate(), _score(), _doc(links=[]))
-    assert "Links found in the source:\n<links>\n(none)\n</links>\n\n<source>" in (
-        llm.calls[0]["user"]
+    assert (
+        "Links found in the source:\n<links>\n(none)\n</links>\n\n<source>"
+        in (llm.calls[0]["user"])
     )
 
 

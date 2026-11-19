@@ -20,6 +20,7 @@ Pull requests must pass `ruff` and `pytest` (run both from `agent/`):
 
 ```
 uv run ruff check .
+uv run ruff format --check .
 uv run pytest -q
 ```
 

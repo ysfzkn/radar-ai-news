@@ -21,9 +21,7 @@ class FetchReport:
 
 
 def make_client() -> httpx.Client:
-    return httpx.Client(
-        timeout=15.0, headers={"User-Agent": USER_AGENT}, follow_redirects=True
-    )
+    return httpx.Client(timeout=15.0, headers={"User-Agent": USER_AGENT}, follow_redirects=True)
 
 
 def _reason(exc: Exception) -> str:

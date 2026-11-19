@@ -8,8 +8,26 @@ _TAGS = re.compile(r"<[^>]*>")
 _SPACE = re.compile(r"\s+")
 _TOKEN = re.compile(r"[a-z0-9çğıöşü]+(?:\.[0-9]+)*")
 _STOPWORDS = frozenset(
-    {"a", "an", "the", "is", "are", "of", "for", "to", "in", "on", "and", "with",
-     "ve", "ile", "bir", "için", "de", "da"}
+    {
+        "a",
+        "an",
+        "the",
+        "is",
+        "are",
+        "of",
+        "for",
+        "to",
+        "in",
+        "on",
+        "and",
+        "with",
+        "ve",
+        "ile",
+        "bir",
+        "için",
+        "de",
+        "da",
+    }
 )
 
 

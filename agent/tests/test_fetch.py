@@ -103,9 +103,7 @@ def test_hn_maps_points_and_falls_back_to_item_url(now):
     items = fetch_hn(s, client_for({s.url: fixture("hn.json")}), now)
     by_url = {i.url: i for i in items}
     assert len(items) == 3
-    assert [i.published_at for i in items] == sorted(
-        (i.published_at for i in items), reverse=True
-    )
+    assert [i.published_at for i in items] == sorted((i.published_at for i in items), reverse=True)
     assert by_url["https://github.com/RunanywhereAI/trnrt"].points == 54
     assert by_url["https://news.ycombinator.com/item?id=50549188"].points == 56
     assert all(i.published_at.utcoffset() == timedelta(0) for i in items)

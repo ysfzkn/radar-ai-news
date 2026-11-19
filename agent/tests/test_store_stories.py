@@ -80,12 +80,22 @@ def test_stories_since_filters_by_status_and_time(store, cluster_id, run_id, sco
 
 def test_usage_roundtrip(store, run_id, now):
     store.record_usage(
-        run_id=run_id, step="score", model="claude-haiku-5-5",
-        input_tokens=1000, output_tokens=200, cost_usd=0.0002, at=now,
+        run_id=run_id,
+        step="score",
+        model="claude-haiku-5-5",
+        input_tokens=1000,
+        output_tokens=200,
+        cost_usd=0.0002,
+        at=now,
     )
     store.record_usage(
-        run_id=None, step="write", model="claude-sonnet-5-5",
-        input_tokens=3000, output_tokens=900, cost_usd=0.015, at=now,
+        run_id=None,
+        step="write",
+        model="claude-sonnet-5-5",
+        input_tokens=3000,
+        output_tokens=900,
+        cost_usd=0.015,
+        at=now,
     )
     rows = store.usage_since(now - timedelta(hours=1))
     assert [r["step"] for r in rows] == ["score", "write"]

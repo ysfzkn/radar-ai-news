@@ -76,9 +76,7 @@ def select(
     )
     chosen = eligible[:limit]
     cut = [
-        c
-        for c in eligible[limit:]
-        if c.is_turkey and scores[c.cluster_id].total >= TURKEY_TOTAL
+        c for c in eligible[limit:] if c.is_turkey and scores[c.cluster_id].total >= TURKEY_TOTAL
     ]
     swaps = 0
     for turkey in cut:
