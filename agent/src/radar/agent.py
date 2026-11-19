@@ -4,7 +4,7 @@ from datetime import datetime
 
 import httpx
 
-from radar.budget import BudgetExceeded
+from radar.budget import BudgetExceeded, day_start
 from radar.cluster import WINDOW
 from radar.llm import LLM, LLMError, Refused
 from radar.models import Candidate, Score
@@ -44,6 +44,10 @@ def run_agent(
         "failed": 0,
         "budget_stopped": False,
     }
+    # The edition is per Istanbul day: stories already written today count against it.
+    limit = max(0, max_stories - len(store.stories_since(day_start(now))))
+    if limit == 0:
+        return stats
     fresh, scores, to_score = plan_scoring(store, candidates)
     if to_score:
         try:
@@ -57,7 +61,7 @@ def run_agent(
             stats["scored"] = len(to_score)
             store.save_scores(new, now)
             scores = {**scores, **{s.cluster_id: s for s in new}}
-    chosen = select(fresh, scores, max_stories)
+    chosen = select(fresh, scores, limit)
     stats["selected"] = len(chosen)
     clusters = {c.id: c for c in store.clusters_since(now - WINDOW)}
     for candidate in chosen:

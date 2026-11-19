@@ -111,6 +111,43 @@ def test_second_run_makes_no_model_calls(store, now, run_id):
     assert llm2.calls == [] and again["scored"] == 0 and again["written"] == 0
 
 
+def test_full_edition_blocks_a_second_edition_the_same_day(store, now, run_id):
+    candidates = world(store, now, count=6)
+    batch = ScoreBatch(scores=[score(c.cluster_id) for c in candidates])
+    llm = FakeLLM({"score": [batch], "write": [draft(), draft()]})
+    first = run_agent(store, candidates, llm, http(), now, run_id, max_stories=2)
+    assert first["written"] == 2
+    llm2 = FakeLLM({})
+    later = now + timedelta(hours=2)
+    again = run_agent(store, candidates, llm2, http(), later, store.start_run("run", later), 2)
+    assert llm2.calls == [] and again["selected"] == 0 and again["written"] == 0
+    assert len(store.stories_since(now)) == 2
+
+
+def test_partial_edition_is_topped_up_to_the_limit_only(store, now, run_id):
+    candidates = world(store, now, count=6)
+    batch = ScoreBatch(scores=[score(c.cluster_id) for c in candidates])
+    llm = FakeLLM({"score": [batch], "write": [draft(), BudgetExceeded("cap")]})
+    first = run_agent(store, candidates, llm, http(), now, run_id, max_stories=2)
+    assert first["written"] == 1 and first["budget_stopped"] is True
+    llm2 = FakeLLM({"write": [draft(), draft(), draft()]})
+    again = run_agent(store, candidates, llm2, http(), now, store.start_run("run", now), 2)
+    assert again["selected"] == 1 and again["written"] == 1
+    assert [c["step"] for c in llm2.calls] == ["write"]
+    assert len(store.stories_since(now)) == 2
+
+
+def test_new_istanbul_day_starts_a_new_edition(store, now, run_id):
+    candidates = world(store, now, count=4)
+    batch = ScoreBatch(scores=[score(c.cluster_id) for c in candidates])
+    llm = FakeLLM({"score": [batch], "write": [draft(), draft()]})
+    run_agent(store, candidates, llm, http(), now, run_id, max_stories=2)
+    tomorrow = now + timedelta(days=1)  # 12:00 UTC is 15:00 in Istanbul, so this is the next day
+    llm2 = FakeLLM({"write": [draft(), draft()]})
+    again = run_agent(store, candidates, llm2, http(), tomorrow, store.start_run("run", now), 2)
+    assert again["written"] == 2
+
+
 def test_cached_scores_are_reused_for_unwritten_clusters(store, now, run_id):
     candidates = world(store, now, count=1)
     store.save_scores([score(candidates[0].cluster_id, total=1)], now - timedelta(days=1))
