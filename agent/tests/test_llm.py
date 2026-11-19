@@ -14,11 +14,8 @@ class Out(BaseModel):
     label: str
 
 
-OK = Out(label="ok")
-
-
 def reply(
-    parsed=OK,
+    text='{"label": "ok"}',
     stop_reason="end_turn",
     model="claude-haiku-5-5",
     input_tokens=1_000,
@@ -26,7 +23,10 @@ def reply(
     stop_details=None,
 ):
     return SimpleNamespace(
-        parsed_output=parsed,
+        content=[
+            SimpleNamespace(type="thinking", thinking="hmm"),
+            SimpleNamespace(type="text", text=text),
+        ],
         stop_reason=stop_reason,
         model=model,
         usage=SimpleNamespace(input_tokens=input_tokens, output_tokens=output_tokens),
@@ -86,7 +86,7 @@ def test_budget_exceeded_sends_nothing(store):
 
 def test_refusal_raises_refused_and_still_records(store):
     details = SimpleNamespace(category="cyber")
-    llm, _ = make(store, reply(parsed=None, stop_reason="refusal", stop_details=details))
+    llm, _ = make(store, reply(text="", stop_reason="refusal", stop_details=details))
     with pytest.raises(Refused, match="cyber"):
         call(llm)
     assert len(usage(store)) == 1
@@ -99,15 +99,15 @@ def test_truncated_reply_raises_llm_error(store):
     assert len(usage(store)) == 1
 
 
-def test_missing_parsed_object_raises_llm_error(store):
-    llm, _ = make(store, reply(parsed=None))
+def test_unparseable_reply_raises_llm_error_and_records(store):
+    llm, _ = make(store, reply(text='{"label": "cut'))
     with pytest.raises(LLMError):
         call(llm)
     assert len(usage(store)) == 1
 
 
-def test_wrong_parsed_type_raises_llm_error(store):
-    llm, _ = make(store, reply(parsed="nope"))
+def test_wrong_shape_raises_llm_error(store):
+    llm, _ = make(store, reply(text='{"other": 1}'))
     with pytest.raises(LLMError):
         call(llm)
 
@@ -118,13 +118,54 @@ def test_fallback_model_is_priced_by_the_response_model(store):
     assert usage(store)[0]["model"] == "claude-sonnet-5"
 
 
-def test_send_failure_becomes_llm_error(store):
-    def send(**kwargs):
-        raise LLMError("boom")
+def _stub_anthropic(monkeypatch, exc, seen):
+    import anthropic
 
-    llm = AnthropicLLM(Meter(store, None, 0.25, lambda: NOW), send=send)
+    class Messages:
+        def create(self, **kwargs):
+            seen.append(kwargs)
+            raise exc
+
+    class Stub:
+        def __init__(self):
+            self.messages = Messages()
+            self.beta = SimpleNamespace(messages=Messages())
+
+    monkeypatch.setattr(anthropic, "Anthropic", Stub)
+    monkeypatch.setattr("radar.llm._client", None)
+
+
+@pytest.mark.parametrize("kind", ["connection", "status", "base"])
+def test_default_send_translates_sdk_errors(monkeypatch, kind):
+    import anthropic
+    import httpx
+
+    from radar.llm import _default_send
+
+    req = httpx.Request("POST", "https://example.invalid")
+    exc = {
+        "connection": anthropic.APIConnectionError(request=req),
+        "status": anthropic.APIStatusError(
+            "bad", response=httpx.Response(500, request=req), body=None
+        ),
+        "base": anthropic.AnthropicError("no key"),
+    }[kind]
+    seen: list[dict] = []
+    _stub_anthropic(monkeypatch, exc, seen)
     with pytest.raises(LLMError):
-        call(llm)
+        _default_send(
+            model="m",
+            max_tokens=1,
+            system="s",
+            messages=[],
+            output_format=Out,
+            output_config={"effort": "low"},
+        )
+    fmt = seen[0]["output_config"]["format"]
+    assert fmt["type"] == "json_schema"
+    assert fmt["schema"]["properties"]["label"]["type"] == "string"
+    assert seen[0]["output_config"]["effort"] == "low"
+    assert "output_format" not in seen[0]
 
 
 def test_request_shape(store):

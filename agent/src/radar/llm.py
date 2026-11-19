@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from typing import Any, Protocol, TypeVar
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from radar.budget import Meter
 
@@ -38,15 +38,29 @@ _client: Any = None
 
 
 def _default_send(**request: Any) -> Any:
+    """Send one request; the only code that touches the SDK.
+
+    `request` carries `output_format` (a pydantic class); it is turned into the
+    json_schema output format here. The reply is returned raw (text blocks),
+    unvalidated, so the caller can record usage before validating.
+    """
     import anthropic
 
     global _client
     try:
         if _client is None:
             _client = anthropic.Anthropic()
+        schema = request.pop("output_format")
+        request["output_config"] = {
+            **request["output_config"],
+            "format": {
+                "type": "json_schema",
+                "schema": anthropic.transform_schema(schema.model_json_schema()),
+            },
+        }
         namespace = _client.beta.messages if "betas" in request else _client.messages
-        return namespace.parse(**request)
-    except (anthropic.APIStatusError, anthropic.APIConnectionError) as exc:
+        return namespace.create(**request)
+    except anthropic.AnthropicError as exc:
         raise LLMError(f"{type(exc).__name__}: {exc}") from exc
 
 
@@ -90,7 +104,8 @@ class AnthropicLLM:
             raise Refused(f"{step}: model refused" + (f" ({category})" if category else ""))
         if response.stop_reason == "max_tokens":
             raise LLMError(f"{step}: reply truncated at max_tokens={max_tokens}")
-        parsed = response.parsed_output
-        if not isinstance(parsed, schema):
-            raise LLMError(f"{step}: no valid {schema.__name__} in the reply")
-        return parsed
+        text = "".join(b.text for b in response.content if b.type == "text")
+        try:
+            return schema.model_validate_json(text)
+        except ValidationError as exc:
+            raise LLMError(f"{step}: reply is not a valid {schema.__name__}: {exc}") from exc
