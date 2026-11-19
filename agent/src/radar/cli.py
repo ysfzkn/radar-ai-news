@@ -1,4 +1,4 @@
-"""Command line entry point: `radar collect`, `radar run`, `radar budget`, `radar check-sources`."""
+"""Command line entry point: `radar collect`, `run`, `budget`, `check-sources` and `push`."""
 
 import argparse
 import json
@@ -280,6 +280,36 @@ def _run_check(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_push(args: argparse.Namespace) -> int:
+    from radar.push import PushError, allowed_url, push_stories
+
+    url = args.url or os.environ.get("RADAR_ADMIN_URL") or ""
+    token = os.environ.get("RADAR_INGEST_TOKEN") or ""
+    if not url:
+        print("Set RADAR_ADMIN_URL or pass --url (the admin service origin).", file=sys.stderr)
+        return 2
+    if not token:
+        print("Set RADAR_INGEST_TOKEN to push stories.", file=sys.stderr)
+        return 2
+    if not allowed_url(url):
+        print(
+            "The admin URL must be https://, or http:// to localhost, 127.0.0.1 or [::1].",
+            file=sys.stderr,
+        )
+        return 2
+    store = _open_store(args)
+    try:
+        with httpx.Client(timeout=30, follow_redirects=False) as client:
+            stats = push_stories(store, client, url, token, datetime.now(UTC))
+    except PushError as exc:
+        print(f"push failed: {exc}", file=sys.stderr)
+        return 1
+    finally:
+        store.close()
+    print(json.dumps(stats))
+    return 0
+
+
 def _positive_int(text: str) -> int:
     value = int(text)
     if value < 1:
@@ -314,6 +344,11 @@ def main(argv: list[str] | None = None) -> int:
     p_check = commands.add_parser("check-sources", help="fetch each source once and report")
     p_check.add_argument("--sources", default=DEFAULT_SOURCES)
     p_check.set_defaults(run=_run_check)
+
+    p_push = commands.add_parser("push", help="send finished stories to the admin service")
+    p_push.add_argument("--db", default=os.environ.get("RADAR_DB_PATH") or DEFAULT_DB)
+    p_push.add_argument("--url", default=None, help="admin origin (default: $RADAR_ADMIN_URL)")
+    p_push.set_defaults(run=_run_push)
 
     args = parser.parse_args(argv)
     return args.run(args)

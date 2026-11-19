@@ -551,3 +551,121 @@ def test_cli_budget_stop_keeps_exit_0_and_records_it(tmp_path, monkeypatch, now,
         store.close()
     assert run["kind"] == "run" and run["stats"]["budget_stopped"] is True
     assert steps == {"score"} and [c["output_format"].__name__ for c in calls] == ["ScoreBatch"]
+
+
+# --- radar push ---------------------------------------------------------------------------
+
+
+def push_db(tmp_path, now, count: int) -> str:
+    from radar.models import Draft, FactCard, Score, StoryText
+
+    path = str(tmp_path / "push.db")
+    store = SqliteStore(path, cli.MIGRATIONS)
+    run = store.start_run("run", now)
+    for n in range(count):
+        cluster = store.create_cluster(f"cluster {n}", now)
+        text = StoryText(title=f"t{n}", summary="s", dev_line="d")
+        store.insert_story(
+            cluster_id=cluster,
+            run_id=run,
+            status="review",
+            reasons=[],
+            score=Score(cluster_id=cluster, relevance=3, novelty=3, usefulness=3, category="model"),
+            draft=Draft(
+                fact_card=FactCard(what="x", who=[], numbers=[], versions=[]), tr=text, en=text
+            ),
+            source_url="https://example.com/a",
+            source_count=1,
+            created_at=now,
+        )
+    store.close()
+    return path
+
+
+def no_push_env(monkeypatch):
+    monkeypatch.delenv("RADAR_ADMIN_URL", raising=False)
+    monkeypatch.delenv("RADAR_INGEST_TOKEN", raising=False)
+
+
+def forbid_http(monkeypatch):
+    def boom(*args, **kwargs):
+        raise AssertionError("no request expected")
+
+    monkeypatch.setattr(httpx.Client, "send", boom)
+
+
+def test_cli_push_without_token_exits_2(tmp_path, monkeypatch, now, capsys):
+    no_push_env(monkeypatch)
+    forbid_http(monkeypatch)
+    db = push_db(tmp_path, now, 1)
+    assert main(["push", "--db", db, "--url", "https://admin.example.com"]) == 2
+    captured = capsys.readouterr()
+    assert "RADAR_INGEST_TOKEN" in captured.err and captured.out == ""
+
+
+def test_cli_push_without_url_exits_2(tmp_path, monkeypatch, now, capsys):
+    no_push_env(monkeypatch)
+    monkeypatch.setenv("RADAR_INGEST_TOKEN", "test-token")
+    forbid_http(monkeypatch)
+    assert main(["push", "--db", push_db(tmp_path, now, 1)]) == 2
+    assert "RADAR_ADMIN_URL" in capsys.readouterr().err
+
+
+def test_cli_push_rejects_a_plain_http_remote_url(tmp_path, monkeypatch, now, capsys):
+    no_push_env(monkeypatch)
+    monkeypatch.setenv("RADAR_INGEST_TOKEN", "test-token")
+    forbid_http(monkeypatch)
+    argv = ["push", "--db", push_db(tmp_path, now, 1), "--url", "http://admin.example.com"]
+    assert main(argv) == 2
+    err = capsys.readouterr().err
+    assert len(err.strip().splitlines()) == 1 and "test-token" not in err
+
+
+def test_cli_push_with_nothing_to_push_makes_no_request(tmp_path, monkeypatch, now, capsys):
+    no_push_env(monkeypatch)
+    monkeypatch.setenv("RADAR_INGEST_TOKEN", "test-token")
+    monkeypatch.setenv("RADAR_ADMIN_URL", "https://admin.example.com")
+    forbid_http(monkeypatch)
+    assert main(["push", "--db", push_db(tmp_path, now, 0)]) == 0
+    assert json.loads(capsys.readouterr().out) == {"pushed": 0, "duplicates": 0, "batches": 0}
+
+
+def test_cli_push_sends_and_prints_stats(tmp_path, monkeypatch, now, capsys):
+    no_push_env(monkeypatch)
+    monkeypatch.setenv("RADAR_INGEST_TOKEN", "test-token")
+    monkeypatch.setenv("RADAR_ADMIN_URL", "https://admin.example.com/")
+    db = push_db(tmp_path, now, 2)
+    seen: list[httpx.Request] = []
+
+    def handler(request):
+        seen.append(request)
+        uids = [s["uid"] for s in json.loads(request.content)["stories"]]
+        return httpx.Response(200, json={"accepted": uids, "duplicates": []})
+
+    real = httpx.Client
+    monkeypatch.setattr(
+        httpx, "Client", lambda **kw: real(transport=httpx.MockTransport(handler), **kw)
+    )
+    assert main(["push", "--db", db]) == 0
+    assert json.loads(capsys.readouterr().out) == {"pushed": 2, "duplicates": 0, "batches": 1}
+    assert str(seen[0].url) == "https://admin.example.com/api/ingest"
+    store = SqliteStore(db)
+    try:
+        assert store.unpushed_stories() == []
+    finally:
+        store.close()
+
+
+def test_cli_push_failure_exits_1_without_the_token(tmp_path, monkeypatch, now, capsys):
+    no_push_env(monkeypatch)
+    monkeypatch.setenv("RADAR_INGEST_TOKEN", "test-token")
+    monkeypatch.setenv("RADAR_ADMIN_URL", "https://admin.example.com")
+    db = push_db(tmp_path, now, 1)
+    real = httpx.Client
+    handler = lambda r: httpx.Response(500, json={"error": "boom"})  # noqa: E731
+    monkeypatch.setattr(
+        httpx, "Client", lambda **kw: real(transport=httpx.MockTransport(handler), **kw)
+    )
+    assert main(["push", "--db", db]) == 1
+    captured = capsys.readouterr()
+    assert "500" in captured.err and "test-token" not in captured.err + captured.out
