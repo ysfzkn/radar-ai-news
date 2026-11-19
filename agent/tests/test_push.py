@@ -63,6 +63,76 @@ def test_payload_matches_the_shared_fixture(now):
     assert build_payload([story], {UID: sources}) == expected
 
 
+def body_with(now, reasons=None, sources=None, **card) -> dict:
+    """The payload entry for the fixture story with some fields replaced."""
+    story, fixture_sources = fixture_story(now)
+    fact_card = story.draft.fact_card.model_copy(update=card)
+    story = story.model_copy(
+        update={
+            "reasons": story.reasons if reasons is None else reasons,
+            "draft": story.draft.model_copy(update={"fact_card": fact_card}),
+        }
+    )
+    used = fixture_sources if sources is None else sources
+    return build_payload([story], {UID: used})["stories"][0]
+
+
+def test_reasons_are_clamped_to_twenty_of_300_characters(now):
+    reasons = [f"r{n}: " + "x" * 400 for n in range(25)]
+    sent = body_with(now, reasons=reasons)["reasons"]
+    assert len(sent) == 20
+    assert sent == [r[:300] for r in reasons[:20]]
+
+
+@pytest.mark.parametrize("field", ["who", "numbers", "versions"])
+def test_fact_card_lists_are_clamped_to_thirty_of_200_characters(now, field):
+    entries = [f"{n}-" + "y" * 250 for n in range(35)]
+    sent = body_with(now, **{field: entries})["fact_card"][field]
+    assert sent == [e[:200] for e in entries[:30]]
+
+
+def test_fact_card_what_is_cut_to_1000_characters(now):
+    assert body_with(now, what="w" * 1500)["fact_card"]["what"] == "w" * 1000
+
+
+def test_sources_are_clamped_to_thirty(now):
+    sources = [{"name": f"s{n}", "url": f"https://s{n}.example/a", "tier": 2} for n in range(35)]
+    sent = body_with(now, sources=sources)["sources"]
+    assert sent == sources[:30]
+
+
+@pytest.mark.parametrize(
+    "try_url",
+    ["", "none", "example.com/x", "ftp://example.com/x", "https://e.example/" + "a" * 1983],
+)
+def test_try_url_that_the_worker_rejects_is_dropped(now, try_url):
+    assert body_with(now, try_url=try_url)["fact_card"]["try_url"] is None
+
+
+@pytest.mark.parametrize(
+    "try_url",
+    ["https://a2ui.org/try", "HTTP://localhost:3000/demo", "https://e.example/" + "a" * 1982],
+)
+def test_valid_try_url_is_kept(now, try_url):
+    assert body_with(now, try_url=try_url)["fact_card"]["try_url"] == try_url
+
+
+def test_text_fields_and_urls_are_sent_as_stored(now):
+    story, sources = fixture_story(now)
+    long = StoryText(title="T" * 400, summary="", dev_line="d" * 700)
+    story = story.model_copy(
+        update={
+            "source_url": "not a url",
+            "draft": story.draft.model_copy(update={"tr": long}),
+        }
+    )
+    sources = [{"name": "n", "url": "nope", "tier": 1}]
+    sent = build_payload([story], {UID: sources})["stories"][0]
+    assert sent["texts"]["tr"] == long.model_dump()
+    assert sent["source_url"] == "not a url"
+    assert sent["sources"] == sources
+
+
 def add_stories(store, now, count: int) -> list[str]:
     run = store.start_run("run", now)
     for n in range(count):
@@ -107,7 +177,7 @@ def test_push_sends_bearer_token_and_marks_accepted_and_duplicates(store, now):
         return httpx.Response(200, json={"accepted": [a], "duplicates": [b]})
 
     stats = push_stories(store, mock_client(handler), URL, TOKEN, now)
-    assert stats == {"pushed": 1, "duplicates": 1, "batches": 1}
+    assert stats == {"pushed": 1, "duplicates": 1, "batches": 1, "rejected": []}
     assert requests[0].headers["Authorization"] == "Bearer test-token"
     assert str(requests[0].url) == "https://admin.example.com/api/ingest"
     assert store.unpushed_stories() == []
@@ -119,8 +189,73 @@ def test_push_sends_batches_of_twenty(store, now):
     stats = push_stories(store, mock_client(echo_accept(requests)), URL, TOKEN, now)
     sizes = [len(json.loads(r.content)["stories"]) for r in requests]
     assert BATCH == 20 and sizes == [20, 20, 5]
-    assert stats == {"pushed": 45, "duplicates": 0, "batches": 3}
+    assert stats == {"pushed": 45, "duplicates": 0, "batches": 3, "rejected": []}
     assert store.unpushed_stories() == []
+
+
+def reject_uids(bad: set[str], requests: list[httpx.Request]):
+    """Answer like the Worker: 400 naming the first bad story's index, else accept all."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        uids = [s["uid"] for s in json.loads(request.content)["stories"]]
+        for index, uid in enumerate(uids):
+            if uid in bad:
+                path = f"stories.{index}.texts.tr.title"
+                return httpx.Response(400, json={"error": "invalid", "path": path})
+        return httpx.Response(200, json={"accepted": uids, "duplicates": []})
+
+    return handler
+
+
+def test_rejected_story_is_skipped_and_the_rest_are_pushed(store, now):
+    uids = add_stories(store, now, 3)
+    requests: list[httpx.Request] = []
+    reported: list[tuple[str, str]] = []
+    stats = push_stories(
+        store,
+        mock_client(reject_uids({uids[1]}, requests)),
+        URL,
+        TOKEN,
+        now,
+        on_reject=lambda uid, path: reported.append((uid, path)),
+    )
+    assert len(requests) == 2
+    assert [s["uid"] for s in json.loads(requests[1].content)["stories"]] == [uids[0], uids[2]]
+    assert stats == {"pushed": 2, "duplicates": 0, "batches": 1, "rejected": [uids[1]]}
+    assert [s.uid for s in store.unpushed_stories()] == [uids[1]]
+    assert reported == [(uids[1], "stories.1.texts.tr.title")]
+
+
+def test_every_story_rejected_marks_nothing_and_stops(store, now):
+    uids = add_stories(store, now, 3)
+    requests: list[httpx.Request] = []
+    stats = push_stories(store, mock_client(reject_uids(set(uids), requests)), URL, TOKEN, now)
+    assert len(requests) == 3
+    assert stats["rejected"] == uids and stats["pushed"] == 0
+    assert [s.uid for s in store.unpushed_stories()] == uids
+
+
+def test_nothing_rejected_reports_an_empty_list(store, now):
+    add_stories(store, now, 1)
+    stats = push_stories(store, mock_client(echo_accept([])), URL, TOKEN, now)
+    assert stats["rejected"] == []
+
+
+@pytest.mark.parametrize("path", ["stories", "version", "", "stories.7.uid", "stories.x.uid"])
+def test_400_without_a_story_index_in_the_batch_still_raises(store, now, path):
+    add_stories(store, now, 2)
+    client = mock_client(lambda r: httpx.Response(400, json={"error": "invalid", "path": path}))
+    with pytest.raises(PushError, match="400"):
+        push_stories(store, client, URL, TOKEN, now)
+    assert len(store.unpushed_stories()) == 2
+
+
+def test_invalid_url_becomes_push_error(store, now):
+    add_stories(store, now, 1)
+    with pytest.raises(PushError, match="InvalidURL"):
+        push_stories(store, mock_client(echo_accept([])), "https://a\x00b.example", TOKEN, now)
+    assert len(store.unpushed_stories()) == 1
 
 
 def test_server_error_raises_and_marks_nothing(store, now):

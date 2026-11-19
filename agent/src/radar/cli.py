@@ -298,16 +298,22 @@ def _run_push(args: argparse.Namespace) -> int:
         )
         return 2
     store = _open_store(args)
+
+    def report_rejected(uid: str, path: str) -> None:
+        print(f"rejected by the admin service: {uid} ({path})", file=sys.stderr)
+
     try:
         with httpx.Client(timeout=30, follow_redirects=False) as client:
-            stats = push_stories(store, client, url, token, datetime.now(UTC))
+            stats = push_stories(
+                store, client, url, token, datetime.now(UTC), on_reject=report_rejected
+            )
     except PushError as exc:
         print(f"push failed: {exc}", file=sys.stderr)
         return 1
     finally:
         store.close()
     print(json.dumps(stats))
-    return 0
+    return 1 if stats["rejected"] else 0
 
 
 def _positive_int(text: str) -> int:

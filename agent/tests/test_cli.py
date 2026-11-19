@@ -627,7 +627,12 @@ def test_cli_push_with_nothing_to_push_makes_no_request(tmp_path, monkeypatch, n
     monkeypatch.setenv("RADAR_ADMIN_URL", "https://admin.example.com")
     forbid_http(monkeypatch)
     assert main(["push", "--db", push_db(tmp_path, now, 0)]) == 0
-    assert json.loads(capsys.readouterr().out) == {"pushed": 0, "duplicates": 0, "batches": 0}
+    assert json.loads(capsys.readouterr().out) == {
+        "pushed": 0,
+        "duplicates": 0,
+        "batches": 0,
+        "rejected": [],
+    }
 
 
 def test_cli_push_sends_and_prints_stats(tmp_path, monkeypatch, now, capsys):
@@ -647,7 +652,12 @@ def test_cli_push_sends_and_prints_stats(tmp_path, monkeypatch, now, capsys):
         httpx, "Client", lambda **kw: real(transport=httpx.MockTransport(handler), **kw)
     )
     assert main(["push", "--db", db]) == 0
-    assert json.loads(capsys.readouterr().out) == {"pushed": 2, "duplicates": 0, "batches": 1}
+    assert json.loads(capsys.readouterr().out) == {
+        "pushed": 2,
+        "duplicates": 0,
+        "batches": 1,
+        "rejected": [],
+    }
     assert str(seen[0].url) == "https://admin.example.com/api/ingest"
     store = SqliteStore(db)
     try:
@@ -669,3 +679,36 @@ def test_cli_push_failure_exits_1_without_the_token(tmp_path, monkeypatch, now, 
     assert main(["push", "--db", db]) == 1
     captured = capsys.readouterr()
     assert "500" in captured.err and "test-token" not in captured.err + captured.out
+
+
+def test_cli_push_with_a_rejected_story_exits_1_and_names_it(tmp_path, monkeypatch, now, capsys):
+    no_push_env(monkeypatch)
+    monkeypatch.setenv("RADAR_INGEST_TOKEN", "test-token")
+    monkeypatch.setenv("RADAR_ADMIN_URL", "https://admin.example.com")
+    db = push_db(tmp_path, now, 2)
+
+    def handler(request):
+        uids = [s["uid"] for s in json.loads(request.content)["stories"]]
+        if len(uids) == 2:
+            return httpx.Response(
+                400, json={"error": "invalid", "path": "stories.0.texts.en.title"}
+            )
+        return httpx.Response(200, json={"accepted": uids, "duplicates": []})
+
+    real = httpx.Client
+    monkeypatch.setattr(
+        httpx, "Client", lambda **kw: real(transport=httpx.MockTransport(handler), **kw)
+    )
+    store = SqliteStore(db)
+    try:
+        first = store.unpushed_stories()[0].uid
+    finally:
+        store.close()
+    assert main(["push", "--db", db]) == 1
+    captured = capsys.readouterr()
+    stats = json.loads(captured.out)
+    assert stats["pushed"] == 1 and stats["rejected"] == [first]
+    lines = captured.err.strip().splitlines()
+    assert len(lines) == 1
+    assert first in lines[0] and "stories.0.texts.en.title" in lines[0]
+    assert "test-token" not in captured.err + captured.out
