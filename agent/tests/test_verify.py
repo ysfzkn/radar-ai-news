@@ -166,6 +166,60 @@ def test_issue_order_is_length_numbers_names_link():
     ]
 
 
+def test_fact_card_what_is_checked_for_numbers_and_names():
+    d = draft()
+    d.fact_card.what = "Google and OpenAI shipped 40 tools."
+    assert verify(d, doc()) == [
+        "fact_card.what: number '40' not in source",
+        "fact_card.what: name 'OpenAI' not in source",
+    ]
+
+
+def test_fact_card_what_sits_after_the_texts_and_before_who():
+    d = draft(en=story(dev_line="Ask Anthropic, 41."), who=["Microsoft"], numbers=["42"])
+    d.fact_card.what = "Today Mistral did 43 things in a sentence with no length limit " + "x" * 400
+    assert verify(d, doc()) == [
+        "en.dev_line: number '41' not in source",
+        "fact_card.what: number '43' not in source",
+        "fact_card.numbers: number '42' not in source",
+        "en.dev_line: name 'Anthropic' not in source",
+        "fact_card.what: name 'Mistral' not in source",
+        "fact_card.who: name 'Microsoft' not in source",
+    ]
+
+
+def test_names_match_whole_words_only():
+    src = SRC + " The metadata format changed."
+    assert verify(draft(en=story(summary="Google and Meta.")), doc(src)) == [
+        "en.summary: name 'Meta' not in source"
+    ]
+    assert verify(draft(who=["Meta"]), doc(src)) == ["fact_card.who: name 'Meta' not in source"]
+    assert verify(draft(who=["Meta"]), doc(src + " Meta, the company.")) == []
+
+
+def test_source_possessive_still_matches_the_name():
+    for src in ("Meta's model is out.", "Meta'nın modeli çıktı.", "Meta’s model is out."):
+        d = draft(en=story(summary="Google and Meta."), who=["Meta"])
+        assert verify(d, doc(SRC + " " + src)) == []
+
+
+def test_plural_allowlisted_acronyms_pass():
+    d = draft(en=story(summary="Google adds APIs, LLMs and SDKs."))
+    assert verify(d, doc()) == []
+    d = draft(en=story(summary="Google adds Radars and APIS."))
+    assert verify(d, doc()) == [
+        "en.summary: name 'Radars' not in source",
+        "en.summary: name 'APIS' not in source",
+    ]
+
+
+def test_hyphenated_tokens_are_checked_part_by_part():
+    d = draft(en=story(summary="Google ships AI-powered and Google-backed LangGraph-ready tools."))
+    assert verify(d, doc()) == []
+    d = draft(en=story(summary="Google ships OpenAI-backed tools."))
+    assert verify(d, doc()) == ["en.summary: name 'OpenAI-backed' not in source"]
+
+
 def candidate(has_primary=True):
     return Candidate(
         cluster_id=1,

@@ -44,7 +44,7 @@ def _check_lengths(draft: Draft) -> list[str]:
 
 def _check_numbers(draft: Draft, source: str) -> list[str]:
     source_numbers = set(_NUMBER.findall(source.replace(",", ".")))
-    fields = _text_fields(draft)
+    fields = _text_fields(draft) + [("fact_card.what", draft.fact_card.what)]
     fields += [("fact_card.numbers", t) for t in draft.fact_card.numbers]
     fields += [("fact_card.versions", t) for t in draft.fact_card.versions]
     issues: list[str] = []
@@ -82,14 +82,47 @@ def _names(text: str) -> list[str]:
     return names
 
 
+def _allowed(token: str) -> bool:
+    if _fold(token) in _ALLOWED:
+        return True
+    # plural of an all-caps allowlisted acronym: APIs, LLMs, SDKs
+    stem = token[:-1]
+    return token.endswith("s") and len(stem) > 1 and stem.isupper() and _fold(stem) in _ALLOWED
+
+
+def _in_source(name: str, folded_source: str) -> bool:
+    """Whole-word match in the folded source. `'` is not a word character, so a source
+    `Google's` or `Google'ın` still matches `Google`."""
+    pattern = r"(?<!\w)" + re.escape(_fold(name)) + r"(?!\w)"
+    return re.search(pattern, folded_source) is not None
+
+
+def _looks_like_name(part: str) -> bool:
+    return any(c.isalpha() for c in part) and (
+        part[0].isupper() or any(c.isupper() or c.isdigit() for c in part[1:])
+    )
+
+
+def _name_ok(name: str, folded_source: str) -> bool:
+    if _allowed(name) or _in_source(name, folded_source):
+        return True
+    parts = [p for p in name.split("-") if p]
+    if len(parts) < 2:
+        return False
+    # AI-powered: every name-like part must pass on its own; plain words are not names
+    return all(
+        not _looks_like_name(p) or _allowed(p) or _in_source(p, folded_source) for p in parts
+    )
+
+
 def _check_names(draft: Draft, source: str) -> list[str]:
     folded_source = _fold(source)
-    found = [(where, name) for where, text in _text_fields(draft) for name in _names(text)]
+    fields = _text_fields(draft) + [("fact_card.what", draft.fact_card.what)]
+    found = [(where, name) for where, text in fields for name in _names(text)]
     found += [("fact_card.who", name) for name in draft.fact_card.who]
     issues: list[str] = []
     for where, name in found:
-        folded = _fold(name)
-        if folded in _ALLOWED or folded in folded_source:
+        if _name_ok(name, folded_source):
             continue
         issue = f"{where}: name '{name}' not in source"
         if issue not in issues:
