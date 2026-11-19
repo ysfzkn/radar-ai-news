@@ -4,7 +4,7 @@ from pathlib import Path
 import httpx
 
 from radar.models import Candidate, Cluster, SourceDoc, StoredItem
-from radar.source import MAX_SOURCE_CHARS, build_source, is_thin
+from radar.source import MAX_LINKS_CHARS, MAX_SOURCE_CHARS, build_source, is_thin
 
 FIXTURE = Path(__file__).parent / "fixtures" / "article.html"
 URL = "https://github.blog/a2ui-1-0"
@@ -13,7 +13,12 @@ NOW = datetime(2026, 11, 19, 12, 0, tzinfo=UTC)
 
 def _item(i: int, url: str, title: str, summary: str) -> StoredItem:
     return StoredItem(
-        id=i, cluster_id=1, source_id="s", url=url, title=title, summary=summary,
+        id=i,
+        cluster_id=1,
+        source_id="s",
+        url=url,
+        title=title,
+        summary=summary,
         published_at=NOW,
     )
 
@@ -24,8 +29,14 @@ def _cluster(*items: StoredItem) -> Cluster:
 
 def _candidate() -> Candidate:
     return Candidate(
-        cluster_id=1, title="A2UI 1.0", url=URL, summary="s", source_count=2,
-        has_primary=True, is_turkey=False, score=1.0,
+        cluster_id=1,
+        title="A2UI 1.0",
+        url=URL,
+        summary="s",
+        source_count=2,
+        has_primary=True,
+        is_turkey=False,
+        score=1.0,
     )
 
 
@@ -58,6 +69,7 @@ def test_extracts_article_text_and_links():
         "https://news.example/a2ui",
     ]
     assert len(doc.links) == len(set(doc.links))
+    assert doc.article_links == doc.links[:2]
 
 
 def test_item_titles_and_summaries_are_appended():
@@ -70,6 +82,7 @@ def test_fetch_failure_falls_back_to_feed_text():
     doc = build_source(_candidate(), _two_items(), _client(lambda r: httpx.Response(500)))
     assert doc.text == "A2UI 1.0. Announcing A2UI 1.0.\nA2UI ships. Coverage of the release."
     assert doc.links == [URL, "https://news.example/a2ui"]
+    assert doc.article_links == []
 
 
 def test_transport_error_does_not_raise():
@@ -109,11 +122,43 @@ def test_falls_back_to_main_then_body():
 
 def test_links_capped_at_50_before_cluster_urls():
     anchors = "".join(f'<a href="https://x.example/{i}">l</a>' for i in range(80))
-    doc = build_source(
-        _candidate(), _two_items(), _html_client(f"<article>{anchors}</article>")
-    )
+    doc = build_source(_candidate(), _two_items(), _html_client(f"<article>{anchors}</article>"))
     assert doc.links[:50] == [f"https://x.example/{i}" for i in range(50)]
     assert doc.links[50:] == [URL, "https://news.example/a2ui"]
+
+
+def test_links_with_whitespace_or_over_200_chars_are_dropped():
+    keep = "https://x.example/" + "k" * 182  # exactly 200 characters
+    long = "https://x.example/" + "l" * 183  # 201 characters
+    anchors = "".join(
+        f'<a href="{h}">l</a>'
+        for h in ("https://x.example/a b", "https://x.example/nb sp", long, keep)
+    )
+    cluster = _cluster(
+        _item(1, URL, "A2UI 1.0", "Announcing A2UI 1.0."),
+        _item(2, "https://news.example/" + "n" * 200, "A2UI ships", "Coverage."),
+    )
+    doc = build_source(_candidate(), cluster, _html_client(f"<article>{anchors}</article>"))
+    assert len(keep) == 200
+    assert doc.links == [keep, URL]
+    assert doc.article_links == [keep]
+
+
+def test_joined_links_are_capped_at_2000_chars():
+    hrefs = [f"https://x.example/{i:02d}/" + "p" * 79 for i in range(30)]  # 100 chars each
+    anchors = "".join(f'<a href="{h}">l</a>' for h in hrefs)
+    doc = build_source(_candidate(), _two_items(), _html_client(f"<article>{anchors}</article>"))
+    # 19 links take 19 * 100 + 18 newlines = 1_918 chars; a 20th would make 2_019
+    assert MAX_LINKS_CHARS == 2000
+    assert doc.links == hrefs[:19]
+    assert doc.article_links == hrefs[:19]
+    assert len("\n".join(doc.links)) <= MAX_LINKS_CHARS
+
+
+def test_cluster_urls_are_links_but_not_article_links():
+    doc = build_source(_candidate(), _two_items(), _html_client(FIXTURE.read_text("utf-8")))
+    assert "https://news.example/a2ui" in doc.links
+    assert "https://news.example/a2ui" not in doc.article_links
 
 
 def test_thin_source():

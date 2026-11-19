@@ -16,6 +16,8 @@ from radar.text import clean_summary
 MAX_SOURCE_CHARS = 6000
 MIN_SOURCE_CHARS = 200
 MAX_LINKS = 50
+MAX_LINK_CHARS = 200
+MAX_LINKS_CHARS = 2000  # the links joined with newlines, as the writer sees them
 
 _HTML_TYPES = ("text/html", "application/xhtml+xml")
 _NOISE = re.compile(
@@ -51,6 +53,21 @@ def _region(html: str) -> str:
     return _NOISE.sub(" ", html)
 
 
+def _usable(url: str) -> bool:
+    return len(url) <= MAX_LINK_CHARS and not any(c.isspace() for c in url)
+
+
+def _cap(links: list[str]) -> list[str]:
+    out: list[str] = []
+    used = 0
+    for link in links:
+        used += len(link) + (1 if out else 0)
+        if used > MAX_LINKS_CHARS:
+            break
+        out.append(link)
+    return out
+
+
 def _links(region: str, base_url: str) -> list[str]:
     parser = _LinkParser()
     parser.feed(region)
@@ -60,6 +77,8 @@ def _links(region: str, base_url: str) -> list[str]:
             continue
         absolute = urljoin(base_url, href).split("#", 1)[0]
         if urlsplit(absolute).scheme not in ("http", "https") or absolute in out:
+            continue
+        if not _usable(absolute):
             continue
         out.append(absolute)
     return out[:MAX_LINKS]
@@ -84,17 +103,20 @@ def _fetch(url: str, client: httpx.Client) -> str:
 def build_source(candidate: Candidate, cluster: Cluster, client: httpx.Client) -> SourceDoc:
     html = _fetch(candidate.url, client)
     article = ""
-    links: list[str] = []
+    article_links: list[str] = []
     if html:
         region = _region(html)
         article = clean_summary(region, limit=MAX_SOURCE_CHARS)
-        links = _links(region, candidate.url)
+        article_links = _links(region, candidate.url)
     lines = [f"{item.title}. {item.summary}".strip() for item in cluster.items]
+    links = list(article_links)
     for item in cluster.items:
-        if item.url not in links:
+        if _usable(item.url) and item.url not in links:
             links.append(item.url)
+    links = _cap(links)
+    article_links = [link for link in article_links if link in links]
     text = "\n".join(([article] if article else []) + lines)[:MAX_SOURCE_CHARS]
-    return SourceDoc(url=candidate.url, text=text, links=links)
+    return SourceDoc(url=candidate.url, text=text, links=links, article_links=article_links)
 
 
 def is_thin(doc: SourceDoc) -> bool:

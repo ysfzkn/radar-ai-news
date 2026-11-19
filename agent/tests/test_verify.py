@@ -4,8 +4,9 @@ from radar.verify import route, verify
 SRC = "Google released A2UI 1.0 on Nov 19. Downloads grew 1.5 times. Works with LangGraph."
 
 
-def doc(text=SRC, links=()):
-    return SourceDoc(url="https://x.test/a", text=text, links=list(links))
+def doc(text=SRC, links=(), article_links=None):
+    article = list(links) if article_links is None else list(article_links)
+    return SourceDoc(url="https://x.test/a", text=text, links=list(links), article_links=article)
 
 
 def story(title="A2UI 1.0", summary="Google released it.", dev_line="Works with LangGraph."):
@@ -99,6 +100,13 @@ def test_try_url_must_be_a_source_link():
     link = "https://x.test/try"
     assert verify(draft(try_url=link), doc(links=[link])) == []
     assert verify(draft(try_url=link), doc()) == ["fact_card.try_url: not a source link"]
+
+
+def test_try_url_must_come_from_the_primary_article():
+    community = "https://news.ycombinator.com/item?id=1"
+    d = doc(links=["https://x.test/try", community], article_links=["https://x.test/try"])
+    assert verify(draft(try_url=community), d) == ["fact_card.try_url: not a source link"]
+    assert verify(draft(try_url="https://x.test/try"), d) == []
 
 
 def test_fact_card_entries_are_checked():

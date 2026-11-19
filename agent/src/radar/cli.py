@@ -103,7 +103,7 @@ def _run_dry(args: argparse.Namespace, cap: float) -> int:
     from radar.budget import worst_case_usd
     from radar.score import SCORE_MODEL, score_user_message
     from radar.score import SYSTEM as SCORE_SYSTEM
-    from radar.source import MAX_SOURCE_CHARS
+    from radar.source import MAX_LINKS_CHARS, MAX_SOURCE_CHARS
     from radar.write import SYSTEM as WRITE_SYSTEM
     from radar.write import WRITE_MODEL
 
@@ -118,9 +118,11 @@ def _run_dry(args: argparse.Namespace, cap: float) -> int:
         store.close()
     worst = 0.0
     if to_score:
-        size = len(SCORE_SYSTEM) + len(score_user_message(to_score))
+        size = len(SCORE_SYSTEM.encode("utf-8")) + len(score_user_message(to_score).encode("utf-8"))
         worst += worst_case_usd(SCORE_MODEL, size, 4000)
-    writer = worst_case_usd(WRITE_MODEL, len(WRITE_SYSTEM) + MAX_SOURCE_CHARS + 500, 2000)
+    size = len(WRITE_SYSTEM.encode("utf-8")) + MAX_SOURCE_CHARS + MAX_LINKS_CHARS + 300
+    # The writer allows a fallback, so each call reserves two attempts.
+    writer = 2 * worst_case_usd(WRITE_MODEL, size, 2000)
     worst += args.max_stories * writer
     print(
         json.dumps(

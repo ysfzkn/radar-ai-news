@@ -99,7 +99,8 @@ class Draft(BaseModel):
 class SourceDoc(BaseModel):
     url: str
     text: str
-    links: list[str]
+    links: list[str]  # article links plus cluster item URLs, shown to the writer
+    article_links: list[str] = []  # links found in the fetched primary article only
 
 
 class Story(BaseModel):

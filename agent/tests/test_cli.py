@@ -278,6 +278,38 @@ def test_cli_dry_run_makes_no_calls(tmp_path, monkeypatch, now, capsys):
         store.close()
 
 
+def test_cli_dry_run_estimate_follows_the_reserve_rule(tmp_path, monkeypatch, now, capsys):
+    import radar.budget
+    import radar.score
+    from radar.score import SCORE_MODEL
+    from radar.score import SYSTEM as SCORE_SYSTEM
+    from radar.source import MAX_LINKS_CHARS, MAX_SOURCE_CHARS
+    from radar.write import SYSTEM as WRITE_SYSTEM
+    from radar.write import WRITE_MODEL
+
+    monkeypatch.setattr(cli, "make_client", lambda: run_client(now))
+    monkeypatch.setattr(radar.score, "score_user_message", lambda cands: "ğ" * 10)  # 20 bytes
+    seen: list[tuple] = []
+    real = radar.budget.worst_case_usd
+
+    def spy(model, input_bytes, max_tokens):
+        seen.append((model, input_bytes, max_tokens))
+        return real(model, input_bytes, max_tokens)
+
+    monkeypatch.setattr(radar.budget, "worst_case_usd", spy)
+    assert main(run_args(tmp_path, "--dry-run", "--max-stories", "3")) == 0
+    out = json.loads(capsys.readouterr().out)
+    writer_bytes = len(WRITE_SYSTEM.encode("utf-8")) + MAX_SOURCE_CHARS + MAX_LINKS_CHARS + 300
+    assert seen == [
+        (SCORE_MODEL, len(SCORE_SYSTEM.encode("utf-8")) + 20, 4000),
+        (WRITE_MODEL, writer_bytes, 2000),
+    ]
+    # each writer call may be billed twice (declined attempt plus fallback)
+    expected = real(SCORE_MODEL, len(SCORE_SYSTEM.encode("utf-8")) + 20, 4000)
+    expected += 3 * 2 * real(WRITE_MODEL, writer_bytes, 2000)
+    assert out["worst_case_usd"] == round(expected, 4)
+
+
 def test_cli_budget_reports_todays_spend(tmp_path, capsys):
     from datetime import UTC, datetime
 

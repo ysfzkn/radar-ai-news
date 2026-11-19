@@ -101,7 +101,7 @@ def verify(draft: Draft, doc: SourceDoc) -> list[str]:
     issues = _check_lengths(draft) + _check_numbers(draft, doc.text)
     issues += _check_names(draft, doc.text)
     url = draft.fact_card.try_url
-    if url is not None and url not in doc.links:
+    if url is not None and url not in doc.article_links:
         issues.append("fact_card.try_url: not a source link")
     return issues
 
