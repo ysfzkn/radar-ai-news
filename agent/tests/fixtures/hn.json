@@ -1,0 +1,30 @@
+{
+  "hits": [
+    {
+      "title": "Show HN: TrnRT \u2013 An open-source LLM inference engine for AWS Trainium",
+      "url": "https://github.com/RunanywhereAI/trnrt",
+      "points": 54,
+      "created_at_i": 1794931264,
+      "objectID": "50533270",
+      "author": "sanchitmonga22",
+      "created_at": "2026-11-17T16:01:04Z"
+    },
+    {
+      "title": "Show HN: Coral \u2013 Open-source gateway where agents write their own tools",
+      "url": "https://github.com/withcoral/coral",
+      "points": 52,
+      "created_at_i": 1794838491,
+      "objectID": "50517803",
+      "author": "jcs",
+      "created_at": "2026-11-16T14:14:51Z"
+    },
+    {
+      "title": "Launch HN: Maritime (YC F26) \u2013 A managed cloud for production AI agents",
+      "points": 56,
+      "created_at_i": 1795022788,
+      "objectID": "50549188",
+      "author": "ashriv",
+      "created_at": "2026-11-18T17:26:28Z"
+    }
+  ]
+}
