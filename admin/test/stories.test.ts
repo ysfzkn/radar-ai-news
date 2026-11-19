@@ -123,6 +123,11 @@ describe("approve", () => {
     expect(await approveStory(db, ok, 1, "owner", NOW)).toEqual({ ok: true });
   });
 
+  it("measures stored text after trimming: a 320-character summary plus a newline approves", async () => {
+    const uid = await seed({ mutate: (s) => (s.texts.tr.summary = "x".repeat(320) + "\n") });
+    expect(await approveStory(db, uid, 1, "owner", NOW)).toEqual({ ok: true });
+  });
+
   it("reports the first over-long field in the order tr title, summary, dev_line, then en", async () => {
     const uid = await seed({
       mutate: (s) => {

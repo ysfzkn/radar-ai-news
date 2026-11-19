@@ -289,7 +289,7 @@ async function runTransition(db: D1Database, t: Transition): Promise<Result> {
 
 function checkLengths(texts: Record<Lang, TextSet>, limits: Record<keyof TextSet, number>): Result {
   for (const lang of LANGS)
-    for (const f of TEXT_FIELDS) if (texts[lang][f].length > limits[f]) return fail("too_long", `${lang}.${f}`);
+    for (const f of TEXT_FIELDS) if (texts[lang][f].trim().length > limits[f]) return fail("too_long", `${lang}.${f}`);
   return { ok: true };
 }
 
