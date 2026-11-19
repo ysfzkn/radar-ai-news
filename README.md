@@ -102,7 +102,12 @@ uv run radar collect --show 5
 ```
 
 ```
-(real output is pasted here at the end of Plan 1)
+{"sources_ok": 19, "sources_failed": 0, "new_items": 156, "new_clusters": 148, "candidates": 30, "llm_calls": 0, "failed": []}
+ 3.00  1  Accelerating development for massive Git repositories  https://developers.googleblog.com/accelerating-development-for-massive-git-repositories
+ 3.00  1  Gemini 4 Hydrogen: a faster model for general purpose robotics  https://developers.googleblog.com/gemini-hydrogen-for-robotics
+ 3.00  1  Build full-stack Android apps with Gemini in Google AI Studio  https://developers.googleblog.com/build-full-stack-android-apps-with-gemini-in-google-ai-studio
+ 3.00  1  Agents are sessions, not requests: size GKE node pools for AI agent sessions  https://developers.googleblog.com/agents-are-sessions-not-requests-size-gke-node-pools-for-ai-agent-sessions
+ 3.00  1  TPU Model Design Considerations and Optimization Guide  https://developers.googleblog.com/tpu-model-design-considerations-and-optimization-guide
 ```
 
 Full instructions, including running your own Radar on your own domain: [docs/setup.md](docs/setup.md).

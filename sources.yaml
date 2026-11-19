@@ -29,7 +29,7 @@ sources:
     tier: primary
     kind: feed
     url: https://www.anthropic.com/news
-    enabled: false
+    enabled: false  # no feed as of 2026-11
   - id: rel-mcp
     name: Model Context Protocol releases
     tier: primary
@@ -85,6 +85,7 @@ sources:
     tier: community
     kind: feed
     url: "https://www.reddit.com/r/LocalLLaMA/top/.rss?t=day"
+    enabled: false  # no feed as of 2026-11 (reddit answers 404/429 to the bot)
   - id: simonw
     name: Simon Willison's Weblog
     tier: commentary
@@ -100,7 +101,7 @@ sources:
     tier: commentary
     kind: feed
     url: https://www.deeplearning.ai/the-batch/
-    enabled: false
+    enabled: false  # no feed as of 2026-11
   - id: webrazzi-ai
     name: Webrazzi
     tier: turkey
@@ -108,9 +109,8 @@ sources:
     url: https://webrazzi.com/feed/
     lang: tr
   - id: donanimhaber-ai
-    name: DonanimHaber AI
+    name: DonanimHaber
     tier: turkey
     kind: feed
-    url: https://www.donanimhaber.com/
+    url: https://www.donanimhaber.com/rss/tum/
     lang: tr
-    enabled: false
