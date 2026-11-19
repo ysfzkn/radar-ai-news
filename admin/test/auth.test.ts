@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { SignJWT, generateKeyPair } from "jose";
+import { SignJWT, exportJWK, generateKeyPair, importJWK } from "jose";
 import { beforeAll, describe, expect, it } from "vitest";
 import { authenticate, sameOrigin, type Identity } from "../src/auth";
 import type { Env } from "../src/env";
@@ -119,6 +119,24 @@ describe("authenticate: Cloudflare Access token", () => {
     expect(r.status).toBe(401);
     expect(r.headers.get("Cache-Control")).toBe("no-store");
     expect(await r.text()).toBe("Unauthorized");
+  });
+
+  it("answers 401 for RS384 signed by the same RSA key that verifies RS256 tokens", async () => {
+    // One RSA key, usable for any RSA algorithm: the resolver imports the public key with
+    // whatever `alg` the token names, the way a JWKS without an `alg` member would. Only
+    // the `algorithms` option in auth.ts then stands between an RS384 token and success.
+    const pair = await generateKeyPair("RS256", { extractable: true });
+    const { alg: _priv, ...privateJwk } = await exportJWK(pair.privateKey);
+    const { alg: _pub, ...publicJwk } = await exportJWK(pair.publicKey);
+    const resolver = async (header: { alg?: string }) => importJWK(publicJwk, header.alg);
+    const signed = async (alg: string) =>
+      token({ alg, key: (await importJWK(privateJwk, alg)) as CryptoKey });
+
+    const rs256 = await authenticate(req(await signed("RS256")), accessEnv(), resolver);
+    expect(rs256).toEqual({ email: "owner@example.com" }); // the resolver itself works
+    const rs384 = (await authenticate(req(await signed("RS384")), accessEnv(), resolver)) as Response;
+    expect(rs384).toBeInstanceOf(Response);
+    expect(rs384.status).toBe(401);
   });
 
   it("answers 401 for a garbage token", async () => {

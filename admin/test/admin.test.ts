@@ -115,6 +115,40 @@ describe("admin screen", () => {
     for (const a of anchors) expect(a).toContain('rel="noopener noreferrer"');
   });
 
+  it("escapes a quote in the try URL and a source URL inside value and href attributes", async () => {
+    const hostile = 'https://a.example/"onx="1';
+    const uid = await seed({
+      mutate: (s) => {
+        s.fact_card.try_url = hostile;
+        s.sources = [{ name: "Quoted", url: 'https://b.example/"onx="1', tier: 1 }];
+      },
+    });
+    const body = await (await get(`/admin/stories/${uid}`)).text();
+    expect(body).toContain('value="https://a.example/&quot;onx=&quot;1"');
+    expect(body).toContain('href="https://a.example/&quot;onx=&quot;1"');
+    expect(body).toContain('href="https://b.example/&quot;onx=&quot;1"');
+    expect(body).not.toContain('"onx="1');
+  });
+
+  it("refuses an approve without an Access token and leaves the story unchanged", async () => {
+    const uid = await seed();
+    const before = (await getStory(env.DB, uid))!;
+    const access = { ...env, ACCESS_TEAM_DOMAIN: "myteam.cloudflareaccess.com", ACCESS_AUD: "aud" };
+    const res = await app.fetch(
+      new Request(`${ORIGIN}/admin/stories/${uid}/approve`, {
+        method: "POST",
+        headers: { Origin: ORIGIN },
+        body: new URLSearchParams({ version: "1", checked: "on" }),
+      }),
+      access,
+    );
+    expect(res.status).toBe(401);
+    const after = (await getStory(env.DB, uid))!;
+    expect(after.status).toBe("review");
+    expect(after.version).toBe(before.version);
+    expect(after.events.length).toBe(before.events.length);
+  });
+
   it("answers 401 without an Access token when Access is configured", async () => {
     await seed();
     const res = await get("/admin", { ...env, ACCESS_TEAM_DOMAIN: "myteam.cloudflareaccess.com", ACCESS_AUD: "aud" });
