@@ -52,6 +52,18 @@ def test_failed_migration_leaves_nothing_behind(tmp_path):
     path = str(tmp_path / "m.db")
     with pytest.raises(sqlite3.Error):
         SqliteStore(path, str(migrations))
+    # Closing the connection would discard an open transaction anyway, so also
+    # check the rollback on a live connection.
+    bad.unlink()
+    live = SqliteStore(path, str(migrations))
+    try:
+        bad.write_text("CREATE TABLE b (x INTEGER); THIS IS NOT SQL;", encoding="utf-8")
+        with pytest.raises(sqlite3.Error):
+            live._apply(bad)
+        rows = live._conn.execute("SELECT name FROM sqlite_master WHERE name = 'b'").fetchall()
+        assert rows == [] and not live._conn.in_transaction
+    finally:
+        live.close()
     bad.unlink()
     reopened = SqliteStore(path, str(migrations))
     try:
@@ -69,3 +81,17 @@ def test_naive_datetime_is_rejected():
         RawItem(
             source_id="x", url="https://e.com/a", title="t", published_at=datetime(2026, 11, 19)
         )
+
+
+def test_migration_with_two_statements_on_one_line_applies(tmp_path):
+    migrations = tmp_path / "migrations"
+    migrations.mkdir()
+    (migrations / "0001_one_line.sql").write_text(
+        "CREATE TABLE a (x TEXT DEFAULT 'p;q'); CREATE INDEX i ON a (x);", encoding="utf-8"
+    )
+    store = SqliteStore(str(tmp_path / "o.db"), str(migrations))
+    try:
+        names = {r[0] for r in store._conn.execute("SELECT name FROM sqlite_master")}
+    finally:
+        store.close()
+    assert {"a", "i"} <= names

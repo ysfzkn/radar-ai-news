@@ -67,9 +67,9 @@ class SqliteStore:
     def _apply(self, file: Path) -> None:
         """Run one migration file and record it in a single transaction."""
         statements, buffer = [], ""
-        for line in file.read_text(encoding="utf-8").splitlines(keepends=True):
-            buffer += line
-            if sqlite3.complete_statement(buffer):
+        for char in file.read_text(encoding="utf-8"):
+            buffer += char
+            if char == ";" and sqlite3.complete_statement(buffer):
                 statements.append(buffer)
                 buffer = ""
         if buffer.strip():
