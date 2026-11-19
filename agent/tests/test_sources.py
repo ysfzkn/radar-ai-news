@@ -3,6 +3,8 @@ import pytest
 from radar.models import Tier
 from radar.sources import load_sources
 
+GH = "https://github.blog/feed/"
+
 
 def write(tmp_path, body: str) -> str:
     p = tmp_path / "sources.yaml"
@@ -26,7 +28,7 @@ def test_loads_enabled_sources_only(tmp_path):
     path = write(
         tmp_path,
         doc(
-            ENTRY.format(id="github-blog", tier="primary", url="https://github.blog/feed/", extra=""),
+            ENTRY.format(id="github-blog", tier="primary", url=GH, extra=""),
             ENTRY.format(
                 id="anthropic-news",
                 tier="primary",
@@ -41,7 +43,7 @@ def test_loads_enabled_sources_only(tmp_path):
 
 
 def test_duplicate_id_raises(tmp_path):
-    entry = ENTRY.format(id="github-blog", tier="primary", url="https://github.blog/feed/", extra="")
+    entry = ENTRY.format(id="github-blog", tier="primary", url=GH, extra="")
     path = write(tmp_path, doc(entry, entry))
     with pytest.raises(ValueError, match="github-blog"):
         load_sources(path)
