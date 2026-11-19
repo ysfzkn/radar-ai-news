@@ -1,0 +1,4 @@
+# Local development only. Copy to .dev.vars (git-ignored).
+# Real secrets are set with `wrangler secret put`, never in a file.
+INGEST_TOKEN=change-me
+DEV_NO_AUTH=1
