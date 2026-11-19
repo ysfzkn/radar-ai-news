@@ -1,0 +1,30 @@
+name: Bug report
+description: Something is broken, or a published story is wrong or misleading
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: What happened
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps
+      description: How can we reproduce it?
+    validations:
+      required: true
+  - type: input
+    id: story_url
+    attributes:
+      label: Story URL (if about published content)
+    validations:
+      required: false

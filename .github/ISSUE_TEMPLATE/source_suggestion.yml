@@ -1,0 +1,41 @@
+name: Source suggestion
+description: Suggest a feed or site Radar should read
+title: "[source] "
+labels: ["source"]
+body:
+  - type: input
+    id: name
+    attributes:
+      label: Name
+    validations:
+      required: true
+  - type: input
+    id: url
+    attributes:
+      label: URL
+    validations:
+      required: true
+  - type: input
+    id: feed_url
+    attributes:
+      label: Feed URL
+      description: RSS or Atom feed address.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why developers should care
+    validations:
+      required: true
+  - type: dropdown
+    id: tier
+    attributes:
+      label: Tier
+      options:
+        - Primary
+        - Community signal
+        - Expert commentary
+        - Türkiye
+    validations:
+      required: true

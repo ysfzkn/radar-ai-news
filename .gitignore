@@ -1,0 +1,11 @@
+dev-notes/
+.superpowers/
+.env
+*.db
+.venv/
+__pycache__/
+.wrangler/
+node_modules/
+dist/
+.pytest_cache/
+.ruff_cache/
