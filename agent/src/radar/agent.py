@@ -86,7 +86,14 @@ def run_agent(
         cluster = clusters.get(candidate.cluster_id)
         if cluster is None:
             continue
-        doc = build_source(candidate, cluster, client)
+        try:
+            doc = build_source(candidate, cluster, client)
+        except Exception:  # one hostile page must not end the run; not retried today
+            stats["failed"] += 1
+            store.record_attempt(
+                cluster_id=candidate.cluster_id, run_id=run_id, outcome="failed", at=now
+            )
+            continue
         if is_thin(doc):
             stats["skipped_thin"] += 1
             store.record_attempt(

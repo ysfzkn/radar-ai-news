@@ -4,6 +4,7 @@ Page content is untrusted data. This module only extracts text and links from it
 it never follows links or evaluates anything.
 """
 
+import codecs
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlsplit
 
@@ -23,6 +24,21 @@ MAX_LINKS_CHARS = 2000  # the links joined with newlines, as the writer sees the
 _HTML_TYPES = ("text/html", "application/xhtml+xml")
 _NOISE = ("script", "style", "nav", "header", "footer", "aside", "form")
 _REGIONS = ("article", "main", "body")
+# Text encodings a page may name. Anything else (an unknown name, a codec that is not a
+# text encoding such as zlib or base64, idna, punycode, utf-16 without a BOM) is ignored
+# and the page is read as UTF-8 with bad bytes replaced.
+_CHARSETS = frozenset(
+    ["utf-8", "ascii", "koi8-r", "koi8-u", "mac-roman", "cp866", "cp874"]
+    + [f"iso8859-{n}" for n in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13, 14, 15, 16)]
+    + [f"cp{n}" for n in range(1250, 1259)]
+    + ["shift_jis", "cp932", "euc_jp", "iso2022_jp", "gb2312", "gbk", "gb18030"]
+    + ["big5", "big5hkscs", "euc_kr", "cp949"]
+)
+_BOMS = (
+    (codecs.BOM_UTF8, "utf-8-sig"),
+    (codecs.BOM_UTF16_LE, "utf-16"),
+    (codecs.BOM_UTF16_BE, "utf-16"),
+)
 
 
 class _LinkParser(HTMLParser):
@@ -64,16 +80,22 @@ def _links(region: str, base_url: str) -> list[str]:
     parser = _LinkParser()
     parser.feed(region)
     out: list[str] = []
+    seen: set[str] = set()
     for href in parser.hrefs:
+        if len(out) == MAX_LINKS:
+            break
         if href.startswith("#"):
             continue
-        absolute = urljoin(base_url, href).split("#", 1)[0]
-        if urlsplit(absolute).scheme not in ("http", "https") or absolute in out:
+        try:
+            absolute = urljoin(base_url, href).split("#", 1)[0]
+            scheme = urlsplit(absolute).scheme
+        except ValueError:  # `http://[` and other malformed links: skip this one
             continue
-        if not _usable(absolute):
+        if scheme not in ("http", "https") or absolute in seen or not _usable(absolute):
             continue
+        seen.add(absolute)
         out.append(absolute)
-    return out[:MAX_LINKS]
+    return out
 
 
 def _fetch(url: str, client: httpx.Client) -> str:
@@ -86,10 +108,27 @@ def _fetch(url: str, client: httpx.Client) -> str:
     content_type = response.headers.get("content-type", "").split(";")[0].strip().lower()
     if content_type not in _HTML_TYPES:
         return ""
+    return _decode(response)
+
+
+def _decode(response: httpx.Response) -> str:
+    """The page as text: a BOM first, then the declared charset if it is a real text
+    encoding, else UTF-8. Never raises; undecodable bytes become U+FFFD."""
+    content = response.content
+    for bom, name in _BOMS:
+        if content.startswith(bom):
+            return content.decode(name, errors="replace")
+    name = "utf-8"
     try:
-        return response.text
-    except (UnicodeDecodeError, LookupError):
-        return ""
+        declared = codecs.lookup(response.charset_encoding or "utf-8").name
+    except (LookupError, ValueError):
+        declared = name
+    if declared in _CHARSETS:
+        name = declared
+    try:
+        return content.decode(name, errors="replace")
+    except Exception:  # a codec bug must not end the run
+        return content.decode("utf-8", errors="replace")
 
 
 def build_source(candidate: Candidate, cluster: Cluster, client: httpx.Client) -> SourceDoc:

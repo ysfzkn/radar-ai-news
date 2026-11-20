@@ -421,7 +421,7 @@ class FakeClock:
         return self.now
 
 
-def test_a_body_that_trickles_in_is_cut_off_at_the_total_deadline(monkeypatch):
+def test_an_unencoded_body_that_trickles_in_is_cut_off_at_the_total_deadline(monkeypatch):
     clock = FakeClock()
     monkeypatch.setattr(common, "_clock", clock)
 
@@ -543,3 +543,227 @@ def test_the_default_resolver_asks_getaddrinfo(monkeypatch):
     monkeypatch.setattr(socket, "getaddrinfo", fake_getaddrinfo)
     assert common.resolve("a.example") == ["93.184.216.34", "2606:2800:220:1::1"]
     assert calls == [("a.example", None)]
+
+
+# Bodies that decode to little or nothing: the cap and the deadline count the raw bytes.
+
+GZIP_HEADER_WITH_NAME = b"\x1f\x8b\x08\x08\x00\x00\x00\x00\x00\xff"  # FNAME flag set
+
+
+class EndlessGzipName(httpx.SyncByteStream):
+    """A gzip header whose file-name field never ends: bytes for ever, no output."""
+
+    def __init__(self, clock=None):
+        self.chunks = 0
+        self.clock = clock
+
+    def __iter__(self):
+        yield GZIP_HEADER_WITH_NAME
+        while True:
+            if self.clock is not None:
+                self.clock.now += 1.0
+            self.chunks += 1
+            yield b"A" * CHUNK
+
+
+class Body(httpx.SyncByteStream):
+    """A body sent as a stream, as a real connection gives it (not read in advance)."""
+
+    def __init__(self, data: bytes):
+        self.data = data
+
+    def __iter__(self):
+        for start in range(0, len(self.data), CHUNK):
+            yield self.data[start : start + CHUNK]
+
+
+def gzip_response(stream) -> httpx.Response:
+    return httpx.Response(200, headers={"content-encoding": "gzip"}, stream=stream)
+
+
+def test_a_gzip_body_that_decodes_to_nothing_is_cut_off_at_the_total_deadline(monkeypatch):
+    clock = FakeClock()
+    monkeypatch.setattr(common, "_clock", clock)
+    body = EndlessGzipName(clock)
+    with pytest.raises(FetchRefused, match="^response too slow$"):
+        get(routed(lambda request: gzip_response(body)), "https://a.test/x")
+    assert body.chunks == int(MAX_SECONDS) + 1
+
+
+def test_a_gzip_body_that_decodes_to_nothing_is_cut_off_at_the_cap_on_raw_bytes():
+    body = EndlessGzipName()
+    with pytest.raises(FetchRefused, match="^response too large$"):
+        get(routed(lambda request: gzip_response(body)), "https://a.test/x")
+    # The 10 header bytes plus 80 full chunks pass the cap: reading stopped there.
+    assert body.chunks == MAX_BYTES // CHUNK
+
+
+def test_a_gzip_bomb_is_refused_without_decoding_it_whole():
+    import gzip
+
+    bomb = gzip.compress(b"\0" * (50 * MAX_BYTES))  # about 250 KB on the wire
+    sizes = []
+    real = common.zlib.decompressobj
+
+    def watched(*args):
+        inner = real(*args)
+
+        class Watch:
+            def decompress(self, data, max_length=0):
+                out = inner.decompress(data, max_length)
+                sizes.append(len(out))
+                return out
+
+        return Watch()
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(common.zlib, "decompressobj", watched)
+        with pytest.raises(FetchRefused, match="^response too large$"):
+            get(routed(lambda request: gzip_response(Body(bomb))), "https://a.test/x")
+    assert sizes and max(sizes) <= MAX_BYTES + 1
+
+
+def test_a_gzip_body_is_decoded():
+    import gzip
+
+    body = Body(gzip.compress(b"hello"))
+    got = get(routed(lambda request: gzip_response(body)), "https://a.test/x")
+    assert got.content == b"hello"
+    assert "content-encoding" not in got.headers
+
+
+@pytest.mark.parametrize("encoding", ["br", "deflate", "zstd", "gzip, gzip"])
+def test_an_encoding_other_than_gzip_is_refused(encoding):
+    def handler(request):
+        return httpx.Response(200, headers={"content-encoding": encoding}, stream=Body(b"\0\0"))
+
+    with pytest.raises(FetchRefused, match="^unsupported content encoding$"):
+        get(routed(handler), "https://a.test/x")
+
+
+def test_only_gzip_is_asked_for():
+    seen = []
+
+    def handler(request):
+        seen.append(request.headers["accept-encoding"])
+        return httpx.Response(200, content=b"ok")
+
+    get(routed(handler), "https://a.test/x")
+    assert seen == ["gzip"]
+
+
+def test_a_wait_for_headers_is_given_up_after_the_hard_stop(monkeypatch):
+    import threading
+    import time
+
+    monkeypatch.setattr(common, "HARD_SECONDS", 0.3)
+    release = threading.Event()
+
+    def handler(request):
+        release.wait(10)  # headers that never come
+        return httpx.Response(200, content=b"late")
+
+    started = time.monotonic()
+    try:
+        with pytest.raises(FetchRefused, match="^response too slow$"):
+            get(routed(handler), "https://a.test/x")
+        assert time.monotonic() - started < 3
+    finally:
+        release.set()
+
+
+def test_a_name_lookup_that_never_answers_is_given_up_after_the_hard_stop(monkeypatch):
+    import threading
+    import time
+
+    monkeypatch.setattr(common, "HARD_SECONDS", 0.3)
+    release = threading.Event()
+
+    def resolver(host):
+        release.wait(10)
+        return ["93.184.216.34"]
+
+    monkeypatch.setattr(common, "_resolver", resolver)
+    started = time.monotonic()
+    try:
+        with pytest.raises(FetchRefused, match="^response too slow$"):
+            get(routed(never_sent), "https://slow-dns.example/x")
+        assert time.monotonic() - started < 3
+    finally:
+        release.set()
+
+
+def test_time_spent_on_name_lookup_counts_against_the_deadline(monkeypatch):
+    clock = FakeClock()
+    monkeypatch.setattr(common, "_clock", clock)
+
+    def resolver(host):
+        clock.now += MAX_SECONDS + 1
+        return ["93.184.216.34"]
+
+    monkeypatch.setattr(common, "_resolver", resolver)
+    with pytest.raises(FetchRefused, match="^response too slow$"):
+        get(routed(never_sent), "https://slow-dns.example/x")
+
+
+def test_an_error_inside_the_fetch_reaches_the_caller_unchanged():
+    def handler(request):
+        raise httpx.ConnectError("refused")
+
+    with pytest.raises(httpx.ConnectError):
+        get(routed(handler), "https://a.test/x")
+
+
+def test_the_name_checked_is_the_name_the_connection_uses(monkeypatch):
+    asked = resolving_to(monkeypatch, {"xn--fa-hia.de": ["93.184.216.34"]})
+    seen = []
+
+    def handler(request):
+        seen.append(request.url.raw_host)
+        return httpx.Response(200, content=b"ok")
+
+    get(routed(handler), "http://faß.de/")
+    assert asked == ["xn--fa-hia.de"]
+    assert seen == [b"xn--fa-hia.de"]
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://[64:ff9b::7f00:1]/",  # NAT64 well-known prefix
+        "http://[::127.0.0.1]/",  # IPv4-compatible
+        "http://[::ffff:0:127.0.0.1]/",  # SIIT
+        "http://[fec0::1]/",  # site-local
+    ],
+)
+def test_ipv6_ranges_that_reach_a_local_address_are_not_public(url):
+    assert public_http_url(url) is False
+
+
+def atom_entry(title: str, summary: str, now: datetime) -> bytes:
+    stamp = now.isoformat()
+    return (
+        '<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><title>t</title>'
+        f'<entry><title type="html">{title}</title><link href="https://e.test/1"/>'
+        f'<updated>{stamp}</updated><summary type="html">{summary}</summary></entry></feed>'
+    ).encode()
+
+
+def test_a_large_hostile_feed_summary_is_parsed_quickly(now):
+    import time
+
+    s = src("a")
+    body = atom_entry("Title", "&lt;!--" * 100_000, now)  # 700 KB; minutes with sanitising
+    started = time.perf_counter()
+    items = fetch_feed(s, client_for({s.url: body}), now)
+    assert time.perf_counter() - started < 3
+    assert [i.title for i in items] == ["Title"]
+
+
+def test_feed_title_and_summary_are_stripped_of_markup_without_the_sanitiser(now):
+    s = src("a")
+    title = "&lt;b&gt;Bold&lt;/b&gt; release &lt;script&gt;alert(1)&lt;/script&gt;"
+    summary = "&lt;p onclick='x'&gt;Hello &lt;img src=x onerror=y&gt;world&lt;/p&gt;"
+    items = fetch_feed(s, client_for({s.url: atom_entry(title, summary, now)}), now)
+    assert items[0].title == "Bold release"
+    assert items[0].summary == "Hello world"

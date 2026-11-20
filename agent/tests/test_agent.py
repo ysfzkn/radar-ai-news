@@ -307,3 +307,28 @@ def test_refusal_and_thin_source_are_recorded_with_their_own_outcome(store, now,
     later = now + timedelta(days=1)
     run_agent(store, candidates[1:], llm2, http(ok=False), later, store.start_run("run", later))
     assert [r["outcome"] for r in _attempts(store, candidates[1].cluster_id)] == ["thin"]
+
+
+def test_a_source_that_fails_to_build_is_recorded_and_the_next_story_is_written(
+    store, now, run_id, monkeypatch
+):
+    import radar.agent as agent_module
+
+    candidates = world(store, now, count=2)
+    first, second = (c.cluster_id for c in candidates)
+    real = agent_module.build_source
+
+    def build(candidate, cluster, client):
+        if candidate.cluster_id == first:
+            raise ValueError("Invalid IPv6 URL")
+        return real(candidate, cluster, client)
+
+    monkeypatch.setattr(agent_module, "build_source", build)
+    llm = FakeLLM({"score": [ScoreBatch(scores=[score(first), score(second)])], "write": [draft()]})
+    stats = run_agent(store, candidates, llm, http(), now, run_id)
+    assert stats["failed"] == 1 and stats["written"] == 1
+    assert [r["outcome"] for r in _attempts(store, first)] == ["failed"]
+    assert [s.cluster_id for s in store.stories_since(now)] == [second]
+    later = now + timedelta(hours=1)
+    again = run_agent(store, candidates, FakeLLM({}), http(), later, store.start_run("r", later))
+    assert again["skipped_retry"] == 1

@@ -204,3 +204,61 @@ def test_only_the_first_300_kb_of_a_page_is_read():
 def test_source_urls_are_the_primary_url_and_the_cluster_items():
     doc = build_source(_candidate(), _two_items(), _html_client(FIXTURE.read_text("utf-8")))
     assert doc.source_urls == [URL, "https://news.example/a2ui"]
+
+
+ARTICLE_TEXT = "Alpha engine 2.0 adds streaming support for agents. " * 8
+
+
+@pytest.mark.parametrize(
+    "charset",
+    [
+        "undefined",
+        "utf-16",
+        "idna",
+        "punycode",
+        "zlib",
+        "bz2",
+        "hex",
+        "base64",
+        "uu",
+        "quopri",
+        "rot13",
+        "unicode_escape",
+        "no-such-codec",
+        "",
+    ],
+)
+def test_a_hostile_or_unknown_charset_falls_back_to_utf8(charset):
+    body = f"<html><body><article><p>{ARTICLE_TEXT}</p></article></body></html>".encode()
+    headers = {"content-type": f"text/html; charset={charset}"}
+    client = _client(lambda r: httpx.Response(200, content=body, headers=headers))
+    doc = build_source(_candidate(), _two_items(), client)
+    assert ARTICLE_TEXT.strip() in doc.text
+
+
+def test_a_real_charset_is_still_used():
+    body = "<html><body><article><p>Türkçe karakterler: ğüşıöç</p></article></body></html>"
+    headers = {"content-type": "text/html; charset=iso-8859-9"}
+    client = _client(
+        lambda r: httpx.Response(200, content=body.encode("iso-8859-9"), headers=headers)
+    )
+    assert "ğüşıöç" in build_source(_candidate(), _two_items(), client).text
+
+
+def test_a_malformed_link_is_skipped_and_the_rest_are_kept():
+    page = (
+        '<html><body><article><a href="http://[">bad</a>'
+        '<a href="http://[::1">bad</a><a href="https://good.example/x">good</a>'
+        f"<p>{ARTICLE_TEXT}</p></article></body></html>"
+    )
+    doc = build_source(_candidate(), _two_items(), _html_client(page))
+    assert doc.article_links == ["https://good.example/x"]
+
+
+def test_many_distinct_links_are_collected_quickly():
+    page = "<html><body><article>" + "".join(f"<a href=/{i}>" for i in range(30_000))
+    page = page[:MAX_HTML_CHARS]
+    started = time.perf_counter()
+    doc = build_source(_candidate(), _two_items(), _html_client(page))
+    assert time.perf_counter() - started < 1.5
+    assert doc.article_links[0] == "https://github.blog/0"
