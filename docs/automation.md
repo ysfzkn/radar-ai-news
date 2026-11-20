@@ -65,7 +65,7 @@ The agent keeps everything it knows in one SQLite database: the sources, items, 
 
 **What is not private.** The job log of a public repository is public, and the one JSON summary line in it reveals: today's model cost and token totals, the number of stories collected, written, published and waiting, the ids of sources that failed, and the admin service's origin (scheme, host and port). It never holds story text, a token or a password. The encryption is not meant to hide those daily totals. If they matter to you, keep the repository private.
 
-**The passphrase.** `RADAR_STATE_KEY` must be at least 16 characters, otherwise the state commands exit with code 2. The workflow checks this at the start of the restore step, on the first run too, so a missing or short key stops the job before anything is spent. Every character counts, including a newline at the end: a value saved in a secret with a trailing newline is a different key from the same text without one. Paste it without one.
+**The passphrase.** Generate it, do not choose it: anyone can download `state.bin` from the public branch and try passphrases offline for as long as they like, and scrypt only slows each guess down. Use at least 32 random characters, for example the output of `openssl rand -base64 32` (44 characters), or a password manager's generator set to 32 characters or more. Do not reuse it anywhere else. `RADAR_STATE_KEY` must be at least 16 characters, otherwise the state commands exit with code 2; that is a floor against mistakes, not a recommendation. The workflow checks this at the start of the restore step, on the first run too, so a missing or short key stops the job before anything is spent. Every character counts, including a newline at the end: a value saved in a secret with a trailing newline is a different key from the same text without one. Paste it without one.
 
 **How the branch is pushed.** The push step builds the commit directly (`git commit-tree`, with the identity `github-actions[bot]`) and pushes it with the workflow's token. The token is given to that one `git push` through git's environment (`GIT_CONFIG_COUNT`, as the same authorization header `actions/checkout` would otherwise write), so it is never written to `.git/config`, never in a command line or a URL, and never printed. Nothing from that branch is ever checked out into the work tree.
 
@@ -127,14 +127,14 @@ If the admin service refuses a story, the agent parks it at once with the name o
 This part has not been tried on GitHub.
 
 1. Push the repository to GitHub, and deploy the admin service and the site first ([admin.md](admin.md#deploy), [site.md](site.md#deploy)). The job pushes to the admin service; it cannot do that before it exists.
-2. Add the secrets and variables below under Settings, Secrets and variables, Actions, including `RADAR_ENABLED` set to `true`. The job, a manual run included, is skipped unless that variable is `true`.
+2. Add the secrets and variables below under Settings, Secrets and variables, Actions, including `RADAR_ENABLED` set to `true`. The job, a manual run included, is skipped unless that variable is `true`. Generate `RADAR_STATE_KEY` rather than typing one (`openssl rand -base64 32`), paste it without a trailing newline, and keep a copy in a password manager: without it the saved state cannot be read.
 3. Start a first manual run (see below). Do it well away from 04:15 UTC, since the schedule is live from step 2 on.
 4. After the first run has been checked, leave `RADAR_ENABLED` on, or set it to anything else to stop the schedule again.
 
 | Name | Kind | What it is for | Needed |
 | --- | --- | --- | --- |
 | `ANTHROPIC_API_KEY` | secret | Model calls | required |
-| `RADAR_STATE_KEY` | secret | Passphrase (16 characters or more) that encrypts the saved database | required |
+| `RADAR_STATE_KEY` | secret | Passphrase that encrypts the saved database: generate 32 or more random characters, such as `openssl rand -base64 32` (16 is the least accepted) | required |
 | `RADAR_INGEST_TOKEN` | secret | Token the admin service accepts for pushes (its `INGEST_TOKEN`) | required to push |
 | `RADAR_ADMIN_URL` | variable | The admin service's origin, `https://...` | required to push |
 | `RADAR_ENABLED` | variable | `true` turns the scheduled run on | required |

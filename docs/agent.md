@@ -82,7 +82,7 @@ A source response is read up to 5 MB; a larger one is refused (by its declared l
 | `RADAR_DB_PATH` | all commands | Database path; `--db` overrides it |
 | `RADAR_DAILY_CAP_USD` | `run`, `daily`, `budget` | Daily spend cap, default 0.25 |
 | `RADAR_ADMIN_URL`, `RADAR_INGEST_TOKEN` | `push`, `daily` | Admin service origin and its ingest token |
-| `RADAR_STATE_KEY` | `state` | Passphrase for the saved database, 16 characters or more |
+| `RADAR_STATE_KEY` | `state` | Passphrase for the saved database: 32 or more random characters, generated (16 is the least accepted; see [automation.md](automation.md#the-state-file)) |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | `daily` | Telegram notices, on when both are set |
 | `RADAR_SMTP_HOST`, `RADAR_SMTP_PORT`, `RADAR_SMTP_USER`, `RADAR_SMTP_PASSWORD`, `RADAR_MAIL_FROM`, `RADAR_MAIL_TO` | `daily` | E-mail notices, on when the host is set; port defaults to 587 |
 
