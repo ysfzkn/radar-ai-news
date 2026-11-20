@@ -157,17 +157,14 @@ These steps were written from Cloudflare's documentation and have not been run. 
 1. Create the D1 database: `npx wrangler d1 create radar`. Put the id it prints in `database_id` in `admin/wrangler.jsonc` (the file holds the project owner's id; a fork needs its own). The id is not a secret. `preview_database_id` in the same file is the id local development uses, so `npm run dev` keeps its own local database whatever the production id is.
 2. Create the tables: `npx wrangler d1 migrations apply radar --remote`.
 3. Set the ingest secret: `npx wrangler secret put INGEST_TOKEN`. Use a long random value, and use the same one as `RADAR_INGEST_TOKEN` for `radar push`.
-4. In Cloudflare Zero Trust, create an Access application that covers `/admin*` on the Worker's hostname and allow only the people who may review. Then add a `vars` block to `admin/wrangler.jsonc` with the team domain (for example `myteam.cloudflareaccess.com`) and the application's audience tag. Neither is a secret:
+4. In Cloudflare Zero Trust, create an Access application that covers `/admin*` on the Worker's hostname and allow only the people who may review. The application must cover only `/admin`: `/api/*` and `/healthz` stay open. Then put the team domain (for example `myteam.cloudflareaccess.com`) and the application's audience tag into the `deploy` script in `admin/package.json` (the file holds the project owner's values; a fork needs its own). Neither is a secret:
 
-   ```jsonc
-   "vars": {
-     "ACCESS_TEAM_DOMAIN": "myteam.cloudflareaccess.com",
-     "ACCESS_AUD": "<the application's audience tag>"
-   }
+   ```
+   wrangler deploy --var ACCESS_TEAM_DOMAIN:myteam.cloudflareaccess.com --var ACCESS_AUD:<the application's audience tag>
    ```
 
-   Both must be set. With only one of them set, or neither, sign-in answers 503 and nothing gets in. Optionally add `ADMIN_EMAILS` the same way. Do not set `DEV_NO_AUTH`. You can set variables in the Cloudflare dashboard instead, but by default `wrangler deploy` treats `wrangler.jsonc` as the source of truth and overwrites dashboard variables, unless `keep_vars` is set to `true` (this is described in the installed wrangler's config schema).
-5. Deploy: `npx wrangler deploy`. The hourly expiry cron (`17 * * * *`) in `wrangler.jsonc` is registered by the deploy.
+   They are passed at deploy time and not kept in `wrangler.jsonc`, because local development and the tests read that file and would then ask for a sign-in that does not exist on your machine. Both must be set. With only one of them set, or neither, sign-in answers 503 and nothing gets in; a plain `npx wrangler deploy` therefore closes the admin screen until the next `npm run deploy`. Optionally add `ADMIN_EMAILS` the same way. Do not set `DEV_NO_AUTH`. Variables set in the Cloudflare dashboard are overwritten by a deploy unless `--keep-vars` is used.
+5. Deploy: `npm run deploy`. The hourly expiry cron (`17 * * * *`) in `wrangler.jsonc` is registered by the deploy.
 6. Check that `/healthz` answers `ok`, that `/admin` asks you to sign in, and that `/api/stories` answers without signing in.
-7. Later updates: apply new migrations first, then deploy: `npx wrangler d1 migrations apply radar --remote`, then `npx wrangler deploy`. New code can rely on a migration (for example `0002_restored_event.sql` for "Geri al"); against a database without it, that action is refused with an error page and nothing changes. The migrations so far only add or widen (a new action, an index), so the old code keeps working on the migrated database in the minutes between the two steps.
+7. Later updates: apply new migrations first, then deploy: `npx wrangler d1 migrations apply radar --remote`, then `npm run deploy`. New code can rely on a migration (for example `0002_restored_event.sql` for "Geri al"); against a database without it, that action is refused with an error page and nothing changes. The migrations so far only add or widen (a new action, an index), so the old code keeps working on the migrated database in the minutes between the two steps.
 8. Optional: set `SITE_DEPLOY_HOOK` so the site is rebuilt when the published set changes: `npx wrangler secret put SITE_DEPLOY_HOOK`, with an `https://` deploy-hook URL from the site's host. The Worker posts to it (empty `POST`) after a story is approved, unpublished, edited while published, or ingested as already published. A value that is not `https://` is ignored, the URL is never logged, and a failed call is ignored. This has never been run against a real hook; see [site.md](site.md#deploy).
