@@ -1,6 +1,7 @@
 """Per-source limits shared by every fetcher."""
 
 import ipaddress
+import socket
 import time
 from datetime import datetime, timedelta
 
@@ -42,12 +43,18 @@ def safe_canonical(url: str) -> str | None:
     return canonical
 
 
+def _global(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    """Globally routable unicast; an IPv4-mapped IPv6 address is judged by its IPv4 part."""
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        ip = ip.ipv4_mapped
+    return ip.is_global and not ip.is_multicast
+
+
 def public_http_url(url: str) -> bool:
     """True for an http(s) URL whose host is not obviously internal.
 
-    Host names are not resolved (no DNS in this check): a public name that
-    resolves to a private address is not caught. IP literals must be globally
-    routable; IPv4-mapped IPv6 literals are judged by their IPv4 part.
+    Host names are not resolved here (see `resolves_public`, which `get` also applies).
+    IP literals must be globally routable.
     """
     try:
         parsed = httpx.URL(url)
@@ -66,9 +73,39 @@ def public_http_url(url: str) -> bool:
         # Numeric shorthand such as 2130706433 or 0x7f.1 is an address, not a name.
         last = host.rsplit(".", 1)[-1]
         return not (last.isdigit() or last.startswith("0x"))
-    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
-        ip = ip.ipv4_mapped
-    return ip.is_global and not ip.is_multicast
+    return _global(ip)
+
+
+def resolve(host: str) -> list[str]:
+    """Every address the system resolver gives for `host` (OSError when there is none)."""
+    return [str(info[4][0]) for info in socket.getaddrinfo(host, None, type=socket.SOCK_STREAM)]
+
+
+_resolver = resolve  # replaced in tests, which must not need the network
+
+
+def resolves_public(url: str) -> bool:
+    """True when the URL's host is an IP literal or a name whose every address is global.
+
+    The connection resolves the name again, so a name whose answer changes between the
+    two lookups (DNS rebinding with a very short TTL) is not caught; that would need the
+    connection pinned to the checked address.
+    """
+    host = httpx.URL(url).host
+    try:
+        ipaddress.ip_address(host)
+        return True  # a literal: already judged by public_http_url
+    except ValueError:
+        pass
+    try:
+        addresses = _resolver(host)
+    except (OSError, UnicodeError):
+        return False
+    try:
+        ips = [ipaddress.ip_address(a.split("%", 1)[0]) for a in addresses]
+    except ValueError:
+        return False
+    return bool(ips) and all(_global(ip) for ip in ips)
 
 
 def _check_deadline(deadline: float) -> None:
@@ -91,7 +128,7 @@ def _read_capped(response: httpx.Response, deadline: float) -> bytes:
 
 def get(client: httpx.Client, url: str, **kwargs) -> httpx.Response:
     """GET with a size cap, a total deadline and redirects followed only to public
-    http(s) URLs.
+    http(s) URLs (names are resolved first and refused when any address is not global).
 
     The deadline is checked between chunks, so a server that stalls inside one read is
     still bounded by the client's per-read timeout on top of MAX_SECONDS.
@@ -100,7 +137,7 @@ def get(client: httpx.Client, url: str, **kwargs) -> httpx.Response:
     deadline = _clock() + MAX_SECONDS
     current = url
     for _ in range(MAX_REDIRECTS + 1):
-        if not public_http_url(current):
+        if not public_http_url(current) or not resolves_public(current):
             raise FetchRefused("refused non-public or non-http(s) address")
         _check_deadline(deadline)
         with client.stream("GET", current, **kwargs) as response:

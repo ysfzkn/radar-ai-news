@@ -1,3 +1,4 @@
+import socket
 from datetime import UTC, datetime, timedelta
 from email.utils import format_datetime
 from pathlib import Path
@@ -458,3 +459,87 @@ def test_the_deadline_covers_every_redirect_hop(monkeypatch):
 
 def test_a_quick_response_is_unaffected_by_the_deadline():
     assert get(routed(lambda r: httpx.Response(200, content=b"ok")), "https://a.test/x").content
+
+
+def resolving_to(monkeypatch, mapping: dict[str, list[str]]) -> list[str]:
+    asked: list[str] = []
+
+    def resolver(host: str) -> list[str]:
+        asked.append(host)
+        if host not in mapping:
+            raise socket.gaierror("unknown host")
+        return mapping[host]
+
+    monkeypatch.setattr(common, "_resolver", resolver)
+    return asked
+
+
+def never_sent(request):
+    raise AssertionError("sent")
+
+
+@pytest.mark.parametrize(
+    "addresses",
+    [
+        ["127.0.0.1"],
+        ["10.0.0.7"],
+        ["169.254.169.254"],
+        ["::1"],
+        ["fe80::1%eth0"],
+        ["::ffff:192.168.0.1"],
+        ["93.184.216.34", "10.0.0.1"],  # one private answer is enough to refuse
+        [],
+    ],
+)
+def test_a_name_that_resolves_to_a_non_public_address_is_never_sent(monkeypatch, addresses):
+    resolving_to(monkeypatch, {"rebind.example": addresses})
+    with pytest.raises(FetchRefused):
+        get(routed(never_sent), "https://rebind.example/x")
+
+
+def test_a_name_that_does_not_resolve_is_refused(monkeypatch):
+    resolving_to(monkeypatch, {})
+    with pytest.raises(FetchRefused):
+        get(routed(never_sent), "https://nowhere.example/x")
+
+
+def test_a_redirect_to_a_name_with_a_private_address_is_refused(monkeypatch):
+    asked = resolving_to(
+        monkeypatch, {"a.example": ["93.184.216.34"], "inside.example": ["10.1.2.3"]}
+    )
+    seen = []
+
+    def handler(request):
+        seen.append(str(request.url))
+        return httpx.Response(302, headers={"location": "https://inside.example/meta"})
+
+    with pytest.raises(FetchRefused):
+        get(routed(handler), "https://a.example/x")
+    assert seen == ["https://a.example/x"]
+    assert asked == ["a.example", "inside.example"]
+
+
+def test_a_name_with_only_public_addresses_is_fetched(monkeypatch):
+    resolving_to(monkeypatch, {"a.example": ["93.184.216.34", "2606:2800:220:1::1"]})
+    assert get(routed(lambda r: httpx.Response(200, content=b"ok")), "https://a.example/").content
+
+
+def test_an_ip_literal_is_not_resolved(monkeypatch):
+    asked = resolving_to(monkeypatch, {})
+    get(routed(lambda r: httpx.Response(200, content=b"ok")), "http://93.184.216.34/")
+    assert asked == []
+
+
+def test_the_default_resolver_asks_getaddrinfo(monkeypatch):
+    calls = []
+
+    def fake_getaddrinfo(host, port, *args, **kwargs):
+        calls.append((host, port))
+        return [
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0)),
+            (socket.AF_INET6, socket.SOCK_STREAM, 6, "", ("2606:2800:220:1::1", 0, 0, 0)),
+        ]
+
+    monkeypatch.setattr(socket, "getaddrinfo", fake_getaddrinfo)
+    assert common.resolve("a.example") == ["93.184.216.34", "2606:2800:220:1::1"]
+    assert calls == [("a.example", None)]

@@ -2,8 +2,16 @@ from datetime import UTC, datetime
 
 import pytest
 
+from radar.fetch import common
 from radar.models import Draft, FactCard, RawItem, Score, Source, StoryText, Tier
 from radar.store import SqliteStore
+
+
+@pytest.fixture(autouse=True)
+def public_dns(monkeypatch):
+    """Every name resolves to one public address, so no test needs the network.
+    Tests about resolution replace the resolver themselves."""
+    monkeypatch.setattr(common, "_resolver", lambda host: ["93.184.216.34"])
 
 
 @pytest.fixture
