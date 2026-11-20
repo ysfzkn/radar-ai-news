@@ -280,9 +280,23 @@ def _run_check(args: argparse.Namespace) -> int:
     return 0
 
 
+def _list_refused(args: argparse.Namespace) -> int:
+    store = _open_store(args)
+    try:
+        parked = store.refused_stories()
+    finally:
+        store.close()
+    for story in parked:
+        when = story.refused_at.isoformat() if story.refused_at else ""
+        print(f"{story.uid}  {when}  {story.refused_path or ''}  {story.draft.tr.title}")
+    return 0
+
+
 def _run_push(args: argparse.Namespace) -> int:
     from radar.push import PushError, allowed_url, push_stories
 
+    if args.list_refused:
+        return _list_refused(args)
     url = args.url or os.environ.get("RADAR_ADMIN_URL") or ""
     token = os.environ.get("RADAR_INGEST_TOKEN") or ""
     if not url:
@@ -305,7 +319,13 @@ def _run_push(args: argparse.Namespace) -> int:
     try:
         with httpx.Client(timeout=30, follow_redirects=False) as client:
             stats = push_stories(
-                store, client, url, token, datetime.now(UTC), on_reject=report_rejected
+                store,
+                client,
+                url,
+                token,
+                datetime.now(UTC),
+                on_reject=report_rejected,
+                retry_refused=args.retry_refused,
             )
     except PushError as exc:
         print(f"push failed: {exc}", file=sys.stderr)
@@ -354,6 +374,13 @@ def main(argv: list[str] | None = None) -> int:
     p_push = commands.add_parser("push", help="send finished stories to the admin service")
     p_push.add_argument("--db", default=os.environ.get("RADAR_DB_PATH") or DEFAULT_DB)
     p_push.add_argument("--url", default=None, help="admin origin (default: $RADAR_ADMIN_URL)")
+    refusals = p_push.add_mutually_exclusive_group()
+    refusals.add_argument(
+        "--retry-refused", action="store_true", help="also send stories the service refused before"
+    )
+    refusals.add_argument(
+        "--list-refused", action="store_true", help="list refused stories and send nothing"
+    )
     p_push.set_defaults(run=_run_push)
 
     args = parser.parse_args(argv)

@@ -111,13 +111,13 @@ uv run radar push
 
 `radar push` only sends stories that exist in the local agent database. Normally that means `radar run` (which calls the paid Anthropic API) has written some; with none, it prints zeros.
 
-`radar push` sends every story it has not pushed yet and prints `{"pushed": N, "duplicates": N, "batches": N, "rejected": [...]}`. Running it again right away pushes nothing. It sends the token only to `https://` addresses, or to `http://` on `localhost`, `127.0.0.1` or `[::1]`, and it does not follow redirects.
+`radar push` sends every story it has not pushed yet and prints `{"pushed": N, "duplicates": N, "batches": N, "rejected": [...], "parked": N}`. Running it again right away pushes nothing. It sends the token only to `https://` addresses, or to `http://` on `localhost`, `127.0.0.1` or `[::1]`, and it does not follow redirects.
 
 ### When a push is refused
 
 Before sending, `radar push` trims what it safely can to the ingest limits: at most 20 reasons of 300 characters; at most 30 `who`, `numbers` and `versions` entries of 200 characters; `what` to 1000 characters; at most 30 sources; and a `try_url` that is not an `http://` or `https://` link of at most 2000 characters is sent as no link. The texts and the source links are sent as stored.
 
-If the Worker still refuses a story (for example an empty or over-long text, or a source link it cannot parse), that story is skipped and the rest of its batch is sent again, so other stories are not held up. The skipped story's uid is listed under `rejected`, one line per skipped story on stderr names the field the Worker objected to, and the command exits 1. The story stays unpushed: it is sent again, and refused again, on every later push, so every later push exits 1 until the story is corrected or removed in the local database. There is no command for that yet.
+If the Worker still refuses a story (for example an empty or over-long text, or a source link it cannot parse), that story is skipped and the rest of its batch is sent again, so other stories are not held up. The skipped story's uid is listed under `rejected`, one line per skipped story on stderr names the field the Worker objected to, and the command exits 1. The story is then parked in the local database with the field the Worker objected to, and later pushes leave it out, so they do not exit 1 because of it; `parked` in the printed statistics counts the stories waiting this way. `radar push --list-refused` shows them (uid, time of the refusal, field and Turkish title) without contacting the service and without needing the address or the token. `radar push --retry-refused` sends the parked stories again, for example after the limits on the service changed; a story that is accepted, or already known to the service, is no longer parked, and one that is refused again stays parked with the new field.
 
 To see an approved story on the site, build the site against this server; see [site.md](site.md#against-a-local-admin-service).
 

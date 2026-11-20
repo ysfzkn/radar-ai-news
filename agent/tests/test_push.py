@@ -177,7 +177,7 @@ def test_push_sends_bearer_token_and_marks_accepted_and_duplicates(store, now):
         return httpx.Response(200, json={"accepted": [a], "duplicates": [b]})
 
     stats = push_stories(store, mock_client(handler), URL, TOKEN, now)
-    assert stats == {"pushed": 1, "duplicates": 1, "batches": 1, "rejected": []}
+    assert stats == {"pushed": 1, "duplicates": 1, "batches": 1, "rejected": [], "parked": 0}
     assert requests[0].headers["Authorization"] == "Bearer test-token"
     assert str(requests[0].url) == "https://admin.example.com/api/ingest"
     assert store.unpushed_stories() == []
@@ -189,7 +189,7 @@ def test_push_sends_batches_of_twenty(store, now):
     stats = push_stories(store, mock_client(echo_accept(requests)), URL, TOKEN, now)
     sizes = [len(json.loads(r.content)["stories"]) for r in requests]
     assert BATCH == 20 and sizes == [20, 20, 5]
-    assert stats == {"pushed": 45, "duplicates": 0, "batches": 3, "rejected": []}
+    assert stats == {"pushed": 45, "duplicates": 0, "batches": 3, "rejected": [], "parked": 0}
     assert store.unpushed_stories() == []
 
 
@@ -222,8 +222,15 @@ def test_rejected_story_is_skipped_and_the_rest_are_pushed(store, now):
     )
     assert len(requests) == 2
     assert [s["uid"] for s in json.loads(requests[1].content)["stories"]] == [uids[0], uids[2]]
-    assert stats == {"pushed": 2, "duplicates": 0, "batches": 1, "rejected": [uids[1]]}
-    assert [s.uid for s in store.unpushed_stories()] == [uids[1]]
+    assert stats == {
+        "pushed": 2,
+        "duplicates": 0,
+        "batches": 1,
+        "rejected": [uids[1]],
+        "parked": 1,
+    }
+    assert [s.uid for s in store.unpushed_stories()] == []
+    assert [s.uid for s in store.unpushed_stories(include_refused=True)] == [uids[1]]
     assert reported == [(uids[1], "stories.1.texts.tr.title")]
 
 
@@ -233,7 +240,7 @@ def test_every_story_rejected_marks_nothing_and_stops(store, now):
     stats = push_stories(store, mock_client(reject_uids(set(uids), requests)), URL, TOKEN, now)
     assert len(requests) == 3
     assert stats["rejected"] == uids and stats["pushed"] == 0
-    assert [s.uid for s in store.unpushed_stories()] == uids
+    assert [s.uid for s in store.unpushed_stories(include_refused=True)] == uids
 
 
 def test_nothing_rejected_reports_an_empty_list(store, now):
@@ -249,6 +256,19 @@ def test_400_without_a_story_index_in_the_batch_still_raises(store, now, path):
     with pytest.raises(PushError, match="400"):
         push_stories(store, client, URL, TOKEN, now)
     assert len(store.unpushed_stories()) == 2
+
+
+@pytest.mark.parametrize("error", [httpx.UnsupportedProtocol("no"), ValueError("bad url")])
+def test_unsupported_protocol_is_a_push_error(store, now, error):
+    add_stories(store, now, 1)
+
+    def handler(request):
+        raise error
+
+    with pytest.raises(PushError, match=type(error).__name__) as info:
+        push_stories(store, mock_client(handler), "ftp://admin.example.com", TOKEN, now)
+    assert "admin.example.com" not in str(info.value)
+    assert len(store.unpushed_stories()) == 1
 
 
 def test_invalid_url_becomes_push_error(store, now):
@@ -364,3 +384,83 @@ def test_push_does_not_import_anthropic():
         "sys.exit(1 if bad else 0)"
     )
     assert subprocess.run([sys.executable, "-c", code]).returncode == 0
+
+
+def refusal(path: str = "texts.tr.title"):
+    return {"error": "invalid", "path": f"stories.0.{path}"}
+
+
+def test_a_refused_story_is_parked_with_the_field_and_not_sent_next_time(store, now):
+    (uid,) = add_stories(store, now, 1)
+    first: list[httpx.Request] = []
+    stats = push_stories(store, mock_client(reject_uids({uid}, first)), URL, TOKEN, now)
+    assert stats["rejected"] == [uid]
+    (parked,) = store.refused_stories()
+    assert parked.uid == uid and parked.refused_at == now
+    assert parked.refused_path == "texts.tr.title" and parked.pushed_at is None
+    second: list[httpx.Request] = []
+    again = push_stories(store, mock_client(echo_accept(second)), URL, TOKEN, now)
+    assert second == []
+    assert again == {"pushed": 0, "duplicates": 0, "batches": 0, "rejected": [], "parked": 1}
+
+
+def test_the_stored_path_is_cleaned_and_cut_to_200_characters(store, now):
+    add_stories(store, now, 1)
+    path = "texts.tr." + TOKEN + "x" * 300
+    client = mock_client(
+        lambda r: httpx.Response(400, json={"error": "invalid", "path": f"stories.0.{path}"})
+    )
+    push_stories(store, client, URL, TOKEN, now)
+    stored = store.refused_stories()[0].refused_path
+    assert TOKEN not in stored and len(stored) == 200 and stored.startswith("texts.tr.[redacted]")
+
+
+def test_parked_count_is_reported(store, now):
+    uids = add_stories(store, now, 4)
+    requests: list[httpx.Request] = []
+    stats = push_stories(
+        store, mock_client(reject_uids({uids[0], uids[2]}, requests)), URL, TOKEN, now
+    )
+    assert stats["pushed"] == 2 and stats["parked"] == 2
+    assert push_stories(store, mock_client(echo_accept([])), URL, TOKEN, now)["parked"] == 2
+
+
+def test_retry_refused_sends_parked_stories_and_clears_the_mark_when_accepted(store, now):
+    uids = add_stories(store, now, 2)
+    push_stories(store, mock_client(reject_uids({uids[0]}, [])), URL, TOKEN, now)
+    requests: list[httpx.Request] = []
+    stats = push_stories(
+        store, mock_client(echo_accept(requests)), URL, TOKEN, now, retry_refused=True
+    )
+    assert [s["uid"] for s in json.loads(requests[0].content)["stories"]] == [uids[0]]
+    assert stats == {"pushed": 1, "duplicates": 0, "batches": 1, "rejected": [], "parked": 0}
+    assert store.refused_stories() == []
+    row = store._conn.execute(
+        "SELECT pushed_at, refused_at, refused_path FROM stories WHERE uid = ?", (uids[0],)
+    ).fetchone()
+    assert row["pushed_at"] is not None and row["refused_at"] is None
+    assert row["refused_path"] is None
+
+
+def test_retry_refused_clears_the_mark_when_the_story_is_a_duplicate(store, now):
+    (uid,) = add_stories(store, now, 1)
+    push_stories(store, mock_client(reject_uids({uid}, [])), URL, TOKEN, now)
+    client = mock_client(lambda r: httpx.Response(200, json={"accepted": [], "duplicates": [uid]}))
+    stats = push_stories(store, client, URL, TOKEN, now, retry_refused=True)
+    assert stats["duplicates"] == 1 and stats["parked"] == 0 and store.refused_stories() == []
+
+
+def test_retry_refused_keeps_the_mark_with_the_new_path_when_refused_again(store, now):
+    from datetime import timedelta
+
+    (uid,) = add_stories(store, now, 1)
+    push_stories(store, mock_client(reject_uids({uid}, [])), URL, TOKEN, now)
+    later = now + timedelta(days=1)
+
+    def handler(request):
+        return httpx.Response(400, json=refusal("texts.en.summary"))
+
+    stats = push_stories(store, mock_client(handler), URL, TOKEN, later, retry_refused=True)
+    assert stats["rejected"] == [uid] and stats["parked"] == 1
+    (parked,) = store.refused_stories()
+    assert parked.refused_path == "texts.en.summary" and parked.refused_at == later

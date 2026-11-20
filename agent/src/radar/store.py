@@ -288,15 +288,41 @@ class SqliteStore:
         sql += " ORDER BY created_at, id"
         return self._stories(sql, params)
 
-    def unpushed_stories(self) -> list[Story]:
+    def unpushed_stories(self, include_refused: bool = False) -> list[Story]:
+        sql = "SELECT * FROM stories WHERE pushed_at IS NULL"
+        if not include_refused:
+            sql += " AND refused_at IS NULL"
+        return self._stories(sql + " ORDER BY created_at, id", [])
+
+    def refused_stories(self) -> list[Story]:
+        """Stories the admin service refused and that are still unsent, oldest refusal first."""
         return self._stories(
-            "SELECT * FROM stories WHERE pushed_at IS NULL ORDER BY created_at, id", []
+            "SELECT * FROM stories WHERE refused_at IS NOT NULL AND pushed_at IS NULL "
+            "ORDER BY refused_at, id",
+            [],
         )
 
     def mark_pushed(self, uids: list[str], at: datetime) -> None:
+        """Record a story as sent; this also clears any earlier refusal."""
         with self._conn:
             self._conn.executemany(
-                "UPDATE stories SET pushed_at = ? WHERE uid = ?", [(_iso(at), uid) for uid in uids]
+                "UPDATE stories SET pushed_at = ?, refused_at = NULL, refused_path = NULL "
+                "WHERE uid = ?",
+                [(_iso(at), uid) for uid in uids],
+            )
+
+    def mark_refused(self, uid: str, path: str, at: datetime) -> None:
+        with self._conn:
+            self._conn.execute(
+                "UPDATE stories SET refused_at = ?, refused_path = ? WHERE uid = ?",
+                (_iso(at), path, uid),
+            )
+
+    def clear_refused(self, uids: list[str]) -> None:
+        with self._conn:
+            self._conn.executemany(
+                "UPDATE stories SET refused_at = NULL, refused_path = NULL WHERE uid = ?",
+                [(uid,) for uid in uids],
             )
 
     def story_sources(self, cluster_id: int) -> list[dict]:
@@ -367,6 +393,8 @@ class SqliteStore:
                     created_at=_parse(r["created_at"]),
                     published_at=_parse(r["published_at"]) if r["published_at"] else None,
                     pushed_at=_parse(r["pushed_at"]) if r["pushed_at"] else None,
+                    refused_at=_parse(r["refused_at"]) if r["refused_at"] else None,
+                    refused_path=r["refused_path"],
                 )
             )
         return stories

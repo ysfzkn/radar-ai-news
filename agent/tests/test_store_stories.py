@@ -197,3 +197,78 @@ def test_attempts_are_recorded_oldest_first(store, cluster_id, run_id, now):
     store.record_attempt(cluster_id=cluster_id, run_id=None, outcome="thin", at=now)
     assert store.attempts_for([cluster_id, 999]) == {cluster_id: [now, later]}
     assert store.attempts_for([]) == {}
+
+
+def two_stories(store, cluster_id, run_id, score, draft, now):
+    _insert(store, cluster_id, run_id, score, draft, now)
+    other = store.create_cluster("Other", now)
+    _insert(store, other, run_id, score.model_copy(update={"cluster_id": other}), draft, now)
+    return store.stories_since(now - timedelta(hours=1))
+
+
+def test_mark_refused_parks_a_story_and_clear_refused_releases_it(
+    store, cluster_id, run_id, score, draft, now
+):
+    first, second = two_stories(store, cluster_id, run_id, score, draft, now)
+    later = now + timedelta(hours=1)
+    store.mark_refused(first.uid, "texts.tr.title", later)
+    assert [s.uid for s in store.unpushed_stories()] == [second.uid]
+    assert [s.uid for s in store.unpushed_stories(include_refused=True)] == [first.uid, second.uid]
+    (parked,) = store.refused_stories()
+    assert parked.uid == first.uid and parked.refused_at == later
+    assert parked.refused_path == "texts.tr.title"
+    store.clear_refused([first.uid])
+    store.clear_refused([])
+    assert store.refused_stories() == []
+    assert [s.uid for s in store.unpushed_stories()] == [first.uid, second.uid]
+
+
+def test_refused_stories_are_oldest_refusal_first_and_exclude_pushed(
+    store, cluster_id, run_id, score, draft, now
+):
+    first, second = two_stories(store, cluster_id, run_id, score, draft, now)
+    store.mark_refused(second.uid, "a", now)
+    store.mark_refused(first.uid, "b", now + timedelta(hours=1))
+    assert [s.uid for s in store.refused_stories()] == [second.uid, first.uid]
+    store.mark_pushed([second.uid], now)
+    assert [s.uid for s in store.refused_stories()] == [first.uid]
+
+
+def test_mark_pushed_clears_a_refusal(store, cluster_id, run_id, score, draft, now):
+    (first, _) = two_stories(store, cluster_id, run_id, score, draft, now)
+    store.mark_refused(first.uid, "a", now)
+    store.mark_pushed([first.uid], now)
+    row = store._conn.execute("SELECT refused_at, refused_path FROM stories WHERE id = ?", (1,))
+    assert tuple(row.fetchone()) == (None, None)
+
+
+def test_migration_0004_adds_the_columns_and_keeps_existing_rows(tmp_path):
+    import shutil
+    from pathlib import Path
+
+    from radar.store import SqliteStore
+
+    source = Path(__file__).resolve().parents[2] / "db" / "migrations"
+    old = tmp_path / "old"
+    old.mkdir()
+    for name in ("0001_init.sql", "0002_stories.sql", "0003_publish.sql"):
+        shutil.copy(source / name, old / name)
+    path = str(tmp_path / "m.db")
+    first = SqliteStore(path, str(old))
+    first.create_cluster("C", datetime(2026, 11, 19, tzinfo=UTC))
+    first._conn.execute("INSERT INTO runs (kind, started_at) VALUES ('run', 'x')")
+    first._conn.execute(
+        "INSERT INTO stories (cluster_id, run_id, category, status, score, fact_card, "
+        "source_url, source_count, created_at, uid) "
+        "VALUES (1, 1, 'tooling', 'review', '{}', '{}', 'https://e.com', 1, 'x', 'u1')"
+    )
+    first._conn.commit()
+    first.close()
+    shutil.copy(source / "0004_refused.sql", old / "0004_refused.sql")
+    again = SqliteStore(path, str(old))
+    try:
+        row = again._conn.execute("SELECT * FROM stories").fetchone()
+    finally:
+        again.close()
+    assert row["uid"] == "u1" and row["source_url"] == "https://e.com"
+    assert row["refused_at"] is None and row["refused_path"] is None

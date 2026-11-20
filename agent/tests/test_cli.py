@@ -632,6 +632,7 @@ def test_cli_push_with_nothing_to_push_makes_no_request(tmp_path, monkeypatch, n
         "duplicates": 0,
         "batches": 0,
         "rejected": [],
+        "parked": 0,
     }
 
 
@@ -657,6 +658,7 @@ def test_cli_push_sends_and_prints_stats(tmp_path, monkeypatch, now, capsys):
         "duplicates": 0,
         "batches": 1,
         "rejected": [],
+        "parked": 0,
     }
     assert str(seen[0].url) == "https://admin.example.com/api/ingest"
     store = SqliteStore(db)
@@ -707,8 +709,75 @@ def test_cli_push_with_a_rejected_story_exits_1_and_names_it(tmp_path, monkeypat
     assert main(["push", "--db", db]) == 1
     captured = capsys.readouterr()
     stats = json.loads(captured.out)
-    assert stats["pushed"] == 1 and stats["rejected"] == [first]
+    assert stats["pushed"] == 1 and stats["rejected"] == [first] and stats["parked"] == 1
     lines = captured.err.strip().splitlines()
     assert len(lines) == 1
     assert first in lines[0] and "stories.0.texts.en.title" in lines[0]
     assert "test-token" not in captured.err + captured.out
+
+
+def refusing_client(monkeypatch, seen: list):
+    """Refuse the first story of any two-story request; accept anything smaller."""
+
+    def handler(request):
+        seen.append(request)
+        uids = [s["uid"] for s in json.loads(request.content)["stories"]]
+        if len(uids) == 2:
+            return httpx.Response(
+                400, json={"error": "invalid", "path": "stories.0.texts.tr.title"}
+            )
+        return httpx.Response(200, json={"accepted": uids, "duplicates": []})
+
+    real = httpx.Client
+    monkeypatch.setattr(
+        httpx, "Client", lambda **kw: real(transport=httpx.MockTransport(handler), **kw)
+    )
+
+
+def push_env(monkeypatch):
+    no_push_env(monkeypatch)
+    monkeypatch.setenv("RADAR_INGEST_TOKEN", "test-token")
+    monkeypatch.setenv("RADAR_ADMIN_URL", "https://admin.example.com")
+
+
+def test_cli_push_exits_1_only_when_this_call_refused_something(tmp_path, monkeypatch, now, capsys):
+    push_env(monkeypatch)
+    db = push_db(tmp_path, now, 2)
+    seen: list = []
+    refusing_client(monkeypatch, seen)
+    assert main(["push", "--db", db]) == 1
+    capsys.readouterr()
+    count = len(seen)
+    assert main(["push", "--db", db]) == 0
+    captured = capsys.readouterr()
+    assert json.loads(captured.out)["parked"] == 1 and captured.err == ""
+    assert len(seen) == count  # nothing left to send, so no request
+
+
+def test_cli_retry_refused_sends_the_parked_story_again(tmp_path, monkeypatch, now, capsys):
+    push_env(monkeypatch)
+    db = push_db(tmp_path, now, 2)
+    refusing_client(monkeypatch, [])
+    assert main(["push", "--db", db]) == 1
+    capsys.readouterr()
+    assert main(["push", "--db", db, "--retry-refused"]) == 0
+    stats = json.loads(capsys.readouterr().out)
+    assert stats["pushed"] == 1 and stats["parked"] == 0 and stats["rejected"] == []
+
+
+def test_cli_list_refused_prints_and_makes_no_request(tmp_path, monkeypatch, now, capsys):
+    no_push_env(monkeypatch)
+    forbid_http(monkeypatch)
+    db = push_db(tmp_path, now, 2)
+    store = SqliteStore(db)
+    try:
+        uid = store.unpushed_stories()[0].uid
+        store.mark_refused(uid, "texts.tr.title", now)
+    finally:
+        store.close()
+    assert main(["push", "--db", db, "--list-refused"]) == 0
+    captured = capsys.readouterr()
+    (line,) = captured.out.strip().splitlines()
+    assert uid in line and "texts.tr.title" in line and "t0" in line
+    assert now.isoformat() in line
+    assert captured.err == ""

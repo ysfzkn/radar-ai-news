@@ -119,3 +119,5 @@ class Story(BaseModel):
     created_at: AwareDatetime
     published_at: AwareDatetime | None
     pushed_at: AwareDatetime | None = None
+    refused_at: AwareDatetime | None = None
+    refused_path: str | None = None  # the field the admin service named, e.g. "texts.tr.title"

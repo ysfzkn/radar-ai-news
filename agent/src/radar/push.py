@@ -25,6 +25,7 @@ MAX_SOURCES = 30
 URL_CHARS = 2000
 
 STORY_PATH = re.compile(r"stories\.(\d+)(?:\.|$)")
+STORY_PREFIX = re.compile(r"stories\.\d+\.?")
 
 
 class PushError(Exception):
@@ -146,7 +147,7 @@ def _post(client: httpx.Client, url: str, token: str, payload: dict) -> dict:
     endpoint = url.rstrip("/") + "/api/ingest"
     try:
         response = client.post(endpoint, json=payload, headers={"Authorization": f"Bearer {token}"})
-    except (httpx.HTTPError, httpx.InvalidURL) as exc:
+    except (httpx.HTTPError, httpx.InvalidURL, httpx.UnsupportedProtocol, ValueError) as exc:
         # The exception text can echo request details, so only its type is reported.
         raise PushError(f"could not reach the admin service ({type(exc).__name__})") from None
     if response.status_code != 200:
@@ -175,14 +176,17 @@ def push_stories(
     token: str,
     now: datetime,
     on_reject: Callable[[str, str], None] | None = None,
+    retry_refused: bool = False,
 ) -> dict:
     """Push every unpushed story in batches.
 
     A story the Worker refuses (a 400 naming `stories.<N>`) is left out, its uid is listed
-    under "rejected" and `on_reject(uid, path)` is called; the rest of its batch is resent.
-    Each refusal removes one story, so a batch takes at most its size in requests.
+    under "rejected", `on_reject(uid, path)` is called and the story is parked in the store
+    with the field named; the rest of its batch is resent. Each refusal removes one story,
+    so a batch takes at most its size in requests. Parked stories are not sent again unless
+    `retry_refused` is true; "parked" counts those still unsent when the call ends.
     """
-    stories = store.unpushed_stories()
+    stories = store.unpushed_stories(include_refused=retry_refused)
     stats: dict = {"pushed": 0, "duplicates": 0, "batches": 0, "rejected": []}
     for start in range(0, len(stories), BATCH):
         batch = stories[start : start + BATCH]
@@ -194,6 +198,8 @@ def push_stories(
             except _Rejected as refused:
                 uid = batch.pop(refused.index).uid
                 stats["rejected"].append(uid)
+                field = STORY_PREFIX.sub("", refused.path, count=1)
+                store.mark_refused(uid, _clean(field, token), now)
                 if on_reject is not None:
                     on_reject(uid, _clean(refused.path, token))
                 if not batch:
@@ -208,4 +214,5 @@ def push_stories(
         stats["pushed"] += len(accepted)
         stats["duplicates"] += len(duplicates)
         stats["batches"] += 1
+    stats["parked"] = len(store.refused_stories())
     return stats
