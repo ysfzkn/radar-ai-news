@@ -23,7 +23,12 @@ export interface Copy {
   demo: string;
   /** The demo line's short form, put before the feed title in a demo build. */
   demoShort: string;
-  otherLang: string;
+  /** The accessible name of a story's number, a link to the story itself. */
+  storyLink: string;
+  /** The name of the language switch in the top strip. */
+  language: string;
+  /** This language's code in the switch: "TR" / "EN". */
+  langShort: string;
   skip: string;
   rss: string;
   sourceCode: string;
@@ -87,7 +92,9 @@ export const COPY: Record<Lang, Copy> = {
     noEdition: "Henüz baskı yok.",
     demo: "Örnek veri: bu haberler gerçek değil.",
     demoShort: "Örnek veri",
-    otherLang: "English",
+    storyLink: "Bu haberin bağlantısı",
+    language: "Dil",
+    langShort: "TR",
     skip: "İçeriğe geç",
     rss: "RSS",
     sourceCode: "Kaynak kodu",
@@ -223,7 +230,9 @@ export const COPY: Record<Lang, Copy> = {
     noEdition: "No edition yet.",
     demo: "Demo data: these stories are not real.",
     demoShort: "Demo data",
-    otherLang: "Türkçe",
+    storyLink: "Link to this story",
+    language: "Language",
+    langShort: "EN",
     skip: "Skip to content",
     rss: "RSS",
     sourceCode: "Source code",

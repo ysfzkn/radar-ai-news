@@ -41,17 +41,24 @@ for (const edition of editions) {
       <section class="month">
         <h2 class="month-name label caps">{month.name}</h2>
         <ol class="list" role="list">
-          {month.editions.map((edition) => (
-            <li>
-              <a class="row" href={routes[lang].edition(edition.date)}>
-                <span class="row-no">{copy.issue(edition.number)}</span>{" "}
-                <time class="row-date" datetime={edition.date}>
-                  {longDate(edition.date, lang)}
-                </time>{" "}
-                <span class="row-count label">{copy.storyCount(edition.stories.length)}</span>
-              </a>
-            </li>
-          ))}
+          {month.editions.map((edition) => {
+            // Editions are already in reading order: the first story is the lead.
+            const total = edition.stories.reduce((sum, story) => sum + story.source_count, 0);
+            return (
+              <li>
+                <a class="row" href={routes[lang].edition(edition.date)}>
+                  <span class="row-no">{copy.issue(edition.number)}</span>{" "}
+                  <time class="row-date" datetime={edition.date}>
+                    {longDate(edition.date, lang)}
+                  </time>{" "}
+                  <span class="row-lead">{edition.stories[0].texts[lang]!.title}</span>{" "}
+                  <span class="row-count label">
+                    {copy.storyCount(edition.stories.length)} · {copy.sources(total)}
+                  </span>
+                </a>
+              </li>
+            );
+          })}
         </ol>
       </section>
     ))

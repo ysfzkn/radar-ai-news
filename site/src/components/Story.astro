@@ -36,11 +36,12 @@ const shown = sources.slice(0, SOURCE_LIMIT);
 const more = sources.length - shown.length;
 
 const tryUrl = httpUrl(story.try_url);
+const id = anchorId(story.uid);
 ---
 
-<article id={anchorId(story.uid)} class:list={["story", { "story-lead": lead }]}>
+<article id={id} class:list={["story", { "story-lead": lead }]}>
   <p class="story-meta label">
-    <span class="story-no">{String(index).padStart(2, "0")}</span>{" "}
+    <a class="story-no" href={`#${id}`} aria-label={copy.storyLink}>{String(index).padStart(2, "0")}</a>{" "}
     <a class="story-cat caps" href={routes[lang].topic(story.category)}>{copy.categories[story.category]}</a>{" "}
     {showDate && <time datetime={date}>{shortDate(date, lang)}</time>}{" "}
     <Echo lang={lang} count={story.source_count} />
@@ -70,8 +71,8 @@ const tryUrl = httpUrl(story.try_url);
   {
     tryUrl && (
       <p class="story-try label">
-        <a href={tryUrl} rel="noopener">
-          <span class="story-try-mark" aria-hidden="true">▸</span> {copy.tryIt} · {hostLabel(tryUrl)}
+        <a class="try" href={tryUrl} rel="noopener">
+          <span class="story-try-mark" aria-hidden="true">▸</span> {copy.tryIt}{" "}<span class="try-host">{hostLabel(tryUrl)}</span>
         </a>
       </p>
     )

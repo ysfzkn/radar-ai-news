@@ -18,10 +18,14 @@ const REAL = join(root, "dist-real");
 const SITE = process.env.SITE_URL || "https://radar.ozkanyusuf.com";
 const DEMO_DATES =["2026-11-17", "2026-11-18", "2026-11-19", "2026-11-20"];
 
+// The demo build forces the fixture with RADAR_DEMO=1, so a fetched site/.data/stories.json
+// (the owner's real data) is neither read nor touched; the others name their file explicitly.
 function build(outDir: string, storiesFile?: string): void {
   const env = { ...process.env };
   delete env.RADAR_STORIES_FILE;
+  delete env.RADAR_DEMO;
   if (storiesFile) env.RADAR_STORIES_FILE = storiesFile;
+  else env.RADAR_DEMO = "1";
   execFileSync(process.execPath, [astro, "build", "--outDir", outDir], {
     cwd: root,
     env,
@@ -30,9 +34,6 @@ function build(outDir: string, storiesFile?: string): void {
 }
 
 beforeAll(() => {
-  if (existsSync(join(root, ".data", "stories.json"))) {
-    throw new Error("site/.data/stories.json exists; the demo build needs it gone");
-  }
   build(DEMO);
   build(HOSTILE, "test/fixtures/hostile.json");
   build(EMPTY, "test/fixtures/empty.json");
@@ -102,6 +103,37 @@ function articles(html: string): string[] {
   return [...html.matchAll(/<article[\s\S]*?<\/article>/g)].map((m) => m[0]);
 }
 
+// A build test cannot measure layout, so layout rules are checked in the stylesheet itself.
+const css = () => readFileSync(join(root, "src", "styles", "base.css"), "utf8");
+
+/** The body of the first rule whose selector list is exactly `selector`, at any indentation. */
+function cssRule(sheet: string, selector: string): string {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = sheet.match(new RegExp(`\\n\\s*${escaped} \\{([^}]*)\\}`));
+  expect(match, selector).not.toBeNull();
+  return match![1];
+}
+
+/** The `@media print` block, which closes the stylesheet. */
+function printRules(sheet: string): string {
+  const start = sheet.indexOf("\n@media print {");
+  expect(start).toBeGreaterThan(-1);
+  return sheet.slice(start);
+}
+
+/** The lit arcs of an article's labelled echo meter. */
+const litArcs = (article: string) =>
+  (article.match(/<span class="echo">[\s\S]*?<\/svg>/)![0].match(/class="echo-on"/g) ?? []).length;
+
+/** The source count an article's echo meter names. */
+const sourceCount = (article: string) => Number(article.match(/role="img" aria-label="[^"]*: (\d+) /)![1]);
+
+function langControl(html: string): { label: string; inner: string } {
+  const all = [...html.matchAll(/<div class="lang label" role="group" aria-label="([^"]+)">([\s\S]*?)<\/div>/g)];
+  expect(all).toHaveLength(1);
+  return { label: all[0][1], inner: all[0][2] };
+}
+
 describe("built site", () => {
   it("the Turkish home page is edition 4 with five articles and the künye `Sayı 4 · 20 Kasım 2026 Cuma · 5 haber`", () => {
     const home = page(DEMO, "");
@@ -147,7 +179,7 @@ describe("built site", () => {
         expect(panel![1]).toMatch(new RegExp(`<p class="story-dev-label label caps">${COPY[lang].forDevelopers}</p>`));
         expect(article).toMatch(/<a [^>]*href="https:\/\/[^"]+"[^>]*rel="noopener"/);
         expect(article).toMatch(/role="img" aria-label="[^"]*"/);
-        const label = article.match(/aria-label="([^"]*)"/)![1];
+        const label = article.match(/role="img" aria-label="([^"]*)"/)![1];
         expect(label).toMatch(lang === "tr" ? /^5 üzerinden [1-5]: \d+ bağımsız kaynak$/ : /^[1-5] of 5: /);
         expect(text(article)).toMatch(lang === "tr" ? /\d+ kaynak/ : /\d+ sources?/);
       }
@@ -236,10 +268,180 @@ describe("built site", () => {
       expect(start, selector).toBeGreaterThan(-1);
       return css.slice(start, css.indexOf("}", start));
     };
-    expect(rule(".index-list li")).toContain("grid-template-columns: 2.25rem minmax(0, 1fr);");
+    expect(rule(".index-list li")).toContain("grid-template-columns: 2.25rem minmax(0, 1fr) auto;");
     expect(rule(".index-list a")).toContain("overflow-wrap: anywhere;");
     // The hostile fixture carries a 60-character token in a title, and the page still builds.
     expect(page(HOSTILE, "en/2026-11-19")).toContain("x".repeat(60));
+  });
+
+  it("each index row carries that story's echo arcs with the right lit count, hidden from assistive tech", () => {
+    for (const path of ["", "en", "2026-11-18", "en/2026-11-17"]) {
+      const html = page(DEMO, path);
+      const index = html.match(/<nav class="index"[^>]*>([\s\S]*?)<\/nav>/)![1];
+      const rows = [...index.matchAll(/<li>([\s\S]*?)<\/li>/g)].map((m) => m[1]);
+      const lit = articles(html).map(litArcs);
+      expect(rows, path).toHaveLength(lit.length);
+      rows.forEach((row, i) => {
+        const svgs = row.match(/<svg[\s\S]*?<\/svg>/g)!;
+        expect(svgs, path).toHaveLength(1);
+        const svg = svgs[0];
+        expect(svg).toMatch(/^<svg class="echo-arcs" viewBox="0 0 44 14" width="33" height="10.5" aria-hidden="true">/);
+        expect(svg).not.toContain("aria-label");
+        expect(svg.match(/class="echo-on"/g) ?? [], `${path} row ${i + 1}`).toHaveLength(lit[i]);
+        expect(svg.match(/class="echo-off"/g) ?? []).toHaveLength(5 - lit[i]);
+        // Number, title link, then the arcs at the row's end.
+        expect(row.indexOf("<svg")).toBeGreaterThan(row.indexOf("</a>"));
+      });
+    }
+    // The demo's 18 November mixes levels, so a wrong count would show.
+    expect(new Set(articles(page(DEMO, "2026-11-18")).map(litArcs)).size).toBeGreaterThan(1);
+  });
+
+  it("the index rule keeps the title in a minmax(0, 1fr) track with the arcs in an auto track", () => {
+    const sheet = css();
+    expect(cssRule(sheet, ".index-list li")).toContain("grid-template-columns: 2.25rem minmax(0, 1fr) auto;");
+    expect(cssRule(sheet, ".index-list a")).toContain("overflow-wrap: anywhere;");
+    // The rail keeps the same tracks: no other rule redefines the row's columns.
+    expect(sheet.match(/grid-template-columns: 2\.25rem/g)).toHaveLength(1);
+  });
+
+  it("each story's number links to its own anchor and has an accessible name", () => {
+    for (const [path, lang] of [["", "tr"], ["en", "en"], ["2026-11-18", "tr"], ["hafta/2026-W47", "tr"], ["en/week/2026-W47", "en"]] as const) {
+      const list = articles(page(DEMO, path));
+      expect(list.length).toBeGreaterThan(1);
+      list.forEach((article, i) => {
+        const id = article.match(/<article id="([^"]+)"/)![1];
+        const no = String(i + 1).padStart(2, "0");
+        expect(article, `${path} ${id}`).toContain(
+          `<a class="story-no" href="#${id}" aria-label="${COPY[lang].storyLink}">${no}</a>`,
+        );
+      });
+    }
+    const sheet = css();
+    expect(cssRule(sheet, "a.story-no")).toContain("text-decoration-line: none;");
+    expect(cssRule(sheet, "a.story-no:hover,\na.story-no:focus-visible")).toContain("text-decoration-line: underline;");
+  });
+
+  it("the stylesheet marks a targeted story and gives stories a scroll margin", () => {
+    const sheet = css();
+    expect(cssRule(sheet, ".story")).toContain("scroll-margin-top: 1.5rem;");
+    const bars = [...sheet.matchAll(/\.story:target::before \{([^}]*)\}/g)].map((m) => m[1]);
+    expect(bars.length).toBeGreaterThan(0);
+    expect(bars.join("")).toContain("3px solid var(--accent)");
+    // A bar only: no background change and no animation on a targeted story.
+    expect(sheet).not.toMatch(/:target \{/);
+    for (const bar of bars) expect(bar).not.toMatch(/animation|transition|background/);
+  });
+
+  it("the try link is one link with the button class, the mark and the host", () => {
+    let seen = 0;
+    for (const [path, lang] of [["", "tr"], ["en", "en"], ["2026-11-18", "tr"]] as const) {
+      for (const article of articles(page(DEMO, path))) {
+        const block = article.match(/<p class="story-try label">([\s\S]*?)<\/p>/);
+        if (!block) continue;
+        seen++;
+        expect(block[1].match(/<a /g)).toHaveLength(1);
+        const link = block[1].match(/<a class="try" href="(https:\/\/[^"]+)" rel="noopener">([\s\S]*?)<\/a>/);
+        expect(link, path).not.toBeNull();
+        const host = new URL(link![1]).host;
+        expect(link![2]).toMatch(
+          new RegExp(
+            `^<span class="story-try-mark" aria-hidden="true">▸</span> ?${COPY[lang].tryIt} <span class="try-host">${host.replace(/\./g, "\\.")}</span>$`,
+          ),
+        );
+      }
+    }
+    expect(seen).toBeGreaterThan(2);
+    const sheet = css();
+    const button = cssRule(sheet, ".try");
+    expect(button).toContain("border: 1px solid var(--ink);");
+    expect(button).toContain("padding: 0.375rem 0.75rem;");
+    expect(button).toContain("min-height: 2.25rem;");
+    const hover = cssRule(sheet, ".try:hover,\n.try:focus-visible");
+    expect(hover).toContain("background: var(--chip);");
+    expect(cssRule(sheet, ".story-try")).toContain("margin-top: 0.75rem;");
+  });
+
+  it("the language control shows both languages, marks the current one and links the other with hreflang", () => {
+    const cases = [
+      ["", "tr", "/en/"],
+      ["en", "en", "/"],
+      ["2026-11-18", "tr", "/en/2026-11-18/"],
+      ["en/2026-11-18", "en", "/2026-11-18/"],
+      ["yontem", "tr", "/en/method/"],
+      ["en/method", "en", "/yontem/"],
+      ["arsiv", "tr", "/en/archive/"],
+    ] as const;
+    for (const [path, lang, href] of cases) {
+      const { label, inner } = langControl(page(DEMO, path));
+      expect(label).toBe(COPY[lang].language);
+      const other = lang === "tr" ? "en" : "tr";
+      const current = `<span class="lang-part" aria-current="true">${COPY[lang].langShort}</span>`;
+      const link = `<a class="lang-part" href="${href}" hreflang="${other}" lang="${other}">${COPY[other].langShort}</a>`;
+      expect(inner, path).toContain(current);
+      expect(inner, path).toContain(link);
+      // TR first, then EN, whichever is current.
+      expect(inner.indexOf(">TR<")).toBeLessThan(inner.indexOf(">EN<"));
+      expect(inner.match(/<a /g)).toHaveLength(1);
+    }
+    // The control replaces the lone other-language link in the strip.
+    const strip = page(DEMO, "").match(/<header class="top">([\s\S]*?)<\/header>/)![1];
+    expect(strip.match(/hreflang=/g)).toHaveLength(1);
+    expect(text(strip)).not.toContain("English");
+  });
+
+  it("on a page with no counterpart the other language links to that language's home", () => {
+    const { inner } = langControl(page(HOSTILE, "en/2026-11-19"));
+    expect(inner).toContain(`<a class="lang-part" href="/" hreflang="tr" lang="tr">TR</a>`);
+    expect(inner).toContain(`<span class="lang-part" aria-current="true">EN</span>`);
+    expect(langControl(readFileSync(join(DEMO, "404.html"), "utf8")).inner).toContain(
+      `<a class="lang-part" href="/en/" hreflang="en" lang="en">EN</a>`,
+    );
+  });
+
+  it("archive rows show the lead headline and the edition's total sources, with one link per row", () => {
+    for (const [path, prefix, lang] of [["arsiv", "", "tr"], ["en/archive", "en/", "en"]] as const) {
+      const html = page(DEMO, path);
+      const rows = [...html.matchAll(/<li>\s*<a class="row" href="([^"]+)"[^>]*>([\s\S]*?)<\/a>\s*<\/li>/g)];
+      expect(rows).toHaveLength(DEMO_DATES.length);
+      for (const [, href, row] of rows) {
+        expect(row).not.toContain("<a ");
+        const edition = articles(page(DEMO, `${prefix}${href.split("/").at(-2)}`));
+        const lead = text(edition[0].match(/<h2[^>]*>([\s\S]*?)<\/h2>/)![1]);
+        const total = edition.map(sourceCount).reduce((a, b) => a + b, 0);
+        const leadSpan = row.match(/<span class="row-lead">([\s\S]*?)<\/span>/);
+        expect(leadSpan, href).not.toBeNull();
+        expect(text(leadSpan![1])).toBe(lead);
+        expect(text(row)).toContain(`${COPY[lang].storyCount(edition.length)} · ${COPY[lang].sources(total)}`);
+        // The lead sits under the date, before the count.
+        expect(row.indexOf("row-date")).toBeLessThan(row.indexOf("row-lead"));
+      }
+    }
+    const sheet = css();
+    const lead = cssRule(sheet, ".row-lead");
+    for (const rule of ["min-width: 0;", "white-space: nowrap;", "overflow: hidden;", "text-overflow: ellipsis;"]) {
+      expect(lead).toContain(rule);
+    }
+    expect(cssRule(sheet, ".row")).toContain("grid-template-columns: 4.75em minmax(0, 1fr);");
+  });
+
+  it("the print rules hide the navigation, banner, index, pager and footer, and print source addresses", () => {
+    const sheet = css();
+    const print = printRules(sheet);
+    // The print block closes the stylesheet, so nothing after it overrides it.
+    expect(print.trimEnd().endsWith("}\n}") || print.trimEnd().endsWith("}\r\n}")).toBe(true);
+    const hidden = cssRule(print, ".top-nav,\n  .demo,\n  .index,\n  .pager,\n  .foot,\n  .skip");
+    expect(hidden).toContain("display: none;");
+    expect(cssRule(print, "body")).toMatch(/background: var\(--surface\);[\s\S]*color: var\(--ink\);/);
+    expect(cssRule(print, ".stories > li")).toContain("break-inside: avoid;");
+    expect(cssRule(print, ".story-dev")).toContain("background: none;");
+    expect(cssRule(print, '.story-sources a[href^="http"]::after,\n  .try[href^="http"]::after')).toContain(
+      'content: " (" attr(href) ")";',
+    );
+    // The rail and the column shift give way to one column.
+    expect(print).toContain(".edition-railed");
+    // The strip that carries the navigation has the class the print rule hides.
+    expect(page(DEMO, "")).toMatch(/<nav class="top-nav">/);
   });
 
   it("an edition with one story has no index", () => {
@@ -438,8 +640,10 @@ describe("built site", () => {
       const html = page(DEMO, path);
       const rows = [...html.matchAll(/<a class="row" href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g)];
       expect(rows.map((m) => m[1])).toEqual([...DEMO_DATES].reverse().map((d) => `/${prefix}${d}/`));
-      expect(text(rows[0][2])).toBe(
-        lang === "tr" ? "Sayı 4 20 Kasım 2026 Cuma 5 haber" : "Issue 4 Friday, 20 November 2026 5 stories",
+      expect(text(rows[0][2])).toMatch(
+        lang === "tr"
+          ? /^Sayı 4 20 Kasım 2026 Cuma .+ 5 haber · \d+ kaynak$/
+          : /^Issue 4 Friday, 20 November 2026 .+ 5 stories · \d+ sources$/,
       );
       expect(text(rows[3][2])).toContain(lang === "tr" ? "Sayı 1" : "Issue 1");
       expect(text(html)).toContain(lang === "tr" ? "Kasım 2026" : "November 2026");
@@ -477,7 +681,7 @@ describe("built site", () => {
       expect(list).toHaveLength(10);
       const counts = list.map((a) => Number(a.match(/aria-label="[^"]*: (\d+) /)![1]));
       expect(counts).toEqual([...counts].sort((a, b) => b - a));
-      const numbers = list.map((a) => text(a.match(/<span class="story-no">(\d+)<\/span>/)![0]));
+      const numbers = list.map((a) => text(a.match(/<a class="story-no"[^>]*>(\d+)<\/a>/)![0]));
       expect(numbers).toEqual(["01", "02", "03", "04", "05", "06", "07", "08", "09", "10"]);
       expect(articles(page(DEMO, index))).toEqual(list);
     }

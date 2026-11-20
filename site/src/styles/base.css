@@ -60,6 +60,11 @@ a:hover {
   outline-offset: 2px;
 }
 
+::selection {
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -75,6 +80,7 @@ a:hover {
   font-size: 0.8125rem;
   letter-spacing: 0.04em;
   line-height: 1.5;
+  font-variant-numeric: tabular-nums;
 }
 
 .caps {
@@ -129,6 +135,14 @@ a:hover {
   text-decoration: none;
 }
 
+/* The navigation, then the language switch beside it. */
+.top-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+}
+
 .nav {
   display: flex;
   flex-wrap: wrap;
@@ -159,6 +173,45 @@ a:hover {
 .nav a[aria-current="page"] {
   color: var(--ink);
   text-decoration-color: var(--accent);
+}
+
+/* The language switch: two parts in one outline; the current one is plain text on a chip. */
+.lang {
+  display: inline-flex;
+  border: 1px solid var(--control-border);
+  border-radius: 2px;
+}
+
+/* 0.6875rem above and below a 1.2 line make a 2.25rem tap target at phone width. */
+.lang-part {
+  padding: 0.6875rem 0.625rem;
+  line-height: 1.2;
+}
+
+.lang-part + .lang-part {
+  border-left: 1px solid var(--control-border);
+}
+
+.lang-part[aria-current] {
+  background: var(--chip);
+  color: var(--ink);
+}
+
+a.lang-part {
+  color: var(--muted);
+  text-decoration-color: transparent;
+}
+
+a.lang-part:hover,
+a.lang-part:focus-visible {
+  color: var(--ink);
+  text-decoration-color: var(--accent);
+}
+
+@media (min-width: 48rem) {
+  .lang-part {
+    padding-block: 0.25rem;
+  }
 }
 
 .demo {
@@ -237,6 +290,7 @@ a:hover {
   font-weight: 700;
   letter-spacing: -0.025em;
   line-height: 1.05;
+  text-wrap: balance;
 }
 
 .mh-year + .mh-big {
@@ -275,7 +329,7 @@ a:hover {
 
 .index-list li {
   display: grid;
-  grid-template-columns: 2.25rem minmax(0, 1fr);
+  grid-template-columns: 2.25rem minmax(0, 1fr) auto;
   align-items: baseline;
   padding-block: var(--space-1);
   font-size: 0.9375rem;
@@ -294,6 +348,13 @@ a:hover {
 
 .index-list a:hover {
   text-decoration-color: var(--accent);
+}
+
+/* The story's echo at the row's end: the meter's arcs at three quarters of its size. */
+.index-list .echo-arcs {
+  position: relative;
+  top: 0.1em;
+  margin-left: var(--space-3);
 }
 
 .edition .stories {
@@ -366,6 +427,22 @@ a:hover {
   border-top: 1px solid var(--line);
 }
 
+/* A story is an anchor: it stops a little below the window's top edge, and the story the
+   address points at gets an accent bar at its left, drawn outside its content. */
+.story {
+  position: relative;
+  scroll-margin-top: 1.5rem;
+}
+
+.story:target::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -0.625rem;
+  border-left: 3px solid var(--accent);
+}
+
 .story-meta {
   display: flex;
   flex-wrap: wrap;
@@ -383,6 +460,19 @@ a:hover {
   line-height: 1;
   color: var(--accent);
   font-variant-numeric: tabular-nums;
+}
+
+/* The number links to its own story; the padding makes a 24px hit area and the negative
+   margin gives the space back, so the number stays where it was. */
+a.story-no {
+  padding-block: 0.25rem;
+  margin-block: -0.25rem;
+  text-decoration-line: none;
+}
+
+a.story-no:hover,
+a.story-no:focus-visible {
+  text-decoration-line: underline;
 }
 
 .story-cat {
@@ -406,8 +496,10 @@ a.story-cat:hover {
 
 /* From 48rem the number leaves the label row and hangs in a 3rem gutter left of the story. */
 @media (min-width: 48rem) {
-  .story {
-    position: relative;
+  /* The bar moves out to the far left of the gutter, left of the hanging number; on a
+     window just over 48rem, where the gutter is narrow, it stops short of the window edge. */
+  .story:target::before {
+    left: max(-3.75rem, calc((var(--measure) - 100vw) / 2 + 0.5rem));
   }
 
   .story .story-no {
@@ -430,7 +522,7 @@ a.story-cat:hover {
   font-weight: 600;
   letter-spacing: -0.01em;
   line-height: 1.25;
-  text-wrap: pretty;
+  text-wrap: balance;
 }
 
 @media (min-width: 40em) {
@@ -441,6 +533,7 @@ a.story-cat:hover {
 
 .story-summary {
   margin-bottom: var(--space-4);
+  text-wrap: pretty;
 }
 
 /* The lead: the first story of an edition. */
@@ -463,24 +556,58 @@ a.story-cat:hover {
   border-left: 3px solid var(--accent);
 }
 
+.story-dev p {
+  text-wrap: pretty;
+}
+
 .story-dev-label {
   margin-bottom: var(--space-1);
   color: var(--accent);
 }
 
-.story-sources,
-.story-try {
+.story-sources {
   margin-bottom: var(--space-1);
   color: var(--muted);
 }
 
-.story-sources a,
-.story-try a {
+.story-sources a {
+  color: var(--ink);
+}
+
+/* The one call to action: an outlined label button on its own line under the sources. */
+.story-try {
+  margin-top: 0.75rem;
+}
+
+.try {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  max-width: 100%;
+  min-height: 2.25rem;
+  padding: 0.375rem 0.75rem;
+  border: 1px solid var(--ink);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.try:hover,
+.try:focus-visible {
+  border-color: var(--ink);
+  background: var(--chip);
   color: var(--ink);
 }
 
 .story-try-mark {
   color: var(--accent);
+}
+
+.try-host {
+  min-width: 0;
+  padding-left: 0.5em;
+  border-left: 1px solid var(--muted);
+  color: var(--muted);
+  overflow-wrap: anywhere;
 }
 
 /* Echo meter: five arcs, the first `level` lit, then the count. The same arcs, all lit and
@@ -625,7 +752,7 @@ a.story-cat:hover {
 /* Archive row: number | date, with the story count under the date, or at the right end from 40em. */
 .row {
   display: grid;
-  grid-template-columns: 4.75em 1fr;
+  grid-template-columns: 4.75em minmax(0, 1fr);
   align-items: baseline;
   column-gap: var(--space-4);
   text-decoration: none;
@@ -638,6 +765,19 @@ a.story-cat:hover {
   font-variant-numeric: tabular-nums;
 }
 
+/* The lead headline under the date: one muted line, cut where it runs out. */
+.row-lead {
+  grid-column: 2;
+  min-width: 0;
+  margin-top: var(--space-1);
+  color: var(--muted);
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .row-count {
   grid-column: 2;
   color: var(--muted);
@@ -645,11 +785,16 @@ a.story-cat:hover {
 
 @media (min-width: 40em) {
   .row {
-    grid-template-columns: 4.75em 1fr auto;
+    grid-template-columns: 4.75em minmax(0, 1fr) auto;
+  }
+
+  .row-lead {
+    grid-column: 2 / 4;
   }
 
   .row-count {
-    grid-column: auto;
+    grid-column: 3;
+    grid-row: 1;
   }
 }
 
@@ -700,4 +845,64 @@ a.story-cat:hover {
   padding-block: var(--space-4) var(--space-6);
   border-top: 1px solid var(--line);
   color: var(--muted);
+}
+
+/* Print: the edition as one plain column of ink on white. Nothing relies on a background,
+   which browsers drop by default; the echo meters are strokes and print as they are. */
+@media print {
+  .top-nav,
+  .demo,
+  .index,
+  .pager,
+  .foot,
+  .skip {
+    display: none;
+  }
+
+  body {
+    background: var(--surface);
+    color: var(--ink);
+    font-size: 11pt;
+  }
+
+  .page {
+    max-width: none;
+    padding-inline: 0;
+  }
+
+  .page:has(.edition-railed) > :is(.top, .demo, .foot) {
+    position: static;
+  }
+
+  .edition-railed {
+    display: block;
+    width: auto;
+    margin-left: 0;
+  }
+
+  .story:target::before {
+    content: none;
+  }
+
+  .stories > li {
+    break-inside: avoid;
+  }
+
+  .story-title {
+    break-after: avoid;
+  }
+
+  .story-dev {
+    background: none;
+  }
+
+  .story-sources a[href^="http"]::after,
+  .try[href^="http"]::after {
+    content: " (" attr(href) ")";
+    overflow-wrap: anywhere;
+  }
+
+  .try {
+    flex-wrap: wrap;
+  }
 }

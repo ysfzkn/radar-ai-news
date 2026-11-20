@@ -15,6 +15,7 @@ interface Props {
 const { lang, path, alternate } = Astro.props;
 const copy = COPY[lang];
 const other: Lang = lang === "tr" ? "en" : "tr";
+const languages: Lang[] = ["tr", "en"];
 const links = [
   { href: routes[lang].home, text: copy.nav.today },
   { href: routes[lang].archive, text: copy.nav.archive },
@@ -28,7 +29,7 @@ const links = [
     <Mark />
     {copy.siteName}
   </a>
-  <nav>
+  <nav class="top-nav">
     <ul class="nav label">
       {
         links.map((link) => (
@@ -39,9 +40,19 @@ const links = [
           </li>
         ))
       }
-      <li>
-        <a href={alternate ?? routes[other].home} hreflang={other} lang={other}>{copy.otherLang}</a>
-      </li>
     </ul>
+    <div class="lang label" role="group" aria-label={copy.language}>
+      {
+        languages.map((code) =>
+          code === lang ? (
+            <span class="lang-part" aria-current="true">{COPY[code].langShort}</span>
+          ) : (
+            <a class="lang-part" href={alternate ?? routes[other].home} hreflang={other} lang={other}>
+              {COPY[code].langShort}
+            </a>
+          ),
+        )
+      }
+    </div>
   </nav>
 </header>
