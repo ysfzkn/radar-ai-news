@@ -980,7 +980,7 @@ describe("feedback and foresight", () => {
       expect(preview).toContain('<div class="pv-story" lang="en">');
       expect(preview).toContain(`>${COPY.previewDev.tr}</p>`);
       expect(preview).toContain(`>${COPY.previewDev.en}</p>`);
-      expect(COPY.previewDev).toEqual({ tr: "Geliştiriciler için", en: "For developers" });
+      expect(COPY.previewDev).toEqual({ tr: "Neden önemli", en: "Why it matters" });
       expect(preview.indexOf('id="pv_tr_title"')).toBeLessThan(preview.indexOf('id="pv_en_title"'));
       // Directly under the reasons, above the fact card.
       expect(body.indexOf('id="reasons-h"')).toBeLessThan(body.indexOf('id="preview-h"'));
@@ -1071,5 +1071,52 @@ describe("feedback and foresight", () => {
     expect(css).toMatch(/\.pv-dev \{[^}]*border-left: 3px solid var\(--accent\)/);
     expect(css).toMatch(/\.pv-title \{[^}]*font-size: 1\.125rem;[^}]*font-weight: 700;/);
     expect(css).not.toContain("box-shadow");
+  });
+
+  it("the story line is labelled Neden önemli in the form, the read-only texts and the messages", async () => {
+    expect(COPY.fields.dev_line).toBe("Neden önemli");
+    expect(COPY.fieldName.dev_line).toBe("neden önemli satırı");
+    const uid = await seed({ status: "published" });
+    const page = await (await get(`/admin/stories/${uid}`)).text();
+    expect(page).toContain('<label for="tr_dev_line">Neden önemli</label>');
+    expect(page).not.toContain("Geliştirici");
+    const res = await post(`/admin/stories/${uid}/edit`, editFields(1, { tr_dev_line: "x".repeat(201) }));
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain("Yayınlamak için metin çok uzun: Türkçe neden önemli satırı");
+    const rejected = await seed();
+    await rejectStory(env.DB, rejected, 1, null, "owner@example.com", new Date());
+    expect(await (await get(`/admin/stories/${rejected}`)).text()).toContain('<dt lang="tr">Neden önemli</dt>');
+  });
+
+  it("Ctrl+S in a field of another form leaves that form alone and keeps the browser default", async () => {
+    const js = await (await get("/admin/app.js")).text();
+    const handler = js.slice(js.indexOf('addEventListener("keydown"'));
+    expect(handler).toMatch(/var target = event\.target;\s*if \(target && target\.form && target\.form !== form\) return;/);
+    expect(handler.indexOf("target.form !== form")).toBeLessThan(handler.indexOf("preventDefault()"));
+  });
+
+  it("the script syncs the preview with the fields once at load", async () => {
+    const js = await (await get("/admin/app.js")).text();
+    expect(js).toMatch(/field\.addEventListener\("input", show\);\s*show\(\);/);
+    expect(js).toMatch(/category\.addEventListener\("change", showCategory\);\s*showCategory\(\);/);
+  });
+
+  it("below 64rem the preview follows the edit form and comes before the decision card; from 64rem it stays in the side column", async () => {
+    const css = await (await get("/admin/app.css")).text();
+    const narrow = css.slice(0, css.indexOf("@media"));
+    expect(narrow).toMatch(/\.story-main \{ display: contents; \}/);
+    expect(narrow).toMatch(/\.story-main > \* \{ order: 1; \}/);
+    expect(narrow).toMatch(/\.preview \{ order: 2; \}/);
+    expect(narrow).toMatch(/\.story-main > \.danger-card \{ order: 3; \}/);
+    expect(narrow).toMatch(/\.history-panel \{ order: 4; \}/);
+    const wide = css.slice(css.indexOf("@media (min-width: 64rem)"));
+    expect(wide).toMatch(/\.story-main \{[^}]*display: flex;[^}]*flex-direction: column;[^}]*gap: var\(--space-5\);/);
+    expect(wide).toMatch(/\.preview \{ order: 0; \}/);
+    // In the markup the preview stays directly under the reasons, inside the side column.
+    const uid = await seed();
+    const body = await (await get(`/admin/stories/${uid}`)).text();
+    const side = body.slice(body.indexOf('<div class="story-side">'), body.indexOf('<div class="story-main">'));
+    expect(side).toContain('id="preview-h"');
+    expect(body.indexOf('<section class="danger-card"')).toBeGreaterThan(body.indexOf('id="story-form"'));
   });
 });

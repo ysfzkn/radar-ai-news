@@ -271,7 +271,7 @@ app.post("/admin/stories/:uid/approve", async (c) => {
     // Only a story in review is saved here; any other status goes straight to approveStory, which refuses it.
     if (story?.status === "review" && differs(story, draft)) {
       const edited = await editStory(c.env.DB, uid, version, patchOf(draft), actor, new Date());
-      if (!edited.ok) return afterResult(c, uid, edited, withDone("/admin", "approved"), draft, ["review"]);
+      if (!edited.ok) return afterResult(c, uid, edited, "/admin", draft, ["review"]);
       version += 1;
       saved = true;
     }

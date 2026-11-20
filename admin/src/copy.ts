@@ -57,8 +57,8 @@ export const COPY = {
   editHeading: "Düzenle",
   category: "Kategori",
   langs: { tr: "Türkçe", en: "İngilizce" } satisfies Record<Lang, string>,
-  fields: { title: "Başlık", summary: "Özet", dev_line: "Geliştirici notu" },
-  fieldName: { title: "başlık", summary: "özet", dev_line: "geliştirici notu" } as Record<string, string>,
+  fields: { title: "Başlık", summary: "Özet", dev_line: "Neden önemli" },
+  fieldName: { title: "başlık", summary: "özet", dev_line: "neden önemli satırı" } as Record<string, string>,
   tryUrlHint: "Boş bırakılırsa bağlantı kaldırılır.",
   limitHint: "Sayaç yayın sınırını gösterir.",
   save: "Kaydet",
@@ -119,7 +119,7 @@ export const COPY = {
     unpublished: "Haber yayından kaldırıldı.",
   },
   previewHeading: "Sitede görünüm",
-  previewDev: { tr: "Geliştiriciler için", en: "For developers" } satisfies Record<Lang, string>,
+  previewDev: { tr: "Neden önemli", en: "Why it matters" } satisfies Record<Lang, string>,
 };
 
 // "tr.summary" -> "Türkçe özet". Unknown details fall back to the raw path.

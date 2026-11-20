@@ -247,8 +247,8 @@ ${e.note ? html`<p class="note">${e.note}</p>` : ""}
 </section>`;
 }
 
-// One column below 64rem (head, reasons, fact card, sources, form, decision card, history);
-// from 64rem the side column (reasons to history) sits sticky on the right of the form.
+// One column below 64rem (head, reasons, fact card, sources, form, preview, decision card, history,
+// by CSS order); from 64rem the side column (reasons to history) sits sticky on the right of the form.
 // `dirty`: the draft holds typed text that is not saved (app.js then starts in the unsaved state).
 export function storyView(s: StoryFull, now: Date, draft: Draft = draftFrom(s), dirty = false): View {
   const editable = s.status === "review" || s.status === "published";

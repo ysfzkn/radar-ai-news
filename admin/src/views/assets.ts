@@ -168,8 +168,12 @@ p { margin: 0; }
 .back a { display: inline-flex; align-items: center; min-height: var(--tap); color: var(--muted); }
 .story { display: flex; flex-direction: column; gap: var(--space-4); }
 .story-side { display: contents; }
-.story-main { order: 1; display: flex; flex-direction: column; gap: var(--space-5); }
-.history-panel { order: 2; }
+.story-main { display: contents; }
+/* Head, reasons, fact card, sources; then the form, the preview, the decision card, history. */
+.story-main > * { order: 1; }
+.preview { order: 2; }
+.story-main > .danger-card { order: 3; }
+.history-panel { order: 4; }
 .story-head .chips { margin-top: var(--space-3); }
 .story-title { font-size: var(--text-xl); font-weight: 700; letter-spacing: -0.01em; overflow-wrap: anywhere; }
 .chip.status { color: var(--ink); font-weight: 600; }
@@ -278,7 +282,8 @@ button:hover { border-color: var(--ink); }
     body:has(.story) .wrap, body:has(.story) .top-inner { max-width: 72rem; }
     .story { display: grid; grid-template-columns: minmax(0, 1fr) 22rem; column-gap: var(--space-6); row-gap: var(--space-5); align-items: start; }
     .story-head { grid-column: 1; grid-row: 1; }
-    .story-main { grid-column: 1; grid-row: 2; }
+    .story-main { grid-column: 1; grid-row: 2; display: flex; flex-direction: column; gap: var(--space-5); }
+    .preview { order: 0; }
     .story-side {
       grid-column: 2; grid-row: 1 / span 2; position: sticky; top: 4.5rem;
       display: flex; flex-direction: column; gap: var(--space-4);
@@ -347,21 +352,26 @@ document.addEventListener("DOMContentLoaded", function () {
   form.addEventListener("submit", function () { kept = false; setDirty(false); });
 
   // The preview follows the form, as text only: each part has the id "pv_" + its field's id.
+  // Synced once at load too, for values the browser restored into the fields.
   Array.prototype.forEach.call(form.querySelectorAll("textarea"), function (field) {
     var part = document.getElementById("pv_" + field.id);
     if (!part) return;
-    field.addEventListener("input", function () { part.textContent = field.value; });
+    var show = function () { part.textContent = field.value; };
+    field.addEventListener("input", show);
+    show();
   });
   var category = document.getElementById("category");
   if (category) {
-    category.addEventListener("change", function () {
+    var showCategory = function () {
       var option = category.options[category.selectedIndex];
       var label = option ? option.text : "";
       ["pv_tr_category", "pv_en_category"].forEach(function (id) {
         var tag = document.getElementById(id);
         if (tag) tag.textContent = label;
       });
-    });
+    };
+    category.addEventListener("change", showCategory);
+    showCategory();
   }
 
   // Ctrl+S / Cmd+S saves through the Kaydet button, so its formaction applies.
@@ -370,6 +380,9 @@ document.addEventListener("DOMContentLoaded", function () {
     document.addEventListener("keydown", function (event) {
       var isSave = (event.ctrlKey || event.metaKey) && typeof event.key === "string" && event.key.toLowerCase() === "s";
       if (!isSave) return;
+      // In a field of another form (the reject or take-down note) the key is left to the browser.
+      var target = event.target;
+      if (target && target.form && target.form !== form) return;
       event.preventDefault();
       if (event.repeat) return;
       if (typeof form.requestSubmit === "function") form.requestSubmit(save);
