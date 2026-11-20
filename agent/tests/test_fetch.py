@@ -228,6 +228,56 @@ def test_a_declared_content_length_over_the_cap_is_refused_without_reading():
         get(routed(handler), "https://a.test/x")
 
 
+CHUNK = 64 * 1024
+
+
+class Large(httpx.SyncByteStream):
+    """A body of twice the cap sent in chunks; counts how many chunks were read."""
+
+    def __init__(self):
+        self.chunks = 0
+
+    def __iter__(self):
+        for _ in range(2 * MAX_BYTES // CHUNK):
+            self.chunks += 1
+            yield b"x" * CHUNK
+
+
+def test_a_streamed_body_without_a_content_length_is_cut_off_at_the_cap():
+    body = Large()
+
+    def handler(request):
+        response = httpx.Response(200, stream=body)
+        assert "content-length" not in response.headers
+        return response
+
+    with pytest.raises(FetchRefused, match="^response too large$"):
+        get(routed(handler), "https://a.test/x")
+    # Reading stopped just past the cap instead of taking the whole body.
+    assert body.chunks == MAX_BYTES // CHUNK + 1
+
+
+def test_a_content_length_that_lies_low_does_not_lift_the_cap():
+    body = Large()
+
+    def handler(request):
+        return httpx.Response(200, headers={"content-length": "100"}, stream=body)
+
+    with pytest.raises(FetchRefused, match="^response too large$"):
+        get(routed(handler), "https://a.test/x")
+    assert body.chunks == MAX_BYTES // CHUNK + 1
+
+
+def test_a_streamed_body_exactly_at_the_cap_is_accepted():
+    class Exact(httpx.SyncByteStream):
+        def __iter__(self):
+            for _ in range(MAX_BYTES // CHUNK):
+                yield b"x" * CHUNK
+
+    response = get(routed(lambda request: httpx.Response(200, stream=Exact())), "https://a.test/x")
+    assert len(response.content) == MAX_BYTES
+
+
 @pytest.mark.parametrize(
     "target",
     [
