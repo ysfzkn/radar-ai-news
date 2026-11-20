@@ -7,17 +7,26 @@ Status: the site builds and runs on your machine, with demo data or against a lo
 ## What it is, and what it is not
 
 - It is static files. After the build there is no server code.
-- It has no JavaScript at all, no cookies, and makes no request to any third party. Links that leave the site (sources, the try button, the owner's site, GitHub) open in a new tab. Fonts are served from the site itself: body text uses the reader's system font, and headings use one self-hosted font (Bricolage Grotesque).
+- It sets no cookies, does no tracking and makes no request to any third party. Links that leave the site (sources, the try button, the owner's site, GitHub) open in a new tab. Fonts are served from the site itself: body text uses the reader's system font, and headings use one self-hosted font (Bricolage Grotesque).
+- Every page is complete without JavaScript. The site's own small script (all of it together at most 30 000 bytes, no library, loaded from the site itself) only adds to a page:
+  - `boot.js`, first in every page's head, marks the page as scripted and decides whether an edition page opens with the short opening (below).
+  - On the archive: the search. Its data, `/search-tr.json` or `/search-en.json`, is fetched from the site on first use.
+  - On an edition page: the scope's pointer tilt and the hollow blip of a story read for two seconds; the "Neden önemli" / "Why it matters" line inking in word by word the first time it is seen; the end of the edition switching off like a screen; and the opening.
+  - The opening plays at most once per browser session, for at most 1.2 seconds: the day's headlines as glyphs on the mark's three arcs, a sweep that lights them, then the mark `)))` and the issue for an instant. It is skipped on back/forward, in a hidden tab, on any click or key press, and when the reader asks for reduced motion. To play only once it writes one key, `radar:intro`, to the browser's session storage (gone when the tab closes). Nothing else is stored, and the site uses no `localStorage`.
+  - Story text reaches the page from a script only as text, never as markup. The Content-Security-Policy in `site/public/_headers` allows scripts, styles, fonts, images and requests from the site's own origin only.
 - It holds no secret and cannot change anything. All it knows is what the admin service's public endpoint returned at build time.
 - It does not promise a publishing hour. A story appears when the site is next built after the story was published.
 - A story carries **no label** saying whether a person read it. The Künye page (About in English; see [Pages](#pages)) explains that every story is written by a language model, and which kinds of story a person reads before they are published.
-- It has no page for a single story, no search, no e-mail newsletter and no images. "Subscribe free" means the RSS feed: the subscribe page shows the feed address and asks for nothing. A story's permanent link is an anchor on its edition page, for example `/2026-11-20/#s-1a2b3c4d` (the anchor is `s-` plus the first 8 characters of the story's uid).
+- It has no page for a single story, no e-mail newsletter and no images. "Subscribe free" means the RSS feed: the subscribe page shows the feed address and asks for nothing. A story's permanent link is an anchor on its edition page, for example `/2026-11-20/#s-1a2b3c4d` (the anchor is `s-` plus the first 8 characters of the story's uid).
 - It is light only. There is no dark theme and no theme switch.
 - Each category has its own colour, used for the story's category tag, its number, the bar beside a story opened from a link, the heading of its topic page and the category text in a topic page's list; the brand red stays for the mark, the issue label, the echo meter and link underlines. Security uses a wine red, so it does not read as the brand red. The lead story of an edition sits in a card with a hard shadow, and so do the two buttons (subscribe, try it); inside the lead card the try button is flat.
 - Every page has a TR / EN control in the top strip: the current language is marked, and the other links to the same page in that language, or to that language's home page when the page has no counterpart.
 - Each story's number is its permanent link: it points at the story's anchor on its edition page, and a story opened from such a link is marked with a bar in its category colour.
-- When printed, a page is one plain column of ink on white: the navigation, banner, index, pager and footer are left out, every animation is off, and the address of each source and try link is printed after it.
-- Motion is CSS only and small: the echo meter's arcs light up in turn on load, buttons press, a thin reading-progress line fills at the top of an edition page, and later stories rise slightly as they scroll in. Nothing loops. All of it is off when the reader's system asks for reduced motion, and the scroll-driven parts only run in browsers that support them; without them every story is simply shown.
+- When printed, a page is one plain column of ink on white: the navigation, banner, scope, search, pager, horizon and footer are left out (an edition prints its plain index instead of the scope, and an archive printed mid-search prints its full list), every animation is off, and the address of each source and try link is printed after it.
+- Each category has an emblem, a small paper cut-out in its colours (linked nodes, stacked layers, a scaffold, a gear and spanner, a flask, a padlock, a workshop with a chimney, a sealed document). It stands on the lead story's card at 56 px and opens the topic page at 96 px; its sheets lift slightly off their shadows as it scrolls into view. It is decoration: the category's name is always written beside it.
+- Every page ends with a horizon over the footer: one thin line drawing of hills and a town whose tallest roof carries a small radar dish that turns, with three birds drifting above. It is decoration and is left out of print.
+- The end of an edition reads "Bugünlük bu kadar." / "That's all for today." with the edition's reading time (words ÷ 200, rounded up, counted at build).
+- Most motion is CSS: the echo meter's arcs light up in turn on load, buttons press, a thin reading-progress line fills at the top of an edition page, later stories rise slightly as they scroll in, the scope's sweep turns every 6 seconds and the horizon's dish and birds move slowly (20 seconds or more). All of it, and the scripted opening, ink-in and tilt, is off when the reader's system asks for reduced motion; the scroll-driven parts only run in browsers that support them, and without them every story is simply shown.
 
 ## Where the data comes from
 
@@ -70,7 +79,7 @@ The site reads every page with `limit=200`, follows `next` until it is `null`, a
 
 - An **edition** is the set of stories whose `published_at` falls on one calendar day in Istanbul (UTC+3, all year). A day with no stories has no edition.
 - **Numbers** count the days that have an edition, oldest first: the oldest edition is number 1. A page's address uses the date, never the number. If a story is taken down and its day becomes empty, the later numbers shift down by one, but no link breaks.
-- An edition page opens with a **masthead**: the issue number, the date in large type, the number of stories, the total number of sources and the reading time. When there is more than one story it is followed by an **index** of the day's stories (a sticky rail beside the stories on wide screens); each index row ends with that story's echo arcs. The first story is the **lead**.
+- An edition page opens with a **masthead**: the issue number, the date in large type, the number of stories, the total number of sources and the reading time. It is followed by the **scope**, a radar on which every story is a blip that links to it (nearer the centre, more sources); on wide screens it sits in a sticky rail beside the stories, and on a phone it is at most 280 px wide. Under it, the markup keeps a plain **index** of the day's stories (with each story's echo arcs), shown when the page is printed or read without its stylesheet. The first story is the **lead**.
 - Each story ends with one line under the label **Neden önemli** / **Why it matters**: why the news matters to a reader.
 - Inside an edition **every published story of the day is shown**, ordered by number of sources (most first), then by publish time. The site never hides a published story.
 - The **weekly digest** is the ten stories of one ISO week (Monday to Sunday, Istanbul days) with the most sources, ordered the same way. No model is involved.
@@ -83,15 +92,15 @@ The site reads every page with `limit=200`, follows `next` until it is `null`, a
 | --- | --- | --- |
 | `/` | `/en/` | The newest edition |
 | `/YYYY-MM-DD/` | `/en/YYYY-MM-DD/` | One edition: a masthead, an index of the day's stories and the lead story first |
-| `/arsiv/` | `/en/archive/` | All editions; each row shows the date, the lead story's headline, the number of stories and the total number of sources |
-| `/konu/<category>/` | `/en/topic/<category>/` | A category's newest 30 stories |
+| `/arsiv/` | `/en/archive/` | All editions; each row shows the date, the lead story's headline, the number of stories and the total number of sources. With script, a search over every story's title, summary and category name (Turkish letters fold, so `sifre` finds `şifre`), with topic, month and "3+ sources" filters kept in the address; at most 100 results are listed. A heat strip shows the last 26 weeks |
+| `/konu/<category>/` | `/en/topic/<category>/` | A category's emblem and newest 30 stories |
 | `/hafta/` | `/en/week/` | The weekly digests |
 | `/hafta/YYYY-Www/` | `/en/week/YYYY-Www/` | One weekly digest |
 | `/kunye/` | `/en/about/` | Künye / About: who makes Radar, and how stories are collected, written and checked |
 | `/abone/` | `/en/subscribe/` | Subscribe free: the RSS feed address and how to use it |
 | `/rss.xml` | `/en/rss.xml` | RSS feed, newest 50 stories |
 
-The build also writes `sitemap-index.xml` and `404.html`. Site copy, in both languages, lives in `site/src/lib/copy.ts`.
+The build also writes `sitemap-index.xml`, `404.html` and the search data `search-tr.json` / `search-en.json`. Site copy, in both languages, lives in `site/src/lib/copy.ts`.
 
 ## Run it locally
 

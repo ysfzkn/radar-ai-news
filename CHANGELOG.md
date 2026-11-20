@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Repository scaffold, community files and CI.
 - The `radar` command reads `agent/.env` on start. A variable already set in the environment wins over the file.
+- Site: a small first-party script (at most 30 000 bytes for all of it, no library, no tracking) that only adds to pages which are complete without it. Archive search over titles, summaries and category names with Turkish folding, topic, month and 3+ source filters kept in the address, matched words marked, an empty state; and a heat strip of the last 26 weeks.
+- Site: the scope, a radar of the day's stories on every edition page, and an opening of at most 1.2 seconds, once per browser session (session storage key `radar:intro`), never with reduced motion.
+- Site: category emblems (paper cut-outs) on the lead story and the topic pages; the "Neden önemli" line inks in word by word; the end of an edition says "Bugünlük bu kadar." with its reading time; a horizon drawing above every page's footer.
+
+### Changed
+
+- Site: the Künye / About page says what the script does and the one key it keeps, instead of saying the site has no script.
 
 ## [0.5.0] - 2026-11-20
 
