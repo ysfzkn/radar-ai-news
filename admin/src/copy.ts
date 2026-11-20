@@ -90,6 +90,8 @@ export const COPY = {
   notFoundTitle: "Bulunamadı",
   notFound: "Haber bulunamadı.",
   badRequest: "Geçersiz istek.",
+  serverErrorTitle: "Hata",
+  serverError: "Sunucuda bir hata oldu; istek tamamlanmadı. Haberin şu anki hâlini açıp tekrar dene.",
   forbidden: "Bu istek reddedildi.",
   mustCheck: "Onaylamadan önce kaynağı kontrol ettiğini işaretle.",
   savedNotApproved: "Değişikliklerin kaydedildi ama haber yayınlanmadı.",

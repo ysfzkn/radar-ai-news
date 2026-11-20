@@ -309,10 +309,17 @@ interface Transition {
   at: string;
 }
 
-// The UPDATE is guarded by uid + version + status; the event is read back from the row at
-// the new version and ignored if that (uid, version) already has one, so a refused update
-// writes nothing. Success is the UPDATE's change count. Statements that must only apply when
-// the update will succeed (text rows) come first and check the same guard on the story row.
+// The history row and the UPDATE are guarded by the same uid + version + status, read before
+// the UPDATE, so both apply or neither does: a refused transition (a stale version, a lost race)
+// matches no row and writes nothing. The event is a plain INSERT: if it cannot be written (a
+// CHECK the database does not know yet, such as 'restored' before migration 0002, or a taken
+// (uid, version) slot) the statement fails, the batch is one transaction and is rolled back, and
+// the error reaches the caller. Earlier the event was read back after the UPDATE at the new
+// version with INSERT OR IGNORE: after a lost race that read found the winner's row and would
+// have collided with the winner's event, and OR IGNORE kept that a clean conflict. It also hid
+// CHECK failures, so a story could change with no history row; guarding on the old state keeps
+// the race safe without it. Success is the UPDATE's change count. Statements that must only
+// apply when the update will succeed (text rows) come first and check the same guard.
 function transitionStatements(db: D1Database, t: Transition): D1PreparedStatement[] {
   const marks = t.from.map(() => "?").join(", ");
   const sets = ["version = version + 1"];
@@ -334,12 +341,15 @@ function transitionStatements(db: D1Database, t: Transition): D1PreparedStatemen
     .bind(...binds, t.uid, t.version, ...t.from);
   const event = db
     .prepare(
-      `INSERT OR IGNORE INTO story_events (story_uid, version, action, actor, note, at)
-       SELECT uid, version, ?, ?, ?, ? FROM stories WHERE uid = ? AND version = ?`,
+      `INSERT INTO story_events (story_uid, version, action, actor, note, at)
+       SELECT uid, version + 1, ?, ?, ?, ? FROM stories WHERE uid = ? AND version = ? AND status IN (${marks})`,
     )
-    .bind(t.action, t.actor, t.note, t.at, t.uid, t.version + 1);
-  return [...(t.before ?? []), update, event];
+    .bind(t.action, t.actor, t.note, t.at, t.uid, t.version, ...t.from);
+  return [...(t.before ?? []), event, update];
 }
+
+// Where the UPDATE sits in transitionStatements' list.
+const updateIndex = (t: Transition): number => (t.before?.length ?? 0) + 1;
 
 // not_found, then conflict, then wrong_status.
 async function precheck(
@@ -355,10 +365,11 @@ async function precheck(
   return { row };
 }
 
-// Runs a transition; the UPDATE's change count says whether it landed.
+// Runs a transition; the UPDATE's change count says whether it landed. A history row that cannot
+// be written throws (see transitionStatements) and nothing is changed.
 async function runTransition(db: D1Database, t: Transition): Promise<Result> {
   const results = await db.batch(transitionStatements(db, t));
-  if ((results[t.before?.length ?? 0]?.meta.changes ?? 0) > 0) return { ok: true };
+  if ((results[updateIndex(t)]?.meta.changes ?? 0) > 0) return { ok: true };
   // Lost a race after our pre-check: classify against the current row.
   return (await precheck(db, t.uid, t.version, t.from)).result ?? fail("conflict");
 }
@@ -821,7 +832,9 @@ export async function expireStale(db: D1Database, now: Date): Promise<number> {
     .bind(cutoff)
     .all<{ uid: string; version: number }>();
   if (results.length === 0) return 0;
-  const statements = results.flatMap((r) => transitionStatements(db, expireTransition(r.uid, r.version, at)));
+  const transitions = results.map((r) => expireTransition(r.uid, r.version, at));
+  const statements = transitions.flatMap((t) => transitionStatements(db, t));
   const out = await db.batch(statements);
-  return results.filter((_, i) => (out[i * 2]?.meta.changes ?? 0) > 0).length;
+  const size = statements.length / transitions.length;
+  return transitions.filter((t, i) => (out[i * size + updateIndex(t)]?.meta.changes ?? 0) > 0).length;
 }

@@ -1,4 +1,5 @@
 import { Hono, type Context } from "hono";
+import { html } from "hono/html";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { authenticate, sameOrigin, type Identity } from "./auth";
 import { COPY, failureMessage } from "./copy";
@@ -379,6 +380,26 @@ app.post("/admin/stories/:uid/restore", async (c) => {
   const result = await restoreStory(c.env.DB, uid, form.version, c.get("identity").email, new Date());
   if (!result.ok && result.error === "expired") return storyPage(c, uid, FAILURE_STATUS.expired, COPY.restoreExpired);
   return afterResult(c, uid, result, withDone(storyPath(uid), "restored"));
+});
+
+// An error thrown on an admin page (for example a decision whose history row the database refused,
+// so the batch was rolled back) is an error page, never a success redirect. It says nothing about
+// the cause; the details go to the Worker's log only. The tab numbers are read if the database
+// answers, and left out (zeros) if it does not.
+app.onError(async (err, c) => {
+  console.error(err);
+  if (!isAdminPath(c.req.path) || !c.get("identity")) return c.text("Internal Server Error", 500);
+  let all: Record<Status, number> = { review: 0, published: 0, rejected: 0, expired: 0 };
+  try {
+    all = await counts(c.env.DB);
+  } catch {
+    // keep the zeros
+  }
+  const body = html`<h1>${COPY.serverErrorTitle}</h1><p><a href="/admin">${COPY.back}</a></p>`;
+  return c.html(
+    layout({ title: COPY.serverErrorTitle, email: c.get("identity").email, counts: all, active: null, message: COPY.serverError, body }),
+    500,
+  );
 });
 
 // Any other path under /admin: the not-found page, reached only after the middleware signed the user in.
