@@ -57,17 +57,20 @@ export function layout(p: Shell): View {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="light dark">
+<meta name="color-scheme" content="light">
 <title>${p.title} · ${COPY.appName}</title>
 <link rel="stylesheet" href="/admin/app.css">
 <script src="/admin/app.js" defer></script>
 </head>
 <body>
 <header class="top">
-<div class="brand-row"><a class="brand" href="/admin">${COPY.appName}</a><span class="who">${p.email}</span></div>
-<nav aria-label="${COPY.queueHeading}"><ul class="tabs">${tabs}</ul></nav>
+<div class="top-inner">
+<a class="brand" href="/admin"><span class="wordmark">${COPY.brand}</span> <span class="brand-suffix">${COPY.brandSuffix}</span></a>
+<span class="who">${p.email}</span>
+</div>
 </header>
-<main>
+<nav class="wrap" aria-label="${COPY.queueHeading}"><ul class="tabs">${tabs}</ul></nav>
+<main class="wrap">
 ${p.message ? html`<p class="notice" role="alert">${p.message}</p>` : ""}
 ${p.body}
 </main>

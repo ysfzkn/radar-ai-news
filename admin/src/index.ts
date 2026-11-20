@@ -12,6 +12,7 @@ import {
   expireStale,
   getStory,
   listStories,
+  PAGE_SIZE,
   rejectStory,
   unpublishStory,
   type EditPatch,
@@ -72,13 +73,25 @@ async function page(
   return c.html(shell, status);
 }
 
+const MAX_PAGE = 1000;
+
+// ?page=N with N an integer from 1 to MAX_PAGE; anything else is page 1.
+function pageNumber(raw: string | undefined): number {
+  if (!raw || !/^[1-9][0-9]{0,3}$/.test(raw)) return 1;
+  const n = Number(raw);
+  return n <= MAX_PAGE ? n : 1;
+}
+
 app.get("/admin", async (c) => {
   const asked = c.req.query("status");
   const status: Status = STATUSES.find((s) => s === asked) ?? "review";
+  const current = pageNumber(c.req.query("page"));
   const now = new Date();
   await expireStale(c.env.DB, now);
-  const stories = await listStories(c.env.DB, status);
-  return page(c, { title: COPY.tabs[status], active: status, body: queueView(status, stories, now) });
+  // One row more than a page tells whether an older page exists.
+  const rows = await listStories(c.env.DB, status, PAGE_SIZE + 1, (current - 1) * PAGE_SIZE);
+  const body = queueView(status, rows.slice(0, PAGE_SIZE), now, { current, hasMore: rows.length > PAGE_SIZE });
+  return page(c, { title: COPY.tabs[status], active: status, body });
 });
 
 // The story page from a fresh read, optionally with a message and the user's own form values.
@@ -200,6 +213,9 @@ app.post("/admin/stories/:uid/unpublish", async (c) => {
   );
   return afterResult(c, uid, result, storyPath(uid));
 });
+
+// Any other path under /admin: the not-found page, reached only after the middleware signed the user in.
+app.all("/admin/*", (c) => page(c, { title: COPY.notFoundTitle, active: null, body: notFoundView() }, 404));
 
 // Hourly cron (see wrangler.jsonc): expires review stories aged 72 hours or more.
 async function scheduled(controller: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {

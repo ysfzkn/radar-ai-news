@@ -148,7 +148,15 @@ export async function counts(db: D1Database): Promise<Record<Status, number>> {
   return out;
 }
 
-export async function listStories(db: D1Database, status: Status, limit = 50): Promise<StorySummary[]> {
+// Rows per queue page.
+export const PAGE_SIZE = 50;
+
+export async function listStories(
+  db: D1Database,
+  status: Status,
+  limit = PAGE_SIZE,
+  offset = 0,
+): Promise<StorySummary[]> {
   const order =
     status === "review"
       ? "s.created_at ASC, s.uid ASC"
@@ -161,9 +169,9 @@ export async function listStories(db: D1Database, status: Status, limit = 50): P
          LEFT JOIN story_texts t ON t.story_uid = s.uid AND t.lang = 'tr'
         WHERE s.status = ?
         ORDER BY ${order}
-        LIMIT ?`,
+        LIMIT ? OFFSET ?`,
     )
-    .bind(status, limit)
+    .bind(status, limit, offset)
     .all<Row & { title_tr: string }>();
   return results.map((r) => ({
     uid: r.uid,

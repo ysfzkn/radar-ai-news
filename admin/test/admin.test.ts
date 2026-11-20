@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import sample from "../fixtures/ingest-sample.json";
+import { COPY } from "../src/copy";
 import { app } from "../src/index";
 import type { IngestStory } from "../src/schema";
 import { getStory, insertStories, rejectStory } from "../src/stories";
@@ -23,6 +24,21 @@ async function seed(
   await insertStories(env.DB, [s as IngestStory], new Date());
   return s.uid;
 }
+
+// Inserts `count` review stories titled "Sıra 1" (oldest, first in the queue) to "Sıra count".
+async function seedQueue(count: number): Promise<void> {
+  const stories = Array.from({ length: count }, (_, i) => {
+    const s = structuredClone((sample as Json).stories[0]) as Json;
+    s.uid = (++n).toString(16).padStart(32, "b");
+    s.created_at = new Date(Date.now() - 60 * HOUR + i * 60_000).toISOString();
+    s.status = "review";
+    s.texts.tr.title = `Sıra ${i + 1}`;
+    return s as IngestStory;
+  });
+  await insertStories(env.DB, stories, new Date());
+}
+
+const cardCount = (body: string): number => (body.match(/<li class="card">/g) ?? []).length;
 
 const get = (path: string, e: Json = dev) => app.fetch(new Request(`${ORIGIN}${path}`), e);
 
@@ -337,7 +353,6 @@ describe("admin screen", () => {
     expect(css.headers.get("Content-Type")).toContain("text/css");
     const cssText = await css.text();
     expect(cssText).toContain(":root");
-    expect(cssText).toContain("prefers-color-scheme: dark");
     const js = await get("/admin/app.js");
     expect(js.status).toBe(200);
     expect(js.headers.get("Content-Type")).toContain("javascript");
@@ -363,5 +378,75 @@ describe("admin screen", () => {
     expect((await getStory(env.DB, old))!.status).toBe("expired");
     expect((await getStory(env.DB, fresh))!.status).toBe("review");
     expect(body).toMatch(/Süresi dolan[^<]*<[^>]*>1</);
+  });
+
+  it("serves a stylesheet with no dark-mode rule and the light colour scheme", async () => {
+    const css = await (await get("/admin/app.css")).text();
+    expect(css).not.toContain("prefers-color-scheme");
+    expect(css).toContain("color-scheme: light");
+    expect(css).toContain("--bg: #f7f7f4");
+  });
+
+  it("declares the light colour scheme in the page head", async () => {
+    const body = await (await get("/admin")).text();
+    expect(body).toContain('<meta name="color-scheme" content="light">');
+  });
+
+  it("shows the time left, the category and the source count as text on a review card", async () => {
+    await seed({ ageMs: 70 * HOUR });
+    const body = await (await get("/admin")).text();
+    const card = body.slice(body.indexOf('<li class="card">'));
+    expect(card).toMatch(/<span class="chip[^"]*">Protokol<\/span>/);
+    expect(card).toMatch(/<span class="chip warn">Kalan süre: 1 sa<\/span>/);
+    expect(card).toMatch(/>4 kaynak</);
+    expect(card.indexOf("Kalan süre")).toBeLessThan(card.indexOf("A2UI 1.0 aday sürümü yayında"));
+  });
+
+  it("pages the queue: 51 review stories give 50 cards and a `Daha eski` link to page=2", async () => {
+    await seedQueue(51);
+    const body = await (await get("/admin")).text();
+    expect(cardCount(body)).toBe(50);
+    expect(body).toContain(">Sıra 1<");
+    expect(body).toContain(">Sıra 50<");
+    expect(body).not.toContain(">Sıra 51<");
+    expect(body).toMatch(/<a [^>]*href="\/admin\?status=review&amp;page=2"[^>]*>Daha eski<\/a>/);
+    expect(body).not.toContain("Daha yeni");
+  });
+
+  it("page 2 shows the 51st story and a `Daha yeni` link; page=abc and page=0 are page 1", async () => {
+    await seedQueue(51);
+    const second = await (await get("/admin?status=review&page=2")).text();
+    expect(cardCount(second)).toBe(1);
+    expect(second).toContain(">Sıra 51<");
+    expect(second).toMatch(/<a [^>]*href="\/admin\?status=review&amp;page=1"[^>]*>Daha yeni<\/a>/);
+    expect(second).not.toContain("Daha eski");
+    for (const page of ["abc", "0", "-1", "1.5", "1001"]) {
+      const body = await (await get(`/admin?status=review&page=${page}`)).text();
+      expect(cardCount(body)).toBe(50);
+      expect(body).toContain(">Sıra 1<");
+      expect(body).not.toContain("Daha yeni");
+    }
+  });
+
+  it("an unknown path under /admin/ is the 404 page inside the layout", async () => {
+    const res = await get("/admin/nothing-here");
+    expect(res.status).toBe(404);
+    expect(res.headers.get("Content-Type")).toContain("text/html");
+    expect(res.headers.get("Content-Security-Policy")).toContain("default-src 'none'");
+    const body = await res.text();
+    expect(body).toContain(COPY.notFound);
+    for (const tab of ["Bekleyen", "Yayında", "Reddedilen", "Süresi dolan"]) expect(body).toContain(tab);
+  });
+
+  it("an unknown path under /admin/ without a token is 401 when Access is configured", async () => {
+    const res = await get("/admin/nothing-here", {
+      ...env,
+      ACCESS_TEAM_DOMAIN: "myteam.cloudflareaccess.com",
+      ACCESS_AUD: "aud",
+    });
+    expect(res.status).toBe(401);
+    const body = await res.text();
+    expect(body).not.toContain(COPY.notFound);
+    expect(body).not.toContain("Bekleyen");
   });
 });

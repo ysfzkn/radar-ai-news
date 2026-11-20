@@ -4,6 +4,8 @@ import type { Lang, Status } from "./schema";
 
 export const COPY = {
   appName: "Radar · Onay",
+  brand: "Radar",
+  brandSuffix: "Onay",
   tabs: {
     review: "Bekleyen",
     published: "Yayında",
@@ -32,6 +34,8 @@ export const COPY = {
   queueHeading: "Haber kuyruğu",
   emptyReview: "Bekleyen haber yok.",
   emptyOther: "Bu listede haber yok.",
+  older: "Daha eski",
+  newer: "Daha yeni",
   sourceCount: (n: number) => `${n} kaynak`,
   edited: "düzenlendi",
   timeLeft: (value: string) => `Kalan süre: ${value}`,
