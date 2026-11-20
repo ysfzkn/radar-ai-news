@@ -31,8 +31,8 @@ const pageHref = (status: Status, page: number): string => `/admin?status=${stat
 function pager(status: Status, page: { current: number; hasMore: boolean }): View {
   if (page.current <= 1 && !page.hasMore) return html``;
   return html`<div class="pager">
-${page.current > 1 ? html`<a class="pager-link" rel="prev" href="${pageHref(status, page.current - 1)}">${COPY.newer}</a>` : ""}
-${page.hasMore ? html`<a class="pager-link older" rel="next" href="${pageHref(status, page.current + 1)}">${COPY.older}</a>` : ""}
+${page.current > 1 ? html`<a class="pager-link" rel="prev" href="${pageHref(status, page.current - 1)}">${COPY.prevPage}</a>` : ""}
+${page.hasMore ? html`<a class="pager-link next" rel="next" href="${pageHref(status, page.current + 1)}">${COPY.nextPage}</a>` : ""}
 </div>`;
 }
 

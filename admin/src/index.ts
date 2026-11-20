@@ -88,7 +88,7 @@ app.get("/admin", async (c) => {
   const current = pageNumber(c.req.query("page"));
   const now = new Date();
   await expireStale(c.env.DB, now);
-  // One row more than a page tells whether an older page exists.
+  // One row more than a page tells whether a next page exists.
   const rows = await listStories(c.env.DB, status, PAGE_SIZE + 1, (current - 1) * PAGE_SIZE);
   const body = queueView(status, rows.slice(0, PAGE_SIZE), now, { current, hasMore: rows.length > PAGE_SIZE });
   return page(c, { title: COPY.tabs[status], active: status, body });

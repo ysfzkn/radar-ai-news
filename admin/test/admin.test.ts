@@ -402,29 +402,37 @@ describe("admin screen", () => {
     expect(card.indexOf("Kalan süre")).toBeLessThan(card.indexOf("A2UI 1.0 aday sürümü yayında"));
   });
 
-  it("pages the queue: 51 review stories give 50 cards and a `Daha eski` link to page=2", async () => {
+  it("pages the queue: 51 review stories give 50 cards and a `Sonraki sayfa` link to page=2", async () => {
     await seedQueue(51);
     const body = await (await get("/admin")).text();
     expect(cardCount(body)).toBe(50);
     expect(body).toContain(">Sıra 1<");
     expect(body).toContain(">Sıra 50<");
     expect(body).not.toContain(">Sıra 51<");
-    expect(body).toMatch(/<a [^>]*href="\/admin\?status=review&amp;page=2"[^>]*>Daha eski<\/a>/);
-    expect(body).not.toContain("Daha yeni");
+    expect(body).toMatch(/<a [^>]*href="\/admin\?status=review&amp;page=2"[^>]*>Sonraki sayfa<\/a>/);
+    expect(body).not.toContain("Önceki sayfa");
   });
 
-  it("page 2 shows the 51st story and a `Daha yeni` link; page=abc and page=0 are page 1", async () => {
+  it("exactly 50 review stories give 50 cards and no `Sonraki sayfa` link", async () => {
+    await seedQueue(50);
+    const body = await (await get("/admin")).text();
+    expect(cardCount(body)).toBe(50);
+    expect(body).not.toContain("Sonraki sayfa");
+    expect(body).not.toContain('class="pager"');
+  });
+
+  it("page 2 shows the 51st story and a `Önceki sayfa` link; page=abc and page=0 are page 1", async () => {
     await seedQueue(51);
     const second = await (await get("/admin?status=review&page=2")).text();
     expect(cardCount(second)).toBe(1);
     expect(second).toContain(">Sıra 51<");
-    expect(second).toMatch(/<a [^>]*href="\/admin\?status=review&amp;page=1"[^>]*>Daha yeni<\/a>/);
-    expect(second).not.toContain("Daha eski");
+    expect(second).toMatch(/<a [^>]*href="\/admin\?status=review&amp;page=1"[^>]*>Önceki sayfa<\/a>/);
+    expect(second).not.toContain("Sonraki sayfa");
     for (const page of ["abc", "0", "-1", "1.5", "1001"]) {
       const body = await (await get(`/admin?status=review&page=${page}`)).text();
       expect(cardCount(body)).toBe(50);
       expect(body).toContain(">Sıra 1<");
-      expect(body).not.toContain("Daha yeni");
+      expect(body).not.toContain("Önceki sayfa");
     }
   });
 

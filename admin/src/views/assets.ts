@@ -149,7 +149,7 @@ p { margin: 0; }
   font-weight: 600; text-decoration: none; transition: border-color 120ms ease;
 }
 .pager-link:hover { border-color: var(--ink); }
-.pager-link.older { margin-left: auto; }
+.pager-link.next { margin-left: auto; }
 
 /* Story */
 .back { margin-bottom: var(--space-4); }
