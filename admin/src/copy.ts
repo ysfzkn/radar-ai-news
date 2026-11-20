@@ -72,6 +72,8 @@ export const COPY = {
   approve: "Kaydet ve onayla",
   rejectNote: "Ret notu (isteğe bağlı)",
   reject: "Reddet",
+  // The phone bar's way to the reject card: a link down the page, never a decision by itself.
+  barReject: "Reddet…",
   unpublishNote: "Kaldırma nedeni",
   unpublish: "Yayından kaldır",
   readOnly: "Bu haber artık değiştirilemez.",

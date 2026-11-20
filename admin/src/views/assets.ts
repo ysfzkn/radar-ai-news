@@ -317,6 +317,8 @@ button:hover { border-color: var(--ink); }
 .bar-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
 .bar-buttons button { width: 100%; padding: 0 var(--space-3); }
 .bar-buttons button:only-child { grid-column: 1 / -1; }
+/* The phone bar's link to the reject card (a link: it moves down the page and decides nothing). */
+.bar-reject { display: none; }
 
 /* Footer: the keyboard hint, shown by the script when the shortcut sheet can open. */
 .foot { padding-bottom: var(--space-5); }
@@ -368,6 +370,12 @@ kbd {
     padding: var(--space-2) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
   }
   .bar-buttons button { min-height: 3rem; }
+  .bar-buttons.decide { grid-template-columns: auto auto minmax(0, 1fr); gap: var(--space-2); }
+  .bar-reject {
+    display: inline-flex; align-items: center; justify-content: center; min-height: 3rem; padding: 0 var(--space-3);
+    font-weight: 600; color: var(--danger); text-decoration: none; white-space: nowrap;
+    border: 1px solid var(--danger); border-radius: var(--radius); background: var(--surface);
+  }
   body:has(.action-bar) { padding-bottom: 11rem; }
   html:has(.action-bar) { scroll-padding-bottom: 11.5rem; }
   .card { padding: var(--space-4) var(--space-4) var(--space-5); }

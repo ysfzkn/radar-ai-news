@@ -153,8 +153,9 @@ ${unsavedNotice}
 ${sourceLink(s)}
 </div>
 ${unsavedNotice}
-<div class="bar-buttons">
+<div class="bar-buttons decide">
 ${save("secondary")}
+<a class="bar-reject" href="#reject-card">${COPY.barReject}</a>
 <button type="submit" class="primary" id="approve-button" form="${FORM_ID}" formaction="${storyPath(s.uid)}/approve" aria-describedby="approve-note">${COPY.approve}</button>
 </div>
 </div>`;

@@ -349,6 +349,24 @@ describe("keys, phone layout and field help", () => {
     expect(css).not.toContain("box-shadow");
   });
 
+  it("on a phone the bar also leads to the reject card, as a link that rejects nothing by itself", async () => {
+    const uid = await seed();
+    const body = await text(`/admin/stories/${uid}`);
+    const bar = body.slice(body.indexOf('<div class="action-bar">'), body.indexOf("</form>", body.indexOf('<div class="action-bar">')));
+    expect(bar).toContain('<a class="bar-reject" href="#reject-card">Reddet…</a>');
+    expect(bar).not.toContain("/reject");
+    expect(body).toContain('<section class="danger-card" id="reject-card"');
+    // Not offered where there is nothing to reject.
+    const published = await seed({ status: "published" });
+    expect(await text(`/admin/stories/${published}`)).not.toContain("bar-reject");
+    const css = await (await get("/admin/app.css")).text();
+    expect(css).toMatch(/\.bar-reject \{[^}]*display: none;/);
+    const phone = css.slice(css.indexOf("@media (max-width: 40rem)"), css.indexOf("@media (min-width: 40rem)"));
+    expect(phone).toMatch(/\.bar-reject \{[^}]*display: inline-flex;[^}]*min-height: 3rem;/);
+    // Three in a row at 375 px: the two short controls take their own width, approve the rest.
+    expect(phone).toMatch(/\.bar-buttons\.decide \{[^}]*grid-template-columns: auto auto minmax\(0, 1fr\);/);
+  });
+
   it("keys move the selection and the focus, open the sheet, and never submit anything", async () => {
     const js = await (await get("/admin/app.js")).text();
     const page = keyPage(js);
