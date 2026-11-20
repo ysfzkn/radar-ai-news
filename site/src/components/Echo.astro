@@ -1,4 +1,5 @@
 ---
+import Mark from "./Mark.astro";
 import { COPY } from "../lib/copy";
 import { echoLevel } from "../lib/editions";
 import type { Lang } from "../lib/schema";
@@ -10,25 +11,9 @@ interface Props {
 
 const { lang, count } = Astro.props;
 const level = echoLevel(count);
-// Five quarter-circle arcs (90 degrees, chord 12, radius 12/sqrt 2), one every 9 units,
-// centred in the 44-unit box. The wordmark's mark is the same arc.
-const arcs = [0, 1, 2, 3, 4].map((i) => {
-  const x = 2.75 + 9 * i;
-  return { d: `M${x} 1A8.485 8.485 0 0 1 ${x} 13`, on: i < level };
-});
 ---
 
 <span class="echo">
-  <svg
-    class="echo-arcs"
-    role="img"
-    aria-label={COPY[lang].echoLabel(level, count)}
-    viewBox="0 0 44 14"
-    width="44"
-    height="14"
-    stroke-width="2"
-  >
-    {arcs.map((arc) => <path class={arc.on ? "echo-on" : "echo-off"} d={arc.d} />)}
-  </svg>
+  <Mark size={22} lit={level} label={COPY[lang].echoLabel(level, count)} />
   <span aria-hidden="true">{COPY[lang].sources(count)}</span>
 </span>

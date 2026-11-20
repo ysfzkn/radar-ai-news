@@ -137,37 +137,180 @@ describe("built site", () => {
     expect(text(page(DEMO, ""))).not.toContain("Sonraki sayı");
   });
 
-  it("each article has the label, the developer line, a source link with rel noopener and the echo meter's aria-label", () => {
+  it("each article has the developer panel, a source link with rel noopener and the echo meter's aria-label", () => {
     for (const [path, lang] of [["", "tr"], ["en", "en"]] as const) {
       for (const article of articles(page(DEMO, path))) {
         expect(article).toMatch(/<article id="s-[0-9a-f]{8}"/);
         expect(article).toMatch(/<h2[^>]*>/);
-        expect(text(article)).toContain(COPY[lang].forDevelopers);
+        const panel = article.match(/<div class="story-dev">([\s\S]*?)<\/div>/);
+        expect(panel).not.toBeNull();
+        expect(panel![1]).toMatch(new RegExp(`<p class="story-dev-label label caps">${COPY[lang].forDevelopers}</p>`));
         expect(article).toMatch(/<a [^>]*href="https:\/\/[^"]+"[^>]*rel="noopener"/);
         expect(article).toMatch(/role="img" aria-label="[^"]*"/);
         const label = article.match(/aria-label="([^"]*)"/)![1];
         expect(label).toMatch(lang === "tr" ? /^5 üzerinden [1-5]: \d+ bağımsız kaynak$/ : /^[1-5] of 5: /);
         expect(text(article)).toMatch(lang === "tr" ? /\d+ kaynak/ : /\d+ sources?/);
-        expect(text(article)).toMatch(new RegExp(Object.values(COPY[lang].label).join("|")));
       }
     }
   });
 
-  it("an auto-published story says `otomatik yayımlandı` and a human-approved one `insan onayladı`", () => {
-    const home = articles(page(DEMO, ""));
-    const human = home.filter((a) => a.includes('id="s-4b06d152"'));
-    expect(human).toHaveLength(1);
-    expect(text(human[0])).toContain("AI yazdı · insan onayladı");
-    const auto = home.filter((a) => a.includes('id="s-5c17e263"'));
-    expect(text(auto[0])).toContain("AI yazdı · otomatik yayımlandı");
-    // A funding figure always goes to a person, so the demo funding story is human-approved.
-    const funding = articles(page(DEMO, "2026-11-18")).filter((a) => a.includes('id="s-07c29d1e"'));
-    expect(funding).toHaveLength(1);
-    expect(text(funding[0])).toContain("AI yazdı · insan onayladı");
+  it("no page and no feed carries a per-story AI or approval label", () => {
+    const labels = ["AI yazdı", "otomatik yayımlandı", "insan onayladı", "Written by AI", "auto-published", "human-approved"];
+    const files = [REAL, DEMO].flatMap(allFiles).filter((f) => /\.(html|xml)$/.test(f));
+    expect(files.some((f) => f.endsWith("rss.xml"))).toBe(true);
+    expect(files.length).toBeGreaterThan(20);
+    for (const file of files) {
+      const content = readFileSync(file, "utf8");
+      for (const label of labels) expect(content, `${file}: ${label}`).not.toContain(label);
+    }
+    expect(Object.keys(COPY.tr)).not.toContain("label");
+    expect(Object.keys(COPY.en)).not.toContain("label");
+  });
+
+  it("the method page explains that every story is written by a model and which ones a person reads first", () => {
+    const tr = text(page(DEMO, "yontem"));
+    const en = text(page(DEMO, "en/method"));
+    expect(tr).toContain("Her haberi, altında bağlantısı verilen kaynaklardan bir dil modeli yazar.");
+    expect(tr).toContain("Riskli konulardaki haberler ancak bir insan okuduktan sonra yayımlanır.");
+    expect(tr).toContain("Geri kalanlar otomatik denetimden geçtikten sonra kendiliğinden yayımlanır.");
+    expect(tr).toContain("Yanlış bir haber düzeltilir ya da yayından kaldırılır.");
+    expect(en).toContain("Every story is written by a language model from the sources linked under it.");
+    expect(en).toContain("Stories on risky subjects are published only after a person has read them.");
+    expect(en).toContain("The rest are published automatically once they pass the automatic check.");
+    expect(en).toContain("A story that is wrong is corrected or taken down.");
+    expect(tr).not.toContain("İki etiket");
+    expect(en).not.toContain("The two labels");
+    for (const html of [page(DEMO, "yontem"), page(DEMO, "en/method")]) {
+      const section = html.match(/<section>(?:(?!<\/section>)[\s\S])*?(?:dil modeli yazar|written by a language model)[\s\S]*?<\/section>/);
+      expect(section).not.toBeNull();
+      expect(section![0]).toContain('href="https://github.com/ysfzkn/radar-ai-news/issues"');
+    }
+  });
+
+  it("the edition masthead is one h1 reading issue, date, count and minutes, with the date in the big line", () => {
+    for (const [path, lang] of [["", "tr"], ["en", "en"]] as const) {
+      const html = page(DEMO, path);
+      expect(html.match(/<h1[\s>]/g), path).toHaveLength(1);
+      expect(html).toMatch(/<h1 class="masthead">/);
+      expect(h1(html)).toMatch(
+        lang === "tr"
+          ? /^Sayı 4 · 20 Kasım 2026 Cuma · 5 haber · ~\d+ dk$/
+          : /^Issue 4 · Friday, 20 November 2026 · 5 stories · ~\d+ min$/,
+      );
+      const head = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)![1];
+      const big = [...head.matchAll(/<span class="mh-big">([^<]*)<\/span>/g)].map((m) => text(m[1]));
+      expect(big).toEqual(lang === "tr" ? ["20 Kasım", "Cuma"] : ["Friday, 20 November"]);
+      expect(head).toMatch(/<span class="mh-no label caps">(Sayı|Issue) 4<\/span>/);
+      expect(head).toMatch(/<span class="mh-year label">\s*2026<\/span>/);
+      expect(head).toMatch(/<time datetime="2026-11-20">/);
+    }
+  });
+
+  it("an edition with several stories has an index whose links match the story anchors, in order", () => {
+    for (const [path, lang] of [["", "tr"], ["en", "en"], ["2026-11-18", "tr"], ["en/2026-11-17", "en"]] as const) {
+      const html = page(DEMO, path);
+      const index = html.match(/<nav class="index"[^>]*>([\s\S]*?)<\/nav>/);
+      expect(index, path).not.toBeNull();
+      expect(text(index![1])).toMatch(new RegExp(`^${COPY[lang].inThisIssue} ?01 `));
+      const links = [...index![1].matchAll(/<a href="#([^"]+)"/g)].map((m) => m[1]);
+      const ids = articles(html).map((a) => a.match(/<article id="([^"]+)"/)![1]);
+      expect(links.length).toBeGreaterThan(1);
+      expect(links).toEqual(ids);
+      const titles = [...index![1].matchAll(/<a href="#[^"]+"[^>]*>([\s\S]*?)<\/a>/g)].map((m) => text(m[1]));
+      const headings = articles(html).map((a) => text(a.match(/<h2[^>]*>([\s\S]*?)<\/h2>/)![1]));
+      expect(titles).toEqual(headings);
+    }
+  });
+
+  it("an edition with one story has no index", () => {
+    const html = page(HOSTILE, "en/2026-11-19");
+    expect(articles(html)).toHaveLength(1);
+    expect(html).not.toContain('class="index"');
+    expect(text(html)).not.toContain(COPY.en.inThisIssue);
+  });
+
+  it("the first story of an edition is marked as the lead and no story on a week page is", () => {
+    for (const path of ["", "en", "2026-11-17", "en/2026-11-18"]) {
+      const list = articles(page(DEMO, path));
+      expect(list[0], path).toMatch(/^<article id="s-[0-9a-f]{8}" class="story story-lead"/);
+      for (const article of list.slice(1)) expect(article, path).not.toContain("story-lead");
+    }
+    for (const path of ["hafta/2026-W47", "en/week/2026-W47"]) {
+      for (const article of articles(page(DEMO, path))) expect(article, path).not.toContain("story-lead");
+    }
+  });
+
+  it("edition pages show no per-story date; week pages do", () => {
+    for (const path of ["", "en", "2026-11-18"]) {
+      for (const article of articles(page(DEMO, path))) expect(article, path).not.toContain("<time");
+    }
+    for (const path of ["hafta/2026-W47", "en/week/2026-W47"]) {
+      for (const article of articles(page(DEMO, path))) {
+        expect(article, path).toMatch(/<time datetime="2026-11-(1[6-9]|2[0-2])">/);
+      }
+    }
+  });
+
+  it("the echo meter is the mark with as many lit arcs as the level, and keeps its aria-label", () => {
+    const echo = (article: string) => article.match(/<span class="echo">([\s\S]*?)<\/svg>/)![1];
+    const two = articles(page(DEMO, "")).find((a) => a.includes('id="s-5c17e263"'))!;
+    const seven = articles(page(DEMO, "2026-11-18")).find((a) => a.includes('id="s-07c29d1e"'))!;
+    for (const [article, on, label] of [
+      [two, 2, "5 üzerinden 2: 2 bağımsız kaynak"],
+      [seven, 5, "5 üzerinden 5: 7 bağımsız kaynak"],
+    ] as const) {
+      const svg = echo(article);
+      expect(svg).toMatch(/<svg class="mark" viewBox="0 0 24 24" width="22" height="22" role="img" aria-label="([^"]*)"/);
+      expect(svg).toContain(`aria-label="${label}"`);
+      expect(svg.match(/class="mark-on"/g) ?? []).toHaveLength(on);
+      expect(svg.match(/class="mark-off"/g) ?? []).toHaveLength(5 - on);
+      expect(svg.match(/<circle class="mark-dot"/g)).toHaveLength(1);
+    }
+    expect(text(two)).toContain("2 kaynak");
+    expect(text(seven)).toContain("7 kaynak");
+  });
+
+  it("the mark, the echo meter and the favicon carry no colour in attributes except the favicon", () => {
+    const arcs = [5, 8.5, 12, 15.5, 19].map((r) => `d="M4 ${20 - r}A${r} ${r} 0 0 1 ${4 + r} 20"`);
+    let marks = 0;
+    for (const file of [DEMO, REAL].flatMap(htmlFiles)) {
+      const html = readFileSync(file, "utf8");
+      for (const [svg] of html.matchAll(/<svg[\s\S]*?<\/svg>/g)) {
+        expect(svg, file).toMatch(/^<svg class="mark" viewBox="0 0 24 24"/);
+        expect(svg, file).not.toMatch(/\s(fill|stroke|color|stop-color)="/);
+        expect(svg, file).not.toMatch(/#[0-9a-f]{3,8}\b|rgb\(/i);
+        for (const arc of arcs) expect(svg, file).toContain(arc);
+        marks++;
+      }
+    }
+    expect(marks).toBeGreaterThan(50);
+    // The top strip's mark has three lit arcs and is hidden from screen readers.
+    const strip = page(DEMO, "").match(/<a class="wordmark"[\s\S]*?<\/svg>/)![0];
+    expect(strip).toMatch(/aria-hidden="true"/);
+    expect(strip.match(/class="mark-on"/g)).toHaveLength(3);
+    // The end of an edition: all five lit, 28 px.
+    const end = page(DEMO, "").match(/<div class="closed">[\s\S]*?<\/svg>/)![0];
+    expect(end).toMatch(/width="28" height="28"/);
+    expect(end.match(/class="mark-on"/g)).toHaveLength(5);
+    // The favicon is a standalone file with no stylesheet, so its colours are the table's hex values.
+    const favicon = readFileSync(join(DEMO, "favicon.svg"), "utf8");
+    for (const arc of arcs) expect(favicon).toContain(arc);
+    expect(favicon).toContain('stroke="#c2371a"');
+    expect(favicon).toContain('stroke="#83868c"');
+    expect(favicon).toContain('fill="#c2371a"');
+    expect(favicon).not.toMatch(/class=|<style/);
+  });
+
+  it("the end of an edition closes it and points to the neighbouring issues", () => {
+    const html = page(DEMO, "2026-11-19");
+    const end = html.match(/<div class="end">([\s\S]*?)<\/main>/)![1];
+    expect(text(end)).toMatch(/^Baskı kapandı\. ?Sayı 3 · \d+ haber ?← Önceki sayı/);
+    expect(end).toMatch(/<a class="pager-prev" href="\/2026-11-18\/" rel="prev">/);
+    expect(end).toMatch(/<a class="pager-next" href="\/2026-11-20\/" rel="next">/);
   });
 
   it("no page contains <script, <style or a style attribute", () => {
-    const files = [DEMO, HOSTILE, EMPTY].flatMap(htmlFiles);
+    const files = [DEMO, HOSTILE, EMPTY, REAL].flatMap(htmlFiles);
     expect(files.length).toBeGreaterThan(8);
     for (const file of files) {
       const html = readFileSync(file, "utf8");
@@ -325,7 +468,7 @@ describe("built site", () => {
         expect(item).toMatch(/<guid isPermaLink="false">[0-9a-f]{32}<\/guid>/);
         expect(item.match(/<guid/g)).toHaveLength(1);
         expect(item).toMatch(/<pubDate>[A-Z][a-z]{2}, \d{2} [A-Z][a-z]{2} \d{4} \d{2}:\d{2}:\d{2} GMT<\/pubDate>/);
-        expect(item).toContain(`\n\n${COPY[lang].forDevelopers} `);
+        expect(item).toContain(`\n\n${lang === "tr" ? "Geliştiriciler için:" : "For developers:"} `);
       }
       // Newest first: the first item is the last story of 20 November.
       expect(list[0]).toContain("7e39048a");

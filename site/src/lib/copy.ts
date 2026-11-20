@@ -10,10 +10,12 @@ export interface Copy {
   minutes(n: number): string;
   sources(n: number): string;
   echoLabel(level: number, n: number): string;
+  /** The developer panel's heading; the feed adds a colon after it. */
   forDevelopers: string;
   sourceLabel: string;
   tryIt: string;
-  label: { auto: string; human: string };
+  /** The heading of an edition's index of stories. */
+  inThisIssue: string;
   closed: string;
   previous: string;
   next: string;
@@ -65,12 +67,6 @@ export interface Method {
 
 const ISSUES = "https://github.com/ysfzkn/radar-ai-news/issues";
 
-/** The honesty labels; the method page quotes them, so they are defined once. */
-const LABEL: Record<Lang, { auto: string; human: string }> = {
-  tr: { auto: "AI yazdı · otomatik yayımlandı", human: "AI yazdı · insan onayladı" },
-  en: { auto: "Written by AI · auto-published", human: "Written by AI · human-approved" },
-};
-
 export const COPY: Record<Lang, Copy> = {
   tr: {
     siteName: "Radar",
@@ -81,10 +77,10 @@ export const COPY: Record<Lang, Copy> = {
     minutes: (n) => `~${n} dk`,
     sources: (n) => `${n} kaynak`,
     echoLabel: (level, n) => `5 üzerinden ${level}: ${n} bağımsız kaynak`,
-    forDevelopers: "Geliştiriciler için:",
+    forDevelopers: "Geliştiriciler için",
     sourceLabel: "Kaynak:",
     tryIt: "Bugün dene",
-    label: LABEL.tr,
+    inThisIssue: "Bu sayıda",
     closed: "Baskı kapandı.",
     previous: "Önceki sayı",
     next: "Sonraki sayı",
@@ -177,12 +173,13 @@ export const COPY: Record<Lang, Copy> = {
           ],
         },
         {
-          heading: "İki etiket",
+          heading: "Haberleri kim yazar?",
           paragraphs: [
-            "Her haberin altında nasıl yayımlandığı yazar.",
-            `“${LABEL.tr.auto}”: haber bütün otomatik denetimlerden geçti ve kimse okumadan yayımlandı.`,
-            `“${LABEL.tr.human}”: bir insan haberi okudu, gerekirse düzeltti ve onayladı.`,
+            "Her haberi, altında bağlantısı verilen kaynaklardan bir dil modeli yazar.",
+            "Riskli konulardaki haberler ancak bir insan okuduktan sonra yayımlanır. Geri kalanlar otomatik denetimden geçtikten sonra kendiliğinden yayımlanır.",
+            "Yanlış bir haber düzeltilir ya da yayından kaldırılır.",
           ],
+          link: { text: "Yanlış bir haberi GitHub'da bildir", href: ISSUES },
         },
         {
           heading: "Riskli haberler bir insanı bekler",
@@ -217,10 +214,10 @@ export const COPY: Record<Lang, Copy> = {
     sources: (n) => (n === 1 ? "1 source" : `${n} sources`),
     echoLabel: (level, n) =>
       `${level} of 5: ${n} independent ${n === 1 ? "source" : "sources"}`,
-    forDevelopers: "For developers:",
+    forDevelopers: "For developers",
     sourceLabel: "Source:",
     tryIt: "Try it today",
-    label: LABEL.en,
+    inThisIssue: "In this issue",
     closed: "End of this edition.",
     previous: "Previous issue",
     next: "Next issue",
@@ -313,12 +310,13 @@ export const COPY: Record<Lang, Copy> = {
           ],
         },
         {
-          heading: "The two labels",
+          heading: "Who writes the stories",
           paragraphs: [
-            "Every story says how it was published.",
-            `“${LABEL.en.auto}”: the story passed every automatic check and went out without a person reading it first.`,
-            `“${LABEL.en.human}”: a person read the story, corrected it where needed and approved it.`,
+            "Every story is written by a language model from the sources linked under it.",
+            "Stories on risky subjects are published only after a person has read them. The rest are published automatically once they pass the automatic check.",
+            "A story that is wrong is corrected or taken down.",
           ],
+          link: { text: "Report a wrong story on GitHub", href: ISSUES },
         },
         {
           heading: "Risky stories wait for a person",

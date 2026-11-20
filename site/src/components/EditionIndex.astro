@@ -1,0 +1,27 @@
+---
+import { COPY } from "../lib/copy";
+import { anchorId, type Edition } from "../lib/editions";
+import type { Lang } from "../lib/schema";
+
+interface Props {
+  lang: Lang;
+  edition: Edition;
+}
+
+const { lang, edition } = Astro.props;
+const copy = COPY[lang];
+---
+
+<nav class="index" aria-labelledby="index-label">
+  <p class="index-label label caps" id="index-label">{copy.inThisIssue}</p>
+  <ol class="index-list" role="list">
+    {
+      edition.stories.map((story, i) => (
+        <li>
+          <span class="index-no label">{String(i + 1).padStart(2, "0")}</span>{" "}
+          <a href={`#${anchorId(story.uid)}`}>{story.texts[lang]!.title}</a>
+        </li>
+      ))
+    }
+  </ol>
+</nav>

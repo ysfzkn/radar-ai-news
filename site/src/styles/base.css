@@ -81,10 +81,6 @@ a:hover {
   text-transform: uppercase;
 }
 
-.nowrap {
-  white-space: nowrap;
-}
-
 .skip {
   position: absolute;
   left: var(--gutter);
@@ -96,6 +92,28 @@ a:hover {
 
 .skip:focus {
   top: var(--space-2);
+}
+
+/* The mark: a dot and five quarter circles, the first few lit. The site's one shape:
+   before the wordmark, as the echo meter, and at the end of an edition. */
+.mark {
+  flex: none;
+  fill: none;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+}
+
+.mark-dot {
+  fill: var(--accent);
+  stroke: none;
+}
+
+.mark-on {
+  stroke: var(--accent);
+}
+
+.mark-off {
+  stroke: var(--control-border);
 }
 
 /* Top strip: wordmark left, text links right; links wrap below at phone width. */
@@ -112,21 +130,13 @@ a:hover {
 .wordmark {
   display: inline-flex;
   align-items: baseline;
-  gap: 0.28em;
+  gap: 0.3em;
   font-family: var(--font-display);
   font-size: 1.5rem;
   font-weight: 700;
   letter-spacing: -0.015em;
   line-height: 1.1;
   text-decoration: none;
-}
-
-.wordmark-mark {
-  width: 0.25em;
-  height: 0.7em;
-  fill: none;
-  stroke: var(--accent);
-  stroke-linecap: round;
 }
 
 .nav {
@@ -151,8 +161,7 @@ a:hover {
 /* Small label links get a taller hit area (at least 24px); inline padding leaves the layout alone. */
 .nav a,
 .foot a,
-.story-sources a,
-a.story-cat {
+.story-sources a {
   padding-block: 0.35em;
 }
 
@@ -169,7 +178,7 @@ a.story-cat {
   color: var(--warn);
 }
 
-/* Künye: the edition's one-line masthead, the page's h1. */
+/* Künye: the one-line heading of the week, archive, topic and method pages. */
 .kunye {
   padding-block: var(--space-5) var(--space-6);
   color: var(--muted);
@@ -184,6 +193,160 @@ a.story-cat {
 .empty {
   padding-bottom: var(--space-6);
   color: var(--muted);
+}
+
+/* The masthead of an edition: one h1 set as three rows between a heavy rule and a hairline.
+   Its text runs "Sayı 4 · 20 Kasım 2026 Cuma · 5 haber · ~2 dk"; `order` moves the year
+   down beside the count, so a screen reader still hears everything in reading order. */
+.masthead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 0.25em;
+  margin-top: var(--space-5);
+  padding-block: var(--space-3) var(--space-4);
+  border-top: 3px solid var(--ink);
+  border-bottom: 1px solid var(--line);
+  font-size: clamp(2rem, 7vw, 3.25rem);
+  font-weight: 400;
+}
+
+/* A full-width empty item: the line break between the date and the count row. */
+.masthead::after {
+  content: "";
+  flex-basis: 100%;
+  order: 4;
+}
+
+.masthead time {
+  display: contents;
+}
+
+.mh-no {
+  flex-basis: 100%;
+  order: 1;
+  margin-bottom: var(--space-1);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* The separator after the issue number is read, not seen: the rows separate visually. */
+.mh-sep {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.mh-big {
+  order: 2;
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+}
+
+.mh-year + .mh-big {
+  order: 3;
+}
+
+.mh-year {
+  order: 5;
+  margin-top: var(--space-2);
+  color: var(--muted);
+}
+
+/* The flex gap is a word space of the big line; on the small row it is cut back to one mono space. */
+.mh-rest {
+  order: 6;
+  margin-top: var(--space-2);
+  margin-left: calc(1ch - 0.25 * clamp(2rem, 7vw, 3.25rem));
+  color: var(--muted);
+}
+
+/* The index of the day: under the masthead, or in the left rail on a wide screen. */
+.index {
+  padding-block: var(--space-5);
+  border-bottom: 1px solid var(--line);
+}
+
+.index-label {
+  margin-bottom: var(--space-2);
+  color: var(--muted);
+}
+
+.index-list {
+  padding: 0;
+  list-style: none;
+}
+
+.index-list li {
+  display: grid;
+  grid-template-columns: 2.25rem 1fr;
+  align-items: baseline;
+  padding-block: var(--space-1);
+  font-size: 0.9375rem;
+  line-height: 1.4;
+}
+
+.index-no {
+  color: var(--muted);
+}
+
+.index-list a {
+  text-decoration-color: transparent;
+}
+
+.index-list a:hover {
+  text-decoration-color: var(--accent);
+}
+
+.edition .stories {
+  margin-top: var(--space-5);
+}
+
+@media (min-width: 72rem) {
+  /* Rail 16rem, gap 4rem, reading column 40rem. The reading column stays under the top
+     strip when the screen is wide enough; otherwise the block moves right and keeps 1.5rem
+     from the window edge (100vw counts a scrollbar, so a little less where there is one). */
+  .edition-railed {
+    display: grid;
+    grid-template-columns: 16rem minmax(0, var(--measure));
+    grid-template-areas:
+      "rail head"
+      "rail body"
+      "rail end";
+    column-gap: 4rem;
+    align-items: start;
+    width: 60rem;
+    margin-left: max(-20rem, calc(1.5rem - (100vw - var(--measure)) / 2));
+  }
+
+  .edition-railed .masthead {
+    grid-area: head;
+  }
+
+  .edition-railed .index {
+    grid-area: rail;
+    position: sticky;
+    top: 1.5rem;
+    max-height: calc(100vh - 3rem);
+    overflow-y: auto;
+    margin-top: var(--space-5);
+    padding-block: var(--space-3) var(--space-4);
+    border-top: 3px solid var(--ink);
+    border-bottom: 0;
+  }
+
+  .edition-railed .stories {
+    grid-area: body;
+  }
+
+  .edition-railed .end {
+    grid-area: end;
+  }
 }
 
 /* The stories. */
@@ -221,8 +384,38 @@ a.story-cat {
   color: var(--ink);
 }
 
+/* The category tag: outlined, it links to its topic page. */
+a.story-cat {
+  padding: 0.125rem 0.5rem;
+  border: 1px solid var(--ink);
+  text-decoration-color: transparent;
+}
+
+a.story-cat:hover {
+  text-decoration-color: var(--accent);
+}
+
 .story-meta .echo {
   margin-left: auto;
+}
+
+/* From 48rem the number leaves the label row and hangs in a 3rem gutter left of the story. */
+@media (min-width: 48rem) {
+  .story {
+    position: relative;
+  }
+
+  .story .story-no {
+    position: absolute;
+    top: 0;
+    right: 100%;
+    width: 3rem;
+    padding-right: 0.625rem;
+    white-space: nowrap;
+    text-align: right;
+    font-size: 2rem;
+    letter-spacing: -0.02em;
+  }
 }
 
 .story-title {
@@ -245,15 +438,29 @@ a.story-cat {
   margin-bottom: var(--space-4);
 }
 
-.story-dev {
-  margin-bottom: var(--space-4);
-  padding-left: var(--space-3);
-  border-left: 2px solid var(--accent);
+/* The lead: the first story of an edition. */
+.story-lead .story-title {
+  font-size: clamp(1.75rem, 5vw, 2.25rem);
+  letter-spacing: -0.02em;
+  line-height: 1.15;
 }
 
-.story-dev strong {
-  font-weight: 650;
-  color: var(--ink);
+.story-lead .story-summary {
+  font-size: 1.1875rem;
+}
+
+/* The developer line: a quiet panel with an accent edge. */
+.story-dev {
+  margin-bottom: var(--space-4);
+  padding: 0.875rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+}
+
+.story-dev-label {
+  margin-bottom: var(--space-1);
+  color: var(--accent);
 }
 
 .story-sources,
@@ -271,12 +478,7 @@ a.story-cat {
   color: var(--accent);
 }
 
-.story-honest {
-  margin-top: var(--space-2);
-  color: var(--muted);
-}
-
-/* Echo meter: five arcs, the first `level` lit. */
+/* Echo meter: the mark, one lit arc per source up to five, then the count. */
 .echo {
   display: inline-flex;
   align-items: baseline;
@@ -284,50 +486,47 @@ a.story-cat {
   white-space: nowrap;
 }
 
-.echo-arcs {
-  position: relative;
-  top: 0.18em;
-  fill: none;
-  stroke-linecap: round;
+.echo .mark {
+  margin-bottom: -0.3em;
 }
 
-.echo-on {
-  stroke: var(--accent);
-}
-
-.echo-off {
-  stroke: var(--control-border);
-}
-
-/* End of page: the edition closes, then the way to the neighbouring issues. */
+/* End of page: the edition closes under a heavy rule, then the neighbouring issues. */
 .end {
   margin-top: var(--space-7);
-  text-align: center;
 }
 
 .closed {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr;
   align-items: center;
-  justify-content: center;
-  gap: var(--space-4);
-  font-family: var(--font-display);
-  font-size: 1.125rem;
-  font-weight: 600;
+  column-gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 3px solid var(--ink);
 }
 
-.closed::before,
-.closed::after {
-  content: "";
-  width: 2.5rem;
-  border-top: 1px solid var(--control-border);
+.closed .mark {
+  grid-row: span 2;
+}
+
+.closed-text {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+}
+
+.closed-meta {
+  color: var(--muted);
 }
 
 .pager {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: var(--space-4);
-  margin-top: var(--space-6);
-  text-align: left;
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
 }
 
 .pager a {
@@ -337,8 +536,13 @@ a.story-cat {
   text-decoration: none;
 }
 
+.pager-prev {
+  justify-self: start;
+}
+
 .pager-next {
-  margin-left: auto;
+  grid-column: 2;
+  justify-self: end;
   text-align: right;
 }
 

@@ -35,7 +35,7 @@ export function feed(lang: Lang, site: URL | undefined): Promise<Response> {
         title: clean(text.title),
         link: new URL(storyLink(lang, istanbulDate(story.published_at), story.uid), site).href,
         pubDate: new Date(story.published_at),
-        description: `${clean(text.summary)}\n\n${copy.forDevelopers} ${clean(text.dev_line)}`,
+        description: `${clean(text.summary)}\n\n${copy.forDevelopers}: ${clean(text.dev_line)}`,
         // @astrojs/rss makes the guid from the link; the uid is the stable identity.
         // A uid is 32 hex characters (the schema checks it), so it is safe inside XML.
         customData: `<guid isPermaLink="false">${story.uid}</guid>`,

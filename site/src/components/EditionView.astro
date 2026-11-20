@@ -1,8 +1,10 @@
 ---
+import EditionIndex from "./EditionIndex.astro";
+import Mark from "./Mark.astro";
 import Story from "./Story.astro";
 import { COPY } from "../lib/copy";
 import { readingMinutes, type Edition } from "../lib/editions";
-import { longDate, shortDate } from "../lib/format";
+import { dayMonth, shortDate, weekdayName, yearOf } from "../lib/format";
 import { routes } from "../lib/routes";
 import type { Lang } from "../lib/schema";
 
@@ -19,48 +21,76 @@ interface Props {
 const { lang, edition, previous, next, isLatest } = Astro.props;
 const copy = COPY[lang];
 const newer = isLatest ? null : next;
+const count = edition.stories.length;
+const hasIndex = count > 1;
+const weekday = weekdayName(edition.date, lang);
 ---
 
-<h1 class="kunye label">
-  <span class="kunye-no">{copy.issue(edition.number)}</span>{" · "}
-  <time datetime={edition.date}>{longDate(edition.date, lang)}</time>{" · "}
-  <span class="nowrap">
-    {copy.storyCount(edition.stories.length)}{" · "}{copy.minutes(readingMinutes(edition.stories, lang))}
-  </span>
-</h1>
+<div class:list={["edition", { "edition-railed": hasIndex }]}>
+  {/* One h1 that reads "Sayı 4 · 20 Kasım 2026 Cuma · 5 haber · ~2 dk" in order; CSS sets it as three rows. */}
+  <h1 class="masthead">
+    <span class="mh-no label caps">{copy.issue(edition.number)}</span>
+    <span class="mh-sep">{" · "}</span>
+    <time datetime={edition.date}>
+      {
+        lang === "tr" ? (
+          <>
+            <span class="mh-big">{dayMonth(edition.date, lang)}</span>
+            <span class="mh-year label">{` ${yearOf(edition.date)}`}</span>
+            <span class="mh-big">{` ${weekday}`}</span>
+          </>
+        ) : (
+          <>
+            <span class="mh-big">{`${weekday}, ${dayMonth(edition.date, lang)}`}</span>
+            <span class="mh-year label">{` ${yearOf(edition.date)}`}</span>
+          </>
+        )
+      }
+    </time>
+    <span class="mh-rest label">
+      {` · ${copy.storyCount(count)} · ${copy.minutes(readingMinutes(edition.stories, lang))}`}
+    </span>
+  </h1>
 
-<ol class="stories" role="list">
-  {
-    edition.stories.map((story, i) => (
-      <li>
-        <Story lang={lang} story={story} index={i + 1} date={edition.date} />
-      </li>
-    ))
-  }
-</ol>
+  {hasIndex && <EditionIndex lang={lang} edition={edition} />}
 
-<div class="end">
-  <p class="closed">{copy.closed}</p>
-  {
-    (previous || newer) && (
-      <p class="pager">
-        {previous && (
-          <a class="pager-prev" href={routes[lang].edition(previous.date)} rel="prev">
-            <span class="pager-dir label caps">← {copy.previous}</span>
-            <span class="pager-issue">
-              {copy.issue(previous.number)} · {shortDate(previous.date, lang)}
-            </span>
-          </a>
-        )}
-        {newer && (
-          <a class="pager-next" href={routes[lang].edition(newer.date)} rel="next">
-            <span class="pager-dir label caps">{copy.next} →</span>
-            <span class="pager-issue">
-              {copy.issue(newer.number)} · {shortDate(newer.date, lang)}
-            </span>
-          </a>
-        )}
-      </p>
-    )
-  }
+  <ol class="stories" role="list">
+    {
+      edition.stories.map((story, i) => (
+        <li>
+          <Story lang={lang} story={story} index={i + 1} date={edition.date} lead={i === 0} />
+        </li>
+      ))
+    }
+  </ol>
+
+  <div class="end">
+    <div class="closed">
+      <Mark size={28} lit={5} />
+      <p class="closed-text">{copy.closed}</p>
+      <p class="closed-meta label">{copy.issue(edition.number)} · {copy.storyCount(count)}</p>
+    </div>
+    {
+      (previous || newer) && (
+        <p class="pager">
+          {previous && (
+            <a class="pager-prev" href={routes[lang].edition(previous.date)} rel="prev">
+              <span class="pager-dir label caps">← {copy.previous}</span>
+              <span class="pager-issue">
+                {copy.issue(previous.number)} · {shortDate(previous.date, lang)}
+              </span>
+            </a>
+          )}
+          {newer && (
+            <a class="pager-next" href={routes[lang].edition(newer.date)} rel="next">
+              <span class="pager-dir label caps">{copy.next} →</span>
+              <span class="pager-issue">
+                {copy.issue(newer.number)} · {shortDate(newer.date, lang)}
+              </span>
+            </a>
+          )}
+        </p>
+      )
+    }
+  </div>
 </div>

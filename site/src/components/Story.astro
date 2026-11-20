@@ -13,11 +13,15 @@ interface Props {
   index: number;
   /** The edition's "YYYY-MM-DD". */
   date: string;
+  /** The first story of an edition page, set larger. */
+  lead?: boolean;
+  /** Show the date in the label row: on week pages, where stories come from several days. */
+  showDate?: boolean;
 }
 
 const SOURCE_LIMIT = 4;
 
-const { lang, story, index, date } = Astro.props;
+const { lang, story, index, date, lead = false, showDate = false } = Astro.props;
 const copy = COPY[lang];
 const text = story.texts[lang]!;
 
@@ -34,16 +38,19 @@ const more = sources.length - shown.length;
 const tryUrl = httpUrl(story.try_url);
 ---
 
-<article id={anchorId(story.uid)} class="story">
+<article id={anchorId(story.uid)} class:list={["story", { "story-lead": lead }]}>
   <p class="story-meta label">
     <span class="story-no">{String(index).padStart(2, "0")}</span>{" "}
     <a class="story-cat caps" href={routes[lang].topic(story.category)}>{copy.categories[story.category]}</a>{" "}
-    <time datetime={date}>{shortDate(date, lang)}</time>{" "}
+    {showDate && <time datetime={date}>{shortDate(date, lang)}</time>}{" "}
     <Echo lang={lang} count={story.source_count} />
   </p>
   <h2 class="story-title">{text.title}</h2>
   <p class="story-summary">{text.summary}</p>
-  <p class="story-dev"><strong>{copy.forDevelopers}</strong> {text.dev_line}</p>
+  <div class="story-dev">
+    <p class="story-dev-label label caps">{copy.forDevelopers}</p>
+    <p>{text.dev_line}</p>
+  </div>
   {
     shown.length > 0 && (
       <p class="story-sources label">
@@ -69,5 +76,4 @@ const tryUrl = httpUrl(story.try_url);
       </p>
     )
   }
-  <p class="story-honest label">{copy.label[story.publish_mode]}</p>
 </article>

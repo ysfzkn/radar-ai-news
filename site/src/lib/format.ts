@@ -22,6 +22,22 @@ export function longDate(date: string, lang: Lang): string {
     : `${weekday}, ${day} ${monthName} ${year}`;
 }
 
+/** "20 Kasım" / "20 November": the edition masthead's big line, without weekday and year. */
+export function dayMonth(date: string, lang: Lang): string {
+  const { month, day } = parts(date);
+  return `${day} ${COPY[lang].months[month]}`;
+}
+
+/** "Cuma" / "Friday". */
+export function weekdayName(date: string, lang: Lang): string {
+  return COPY[lang].weekdays[weekdayOf(date)];
+}
+
+/** "2026". */
+export function yearOf(date: string): string {
+  return String(parts(date).year);
+}
+
 /** "Sayı 4 · 20 Kasım 2026 · Radar": an edition page's <title>. */
 export function editionTitle(number: number, date: string, lang: Lang): string {
   const { year, month, day } = parts(date);

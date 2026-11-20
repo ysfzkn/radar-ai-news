@@ -31,7 +31,7 @@ const copy = COPY[lang];
       <ol class="stories" role="list">
         {week.stories.map((story, i) => (
           <li>
-            <Story lang={lang} story={story} index={i + 1} date={istanbulDate(story.published_at)} />
+            <Story lang={lang} story={story} index={i + 1} date={istanbulDate(story.published_at)} showDate />
           </li>
         ))}
       </ol>

@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { hostLabel, httpUrl, longDate, shortDate, weekHeading } from "../src/lib/format";
+import {
+  dayMonth,
+  hostLabel,
+  httpUrl,
+  longDate,
+  shortDate,
+  weekdayName,
+  weekHeading,
+  yearOf,
+} from "../src/lib/format";
 
 describe("dates", () => {
   it("formats 2026-11-20 as `20 Kasım 2026 Cuma` and `Friday, 20 November 2026`", () => {
@@ -10,6 +19,14 @@ describe("dates", () => {
   it("formats short dates", () => {
     expect(shortDate("2026-11-20", "tr")).toBe("20 Kas");
     expect(shortDate("2026-11-20", "en")).toBe("20 Nov");
+  });
+
+  it("splits a date into day and month, weekday and year for the edition masthead", () => {
+    expect(dayMonth("2026-11-20", "tr")).toBe("20 Kasım");
+    expect(dayMonth("2026-11-20", "en")).toBe("20 November");
+    expect(weekdayName("2026-11-20", "tr")).toBe("Cuma");
+    expect(weekdayName("2026-09-30", "en")).toBe("Wednesday");
+    expect(yearOf("2026-11-20")).toBe("2026");
   });
 
   it("names a Sunday and a leap day correctly", () => {
