@@ -1,0 +1,19 @@
+---
+import Base from "../layouts/Base.astro";
+import SubscribeView from "../components/SubscribeView.astro";
+import { COPY } from "../lib/copy";
+import { routes } from "../lib/routes";
+
+const lang = "tr";
+const copy = COPY[lang];
+---
+
+<Base
+  lang={lang}
+  title={`${copy.subscribeFree} · ${copy.siteName}`}
+  description={copy.subscribe.description}
+  path={routes[lang].subscribe}
+  alternate={routes.en.subscribe}
+>
+  <SubscribeView lang={lang} />
+</Base>

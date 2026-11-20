@@ -4,7 +4,7 @@ import "../styles/base.css";
 import Masthead from "../components/Masthead.astro";
 import { COPY } from "../lib/copy";
 import { loadData } from "../lib/data";
-import { routes } from "../lib/routes";
+import { EXTERNAL, OWNER, routes } from "../lib/routes";
 import type { Lang } from "../lib/schema";
 
 interface Props {
@@ -60,9 +60,17 @@ const { demo } = loadData();
         <slot />
       </main>
       <footer class="foot label">
-        <a href={routes[lang].rss}>{copy.rss}</a>{" "}
-        <a href={routes[lang].method}>{copy.nav.method}</a>{" "}
-        <a href="https://github.com/ysfzkn/radar-ai-news">{copy.sourceCode}</a>
+        <p class="sig">
+          {copy.owner}{" · "}<a href={OWNER.site} {...EXTERNAL}>{copy.by}</a>{" · "}<a
+            href={OWNER.github}
+            {...EXTERNAL}>{copy.github}</a
+          >
+        </p>
+        <p class="foot-links">
+          <a href={routes[lang].rss}>{copy.rss}</a>{" "}
+          <a href={routes[lang].about}>{copy.nav.about}</a>{" "}
+          <a href={OWNER.repository} {...EXTERNAL}>{copy.sourceCode}</a>
+        </p>
       </footer>
     </div>
   </body>

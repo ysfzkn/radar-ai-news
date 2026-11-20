@@ -3,6 +3,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { COPY } from "../src/lib/copy";
+import { routes } from "../src/lib/routes";
 import { CATEGORIES } from "../src/lib/schema";
 
 // These tests read the files of finished builds. beforeAll runs four builds one after
@@ -114,6 +115,56 @@ function cssRule(sheet: string, selector: string): string {
   return match![1];
 }
 
+/** Both stylesheets, tokens first. */
+const sheets = () => readFileSync(join(root, "src", "styles", "tokens.css"), "utf8") + "\n" + css();
+
+interface Declaration {
+  prop: string;
+  value: string;
+  /** The innermost block's prelude: a selector list, or an at-rule for a bare declaration. */
+  selector: string;
+  /** Every enclosing prelude, outermost first. */
+  stack: string[];
+}
+
+/** Every declaration of a stylesheet with the blocks around it (comments dropped; no braces in strings). */
+function declarations(sheet: string): Declaration[] {
+  const source = sheet.replace(/\/\*[\s\S]*?\*\//g, "");
+  const out: Declaration[] = [];
+  const stack: string[] = [];
+  let buffer = "";
+  const flush = () => {
+    const m = buffer.match(/^\s*(-?[\w-]+)\s*:\s*([\s\S]*?)\s*$/);
+    if (m && stack.length > 0) out.push({ prop: m[1], value: m[2], selector: stack.at(-1)!, stack: [...stack] });
+    buffer = "";
+  };
+  for (const ch of source) {
+    if (ch === "{") {
+      stack.push(buffer.trim().replace(/\s+/g, " "));
+      buffer = "";
+    } else if (ch === "}") {
+      flush();
+      stack.pop();
+    } else if (ch === ";") {
+      flush();
+    } else {
+      buffer += ch;
+    }
+  }
+  return out;
+}
+
+/** Every `<a …>` start tag of a page with its attributes. */
+function anchors(html: string): { tag: string; attrs: Record<string, string> }[] {
+  return [...html.matchAll(/<a\s[^>]*>/g)].map(([tag]) => {
+    const attrs: Record<string, string> = {};
+    for (const [, name, value] of tag.matchAll(/\s([\w:-]+)(?:="([^"]*)")?/g)) attrs[name] = value ?? "";
+    return { tag, attrs };
+  });
+}
+
+const EXTERNAL = 'target="_blank" rel="noopener noreferrer"';
+
 /** The `@media print` block, which closes the stylesheet. */
 function printRules(sheet: string): string {
   const start = sheet.indexOf("\n@media print {");
@@ -169,15 +220,16 @@ describe("built site", () => {
     expect(text(page(DEMO, ""))).not.toContain("Sonraki sayı");
   });
 
-  it("each article has the developer panel, a source link with rel noopener and the echo meter's aria-label", () => {
+  it("each article has the why-it-matters line, a source link that opens in a new tab and the echo meter's aria-label", () => {
     for (const [path, lang] of [["", "tr"], ["en", "en"]] as const) {
       for (const article of articles(page(DEMO, path))) {
         expect(article).toMatch(/<article id="s-[0-9a-f]{8}"/);
         expect(article).toMatch(/<h2[^>]*>/);
-        const panel = article.match(/<div class="story-dev">([\s\S]*?)<\/div>/);
-        expect(panel).not.toBeNull();
-        expect(panel![1]).toMatch(new RegExp(`<p class="story-dev-label label caps">${COPY[lang].forDevelopers}</p>`));
-        expect(article).toMatch(/<a [^>]*href="https:\/\/[^"]+"[^>]*rel="noopener"/);
+        expect(article).not.toContain("story-dev");
+        const why = article.match(/<p class="story-why">([\s\S]*?)<\/p>/);
+        expect(why).not.toBeNull();
+        expect(why![1]).toMatch(new RegExp(`^<span class="why-label label caps">${COPY[lang].whyItMatters}</span> \\S`));
+        expect(article).toMatch(new RegExp(`<a href="https://[^"]+" ${EXTERNAL}>`));
         expect(article).toMatch(/role="img" aria-label="[^"]*"/);
         const label = article.match(/role="img" aria-label="([^"]*)"/)![1];
         expect(label).toMatch(lang === "tr" ? /^5 üzerinden [1-5]: \d+ bağımsız kaynak$/ : /^[1-5] of 5: /);
@@ -199,9 +251,9 @@ describe("built site", () => {
     expect(Object.keys(COPY.en)).not.toContain("label");
   });
 
-  it("the method page explains that every story is written by a model and which ones a person reads first", () => {
-    const tr = text(page(DEMO, "yontem"));
-    const en = text(page(DEMO, "en/method"));
+  it("the Künye page explains that every story is written by a model and which ones a person reads first", () => {
+    const tr = text(page(DEMO, "kunye"));
+    const en = text(page(DEMO, "en/about"));
     expect(tr).toContain("Her haberi bir dil modeli, haberin altında bağlantıları verilen kaynaklardan yazar.");
     expect(tr).toContain("Riskli konulardaki haberler ancak bir insan okuduktan sonra yayımlanır.");
     expect(tr).toContain("Geri kalanlar otomatik denetimden geçtikten sonra kendiliğinden yayımlanır.");
@@ -215,7 +267,7 @@ describe("built site", () => {
     expect(en).toContain("Who writes the stories?");
     expect(tr).toContain("Haberleri kim yazar?");
     // The call to report a wrong story stays in its own section further down, not repeated here.
-    for (const html of [page(DEMO, "yontem"), page(DEMO, "en/method")]) {
+    for (const html of [page(DEMO, "kunye"), page(DEMO, "en/about")]) {
       const sections = [...html.matchAll(/<section>[\s\S]*?<\/section>/g)].map((m) => m[0]);
       const section = sections.find((x) => /dil modeli,|written by a language model/.test(x));
       expect(section).toBeDefined();
@@ -231,8 +283,8 @@ describe("built site", () => {
       expect(html).toMatch(/<h1 class="masthead">/);
       expect(h1(html)).toMatch(
         lang === "tr"
-          ? /^Sayı 4 · 20 Kasım 2026 Cuma · 5 haber · ~\d+ dk$/
-          : /^Issue 4 · Friday, 20 November 2026 · 5 stories · ~\d+ min$/,
+          ? /^Sayı 4 · 20 Kasım 2026 Cuma · 5 haber · \d+ kaynak · ~\d+ dk$/
+          : /^Issue 4 · Friday, 20 November 2026 · 5 stories · \d+ sources · ~\d+ min$/,
       );
       const head = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)![1];
       const big = [...head.matchAll(/<span class="mh-big">([^<]*)<\/span>/g)].map((m) => text(m[1]));
@@ -305,7 +357,7 @@ describe("built site", () => {
     expect(sheet.match(/grid-template-columns: 2\.25rem/g)).toHaveLength(1);
   });
 
-  it("each story's number links to its own anchor and has an accessible name", () => {
+  it("each story's number links to its own anchor and its accessible name contains the number", () => {
     for (const [path, lang] of [["", "tr"], ["en", "en"], ["2026-11-18", "tr"], ["hafta/2026-W47", "tr"], ["en/week/2026-W47", "en"]] as const) {
       const list = articles(page(DEMO, path));
       expect(list.length).toBeGreaterThan(1);
@@ -313,10 +365,12 @@ describe("built site", () => {
         const id = article.match(/<article id="([^"]+)"/)![1];
         const no = String(i + 1).padStart(2, "0");
         expect(article, `${path} ${id}`).toContain(
-          `<a class="story-no" href="#${id}" aria-label="${COPY[lang].storyLink}">${no}</a>`,
+          `<a class="story-no" href="#${id}" aria-label="${COPY[lang].storyLink(no)}">${no}</a>`,
         );
       });
     }
+    expect(COPY.tr.storyLink("03")).toBe("03 numaralı haberin bağlantısı");
+    expect(COPY.en.storyLink("03")).toBe("Link to story 03");
     const sheet = css();
     expect(cssRule(sheet, "a.story-no")).toContain("text-decoration-line: none;");
     expect(cssRule(sheet, "a.story-no:hover,\na.story-no:focus-visible")).toContain("text-decoration-line: underline;");
@@ -325,12 +379,26 @@ describe("built site", () => {
   it("the stylesheet marks a targeted story and gives stories a scroll margin", () => {
     const sheet = css();
     expect(cssRule(sheet, ".story")).toContain("scroll-margin-top: 1.5rem;");
-    const bars = [...sheet.matchAll(/\.story:target::before \{([^}]*)\}/g)].map((m) => m[1]);
+    const bars = declarations(sheet).filter((d) => d.selector.includes(".story:target::before"));
     expect(bars.length).toBeGreaterThan(0);
-    expect(bars.join("")).toContain("3px solid var(--accent)");
-    // A bar only: no background change and no animation on a targeted story.
+    // The bar takes the story's category colour, the accent where a story has none.
+    expect(bars.map((d) => `${d.prop}: ${d.value}`)).toContain("border-left: 3px solid var(--cat, var(--accent))");
+    // A bar only: no background change; it grows only where motion is welcome.
     expect(sheet).not.toMatch(/:target \{/);
-    for (const bar of bars) expect(bar).not.toMatch(/animation|transition|background/);
+    for (const bar of bars) {
+      expect(bar.prop).not.toMatch(/background|transition/);
+      if (bar.prop.startsWith("animation") && bar.value !== "none") {
+        expect(bar.stack.join(" ")).toContain("prefers-reduced-motion: no-preference");
+      }
+    }
+    // From 48rem it sits between the hanging number and the text; from 50rem, where the gutter
+    // has room even beside a 20px scrollbar, 0.5rem left of the number (0.5rem from the rail).
+    const left = (media: string) =>
+      bars.find((d) => d.prop === "left" && d.stack[0] === `@media (min-width: ${media})`)?.value;
+    expect(left("48rem")).toBe("calc(-0.6 * var(--hang-pad))");
+    expect(left("50rem")).toBe("-3.5rem");
+    // No width-based clamp that a scrollbar can throw off.
+    for (const bar of bars) expect(bar.value).not.toContain("100vw");
   });
 
   it("the try link is one link with the button class, the mark and the host", () => {
@@ -341,7 +409,7 @@ describe("built site", () => {
         if (!block) continue;
         seen++;
         expect(block[1].match(/<a /g)).toHaveLength(1);
-        const link = block[1].match(/<a class="try" href="(https:\/\/[^"]+)" rel="noopener">([\s\S]*?)<\/a>/);
+        const link = block[1].match(new RegExp(`<a class="try" href="(https://[^"]+)" ${EXTERNAL}>([\\s\\S]*?)</a>`));
         expect(link, path).not.toBeNull();
         const host = new URL(link![1]).host;
         expect(link![2]).toMatch(
@@ -354,12 +422,21 @@ describe("built site", () => {
     expect(seen).toBeGreaterThan(2);
     const sheet = css();
     const button = cssRule(sheet, ".try");
-    expect(button).toContain("border: 1px solid var(--ink);");
     expect(button).toContain("padding: 0.375rem 0.75rem;");
     expect(button).toContain("min-height: 2.25rem;");
-    const hover = cssRule(sheet, ".try:hover,\n.try:focus-visible");
-    expect(hover).toContain("background: var(--chip);");
-    expect(cssRule(sheet, ".story-try")).toContain("margin-top: 0.75rem;");
+    // The depth block, shared with the subscribe button: a 1.5px ink border on white, a 3px hard shadow.
+    const block = cssRule(sheet, ".subscribe,\n.try");
+    expect(block).toContain("border: 1.5px solid var(--ink);");
+    expect(block).toContain("background: var(--surface);");
+    expect(block).toContain("color: var(--ink);");
+    expect(block).toContain("box-shadow: 3px 3px 0 var(--ink);");
+    const hover = cssRule(sheet, ".subscribe:hover,\n.subscribe:focus-visible,\n.try:hover,\n.try:focus-visible");
+    expect(hover).toContain("transform: translate(-1px, -1px);");
+    expect(hover).toContain("box-shadow: 4px 4px 0 var(--ink);");
+    const active = cssRule(sheet, ".subscribe:active,\n.try:active");
+    expect(active).toContain("transform: translate(2px, 2px);");
+    expect(active).toContain("box-shadow: 1px 1px 0 var(--ink);");
+    expect(cssRule(sheet, ".story-try")).toContain("margin-top: var(--space-3);");
   });
 
   it("the language control shows both languages, marks the current one and links the other with hreflang", () => {
@@ -368,8 +445,10 @@ describe("built site", () => {
       ["en", "en", "/"],
       ["2026-11-18", "tr", "/en/2026-11-18/"],
       ["en/2026-11-18", "en", "/2026-11-18/"],
-      ["yontem", "tr", "/en/method/"],
-      ["en/method", "en", "/yontem/"],
+      ["kunye", "tr", "/en/about/"],
+      ["en/about", "en", "/kunye/"],
+      ["abone", "tr", "/en/subscribe/"],
+      ["en/subscribe", "en", "/abone/"],
       ["arsiv", "tr", "/en/archive/"],
     ] as const;
     for (const [path, lang, href] of cases) {
@@ -434,14 +513,26 @@ describe("built site", () => {
     expect(hidden).toContain("display: none;");
     expect(cssRule(print, "body")).toMatch(/background: var\(--surface\);[\s\S]*color: var\(--ink\);/);
     expect(cssRule(print, ".stories > li")).toContain("break-inside: avoid;");
-    expect(cssRule(print, ".story-dev")).toContain("background: none;");
+    // Backgrounds do not print: the filled pills turn into outlined ink, and the shadows go.
+    expect(cssRule(print, ".why-label,\n  .mh-no")).toMatch(
+      /background: none;[\s\S]*color: var\(--ink\);[\s\S]*border: 1px solid var\(--ink\);/,
+    );
+    expect(cssRule(print, ".story-lead,\n  .subscribe,\n  .try")).toContain("box-shadow: none;");
+    expect(cssRule(print, ".progress,\n  .top-act,\n  .by,\n  .closed-sub")).toContain("display: none;");
     expect(cssRule(print, '.story-sources a[href^="http"]::after,\n  .try[href^="http"]::after')).toContain(
       'content: " (" attr(href) ")";',
     );
     // The rail and the column shift give way to one column.
     expect(print).toContain(".edition-railed");
-    // The strip that carries the navigation has the class the print rule hides.
-    expect(page(DEMO, "")).toMatch(/<nav class="top-nav">/);
+    // The elements the print rules hide carry those classes.
+    const edition = page(DEMO, "2026-11-19");
+    expect(edition).toMatch(/<nav class="top-nav">/);
+    expect(edition).toContain('<p class="pager">');
+    expect(edition).toContain('<footer class="foot label">');
+    expect(edition).toContain('<nav class="index"');
+    expect(edition).toContain('<div class="progress" aria-hidden="true"></div>');
+    expect(edition).toContain('<div class="top-act">');
+    expect(edition).toContain('<p class="closed-sub">');
   });
 
   it("an edition with one story has no index", () => {
@@ -454,7 +545,7 @@ describe("built site", () => {
   it("the first story of an edition is marked as the lead and no story on a week page is", () => {
     for (const path of ["", "en", "2026-11-17", "en/2026-11-18"]) {
       const list = articles(page(DEMO, path));
-      expect(list[0], path).toMatch(/^<article id="s-[0-9a-f]{8}" class="story story-lead"/);
+      expect(list[0], path).toMatch(/^<article id="s-[0-9a-f]{8}" class="story story-lead cat-[a-z]+"/);
       for (const article of list.slice(1)) expect(article, path).not.toContain("story-lead");
     }
     for (const path of ["hafta/2026-W47", "en/week/2026-W47"]) {
@@ -540,7 +631,7 @@ describe("built site", () => {
   it("the end of an edition closes it and points to the neighbouring issues", () => {
     const html = page(DEMO, "2026-11-19");
     const end = html.match(/<div class="end">([\s\S]*?)<\/main>/)![1];
-    expect(text(end)).toMatch(/^Baskı kapandı\. ?Sayı 3 · \d+ haber ?← Önceki sayı/);
+    expect(text(end)).toMatch(/^Baskı kapandı\. ?Sayı 3 · \d+ haber ?Yarınki sayıyı kaçırma\. ?Ücretsiz abone ol ?← Önceki sayı/);
     expect(end).toMatch(/<a class="pager-prev" href="\/2026-11-18\/" rel="prev">/);
     expect(end).toMatch(/<a class="pager-next" href="\/2026-11-20\/" rel="next">/);
   });
@@ -706,7 +797,7 @@ describe("built site", () => {
         expect(item).toMatch(/<guid isPermaLink="false">[0-9a-f]{32}<\/guid>/);
         expect(item.match(/<guid/g)).toHaveLength(1);
         expect(item).toMatch(/<pubDate>[A-Z][a-z]{2}, \d{2} [A-Z][a-z]{2} \d{4} \d{2}:\d{2}:\d{2} GMT<\/pubDate>/);
-        expect(item).toContain(`\n\n${lang === "tr" ? "Geliştiriciler için:" : "For developers:"} `);
+        expect(item).toContain(`\n\n${lang === "tr" ? "Neden önemli:" : "Why it matters:"} `);
       }
       // Newest first: the first item is the last story of 20 November.
       expect(list[0]).toContain("7e39048a");
@@ -748,9 +839,9 @@ describe("built site", () => {
     expect(readFileSync(join(REAL, "rss.xml"), "utf8")).toContain(titles[0]);
   });
 
-  it("the method page exists in both languages and names the 72-hour rule", () => {
-    const tr = page(DEMO, "yontem");
-    const en = page(DEMO, "en/method");
+  it("the Künye page exists in both languages and names the 72-hour rule", () => {
+    const tr = page(DEMO, "kunye");
+    const en = page(DEMO, "en/about");
     expect(tr).toMatch(/<html lang="tr"/);
     expect(en).toMatch(/<html lang="en"/);
     expect(text(tr)).toContain("72 saat");
@@ -786,6 +877,294 @@ describe("built site", () => {
     const robots = readFileSync(join(DEMO, "robots.txt"), "utf8");
     expect(robots).toContain(`Sitemap: ${SITE}/sitemap-index.xml`);
     expect(existsSync(join(DEMO, "sitemap-index.xml"))).toBe(true);
+  });
+
+  it("the Künye pages exist at /kunye/ and /en/about/, the old method addresses do not, and no page links to them", () => {
+    for (const dir of [DEMO, HOSTILE, EMPTY, REAL]) {
+      expect(existsSync(join(dir, "kunye", "index.html")), dir).toBe(true);
+      expect(existsSync(join(dir, "en", "about", "index.html")), dir).toBe(true);
+      expect(existsSync(join(dir, "yontem")), dir).toBe(false);
+      expect(existsSync(join(dir, "en", "method")), dir).toBe(false);
+      for (const file of htmlFiles(dir)) {
+        const html = readFileSync(file, "utf8");
+        expect(html, file).not.toMatch(/\/yontem\/|\/en\/method\//);
+      }
+    }
+    expect(page(DEMO, "kunye")).toMatch(/<link rel="alternate" hreflang="en" href="https:\/\/[^"]+\/en\/about\/">/);
+    expect(page(DEMO, "en/about")).toMatch(/<link rel="alternate" hreflang="tr" href="https:\/\/[^"]+\/kunye\/">/);
+    expect(h1(page(DEMO, "kunye"))).toBe("Künye");
+    expect(h1(page(DEMO, "en/about"))).toBe("About");
+    const sitemap = readFileSync(join(DEMO, "sitemap-0.xml"), "utf8");
+    for (const path of ["kunye/", "en/about/", "abone/", "en/subscribe/"]) expect(sitemap).toContain(`<loc>${SITE}/${path}</loc>`);
+    expect(sitemap).not.toMatch(/yontem|method/);
+    // The navigation and the footer name the page.
+    for (const [path, lang] of [["", "tr"], ["en", "en"]] as const) {
+      const html = page(DEMO, path);
+      const nav = html.match(/<nav class="top-nav">([\s\S]*?)<\/nav>/)![1];
+      expect(nav).toContain(`<a href="${lang === "tr" ? "/kunye/" : "/en/about/"}">${COPY[lang].nav.about}</a>`);
+      const foot = html.match(/<footer[\s\S]*?<\/footer>/)![0];
+      expect(foot).toContain(`<a href="${lang === "tr" ? "/kunye/" : "/en/about/"}">${COPY[lang].nav.about}</a>`);
+    }
+    expect(COPY.tr.nav.about).toBe("Künye");
+    expect(COPY.en.nav.about).toBe("About");
+  });
+
+  it("the Künye page opens with who makes Radar and links ozkanyusuf.com and the GitHub account", () => {
+    for (const [path, heading] of [["kunye", "Radar'ı kim çıkarıyor?"], ["en/about", "Who makes Radar?"]] as const) {
+      const html = page(DEMO, path);
+      const first = html.match(/<section>([\s\S]*?)<\/section>/)![1];
+      expect(text(first.match(/<h2[^>]*>([\s\S]*?)<\/h2>/)![1])).toBe(heading);
+      expect(text(first)).toContain("Yusuf Özkan");
+      for (const href of ["https://ozkanyusuf.com", "https://github.com/ysfzkn", "https://github.com/ysfzkn/radar-ai-news"]) {
+        expect(first, `${path} ${href}`).toContain(`href="${href}" ${EXTERNAL}`);
+      }
+    }
+    // The rest of the method stays below it.
+    expect(text(page(DEMO, "kunye"))).toContain("Yankı ölçer");
+    expect(text(page(DEMO, "en/about"))).toContain("The echo meter");
+  });
+
+  it("every page shows ozkanyusuf.com beside the wordmark and the signature in the footer", () => {
+    const files = [DEMO, REAL].flatMap(htmlFiles);
+    expect(files.length).toBeGreaterThan(20);
+    for (const file of files) {
+      const html = readFileSync(file, "utf8");
+      const strip = html.match(/<header class="top">([\s\S]*?)<\/header>/)![1];
+      const afterWordmark = strip.slice(strip.indexOf("</a>", strip.indexOf('class="wordmark"')) + 4);
+      expect(afterWordmark.match(/<a\s[^>]*>/)![0], file).toBe(`<a class="by label" href="https://ozkanyusuf.com" ${EXTERNAL}>`);
+      expect(text(afterWordmark).startsWith("ozkanyusuf.com"), file).toBe(true);
+      const foot = html.match(/<footer class="foot label">([\s\S]*?)<\/footer>/)![1];
+      const sig = foot.match(/<p class="sig">([\s\S]*?)<\/p>/);
+      expect(sig, file).not.toBeNull();
+      expect(text(sig![1])).toBe("Yusuf Özkan · ozkanyusuf.com · GitHub");
+      expect(sig![1]).toContain(`<a href="https://ozkanyusuf.com" ${EXTERNAL}>ozkanyusuf.com</a>`);
+      expect(sig![1]).toContain(`<a href="https://github.com/ysfzkn" ${EXTERNAL}>GitHub</a>`);
+      // Then the RSS, Künye and source code links, after the signature.
+      expect(text(foot).indexOf("RSS")).toBeGreaterThan(text(foot).indexOf("GitHub"));
+    }
+  });
+
+  it("no page says the site is for developers in its tagline or description", () => {
+    expect(COPY.tr.tagline).toBe("Günün teknoloji ve yapay zekâ haberleri. Beş dakika, gürültü yok.");
+    expect(COPY.en.tagline).toBe("The day's tech and AI news. Five minutes, no noise.");
+    for (const file of [DEMO, REAL, EMPTY].flatMap(allFiles).filter((f) => /\.(html|xml)$/.test(f))) {
+      const content = readFileSync(file, "utf8");
+      for (const [, value] of content.matchAll(/<meta (?:name|property)="(?:description|og:description)" content="([^"]*)"/g)) {
+        expect(value, file).not.toMatch(/geliştirici|developer/i);
+      }
+      expect(text(content), file).not.toMatch(/geliştiriciler için|for developers/i);
+    }
+  });
+
+  it("the subscribe button is in the top strip of every page and under the end sign of an edition", () => {
+    for (const file of [DEMO, REAL].flatMap(htmlFiles)) {
+      const html = readFileSync(file, "utf8");
+      const lang = html.match(/<html lang="(tr|en)"/)![1] as "tr" | "en";
+      const strip = html.match(/<header class="top">([\s\S]*?)<\/header>/)![1];
+      const buttons = [...strip.matchAll(/<a class="subscribe label" href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g)];
+      expect(buttons, file).toHaveLength(1);
+      expect(buttons[0][1]).toBe(lang === "tr" ? "/abone/" : "/en/subscribe/");
+      expect(text(buttons[0][2])).toBe(COPY[lang].subscribeFree);
+      // The only button in the strip.
+      expect(strip).not.toContain('class="try');
+    }
+    expect(COPY.tr.subscribeFree).toBe("Ücretsiz abone ol");
+    expect(COPY.en.subscribeFree).toBe("Subscribe free");
+    for (const [path, lang] of [["", "tr"], ["en", "en"], ["2026-11-18", "tr"]] as const) {
+      const closed = page(DEMO, path).match(/<div class="closed">([\s\S]*?)<\/div>/)![1];
+      const line = closed.match(/<p class="closed-sub">([\s\S]*?)<\/p>/);
+      expect(line, path).not.toBeNull();
+      expect(text(line![1])).toBe(`${COPY[lang].dontMiss} ${COPY[lang].subscribeFree}`);
+      expect(line![1]).toContain(`<a class="subscribe label" href="${routes[lang].subscribe}">`);
+    }
+    expect(COPY.tr.dontMiss).toBe("Yarınki sayıyı kaçırma.");
+    expect(COPY.en.dontMiss).toBe("Don't miss tomorrow's issue.");
+  });
+
+  it("the subscribe pages show the feed address as text and as a link, have no form and no input", () => {
+    for (const [path, lang, other] of [["abone", "tr", "en"], ["en/subscribe", "en", "tr"]] as const) {
+      const html = page(DEMO, path);
+      const main = html.match(/<main[\s\S]*?<\/main>/)![0];
+      const feed = `${SITE}${routes[lang].rss}`;
+      const otherFeed = `${SITE}${routes[other].rss}`;
+      expect(h1(html)).toBe(COPY[lang].subscribeFree);
+      expect(main).toContain(`<code class="feed-url">${feed}</code>`);
+      expect(main).toContain(`href="${feed}"`);
+      expect(main).toContain(`href="${otherFeed}"`);
+      expect(main).not.toMatch(/<form|<input|<button|<textarea/i);
+      expect(text(main)).toContain(COPY[lang].subscribe.noNewsletter);
+      expect(main.match(/<ol class="steps"[^>]*>([\s\S]*?)<\/ol>/)![1].match(/<li>/g)).toHaveLength(3);
+      // The page asks for nothing and stores nothing; it does not promise a date.
+      expect(text(main)).not.toMatch(/\b20\d\d\b/);
+    }
+    expect(page(DEMO, "abone")).toMatch(/<link rel="alternate" hreflang="en" href="https:\/\/[^"]+\/en\/subscribe\/">/);
+    // The strip's button marks the subscribe page as the current page there.
+    expect(page(DEMO, "abone")).toContain('<a class="subscribe label" href="/abone/" aria-current="page">');
+  });
+
+  it("every link leaving the site has target=_blank and rel noopener noreferrer, and no internal link has a target", () => {
+    let external = 0;
+    let internal = 0;
+    for (const file of [REAL, DEMO].flatMap(htmlFiles)) {
+      for (const { tag, attrs } of anchors(readFileSync(file, "utf8"))) {
+        const href = attrs.href ?? "";
+        const leaves = /^https?:\/\//.test(href) && new URL(href).origin !== SITE;
+        if (leaves) {
+          expect(attrs.target, `${file}: ${tag}`).toBe("_blank");
+          expect(attrs.rel, `${file}: ${tag}`).toBe("noopener noreferrer");
+          external++;
+        } else {
+          expect(attrs.target, `${file}: ${tag}`).toBeUndefined();
+          internal++;
+        }
+      }
+    }
+    expect(external).toBeGreaterThan(100);
+    expect(internal).toBeGreaterThan(100);
+    // The arrow marks outside links in running text only: the footer signature and the Künye page.
+    const arrows = declarations(css()).filter((d) => d.prop === "content" && d.value.includes("↗"));
+    expect(arrows.length).toBeGreaterThan(0);
+    for (const arrow of arrows) {
+      for (const part of arrow.selector.split(",").map((x) => x.trim())) {
+        expect(part).toMatch(/^\.(sig|prose) a\[target="_blank"\]::after$/);
+      }
+    }
+  });
+
+  it("the per-story line is labelled Neden önemli / Why it matters, with no developer wording left on pages or in feeds", () => {
+    expect(COPY.tr.whyItMatters).toBe("Neden önemli");
+    expect(COPY.en.whyItMatters).toBe("Why it matters");
+    expect(Object.keys(COPY.tr)).not.toContain("forDevelopers");
+    for (const file of [REAL, DEMO, HOSTILE].flatMap(allFiles).filter((f) => /\.(html|xml)$/.test(f))) {
+      const content = readFileSync(file, "utf8");
+      expect(content, file).not.toMatch(/Geliştiriciler için|For developers|story-dev/i);
+    }
+    const xml = readFileSync(join(REAL, "rss.xml"), "utf8");
+    expect(items(xml).every((item) => item.includes("\n\nNeden önemli: "))).toBe(true);
+    // The pill: ink on page colour, the label face at 0.6875rem, fully rounded; inline in the line.
+    const sheet = css();
+    const pill = cssRule(sheet, ".why-label");
+    for (const rule of [
+      "background: var(--ink);",
+      "color: var(--bg);",
+      "font-size: 0.6875rem;",
+      "letter-spacing: 0.04em;",
+      "padding: 0.125rem 0.5rem;",
+      "border-radius: 999px;",
+    ]) {
+      expect(pill).toContain(rule);
+    }
+    expect(pill).not.toMatch(/display:/);
+    const line = cssRule(sheet, ".story-why");
+    expect(line).toContain("margin-top: 0.75rem;");
+    expect(line).toContain("font-size: 1rem;");
+    expect(line).not.toMatch(/border|background/);
+  });
+
+  it("each story block carries its category class and the stylesheet defines the eight category colours", () => {
+    const table: Record<string, [string, string]> = {
+      protocol: ["#0f6b63", "#dff3f0"],
+      model: ["#4338ca", "#e6e8fb"],
+      framework: ["#1d4fbf", "#e1ebfb"],
+      tooling: ["#8a4b06", "#f8ecd8"],
+      research: ["#1b6b3a", "#e0f2e6"],
+      security: ["#b3261e", "#fbe9e7"],
+      industry: ["#3b4656", "#e8ebf0"],
+      policy: ["#8e2a8a", "#f6e4f5"],
+    };
+    expect(Object.keys(table).sort()).toEqual([...CATEGORIES].sort());
+    let seen = 0;
+    for (const path of ["", "en", "2026-11-17", "2026-11-18", "en/2026-11-19", "hafta/2026-W47"]) {
+      for (const article of articles(page(DEMO, path))) {
+        const category = article.match(/<a class="story-cat caps" href="\/(?:en\/topic|konu)\/([a-z]+)\/"/)![1];
+        const classes = article.match(/^<article id="[^"]+" class="([^"]+)"/)![1].split(" ");
+        expect(classes, path).toContain(`cat-${category}`);
+        expect(classes.filter((c) => c.startsWith("cat-"))).toHaveLength(1);
+        seen++;
+      }
+    }
+    expect(seen).toBeGreaterThan(20);
+    // Topic pages: the list rows and the heading tag carry it too.
+    for (const category of CATEGORIES) {
+      const html = page(DEMO, `konu/${category}`);
+      expect(html).toMatch(new RegExp(`<h1 class="kunye label cat-${category}">\\s*<span class="topic-tag caps">`));
+    }
+    expect(page(DEMO, "konu/security")).toMatch(/<li class="cat-security">/);
+    const decls = declarations(sheets());
+    const value = (selector: string, prop: string) =>
+      decls.find((d) => d.selector === selector && d.prop === prop)?.value;
+    for (const [category, [colour, tint]] of Object.entries(table)) {
+      expect(value(":root", `--cat-${category}`), category).toBe(colour);
+      expect(value(":root", `--cat-${category}-soft`), category).toBe(tint);
+      expect(value(`.cat-${category}`, "--cat")).toBe(`var(--cat-${category})`);
+      expect(value(`.cat-${category}`, "--cat-soft")).toBe(`var(--cat-${category}-soft)`);
+    }
+    // Exactly three consumers: the tag, the hanging number and the target bar.
+    const users = decls.filter((d) => /var\(--cat(-soft)?[,)]/.test(d.value)).map((d) => d.selector);
+    for (const selector of users) {
+      expect(selector).toMatch(/^(a\.story-cat, \.topic-tag|\.story-cat|\.story-no|\.story:target::before)$/);
+    }
+    expect(new Set(users)).toEqual(new Set(["a.story-cat, .topic-tag", ".story-cat", ".story-no", ".story:target::before"]));
+  });
+
+  it("only the lead card, the subscribe button and the try button have a box-shadow, and none is blurred", () => {
+    const shadows = declarations(sheets()).filter((d) => d.prop === "box-shadow");
+    expect(shadows.length).toBeGreaterThan(3);
+    for (const shadow of shadows) {
+      expect(shadow.value === "none" || /^\d+px \d+px 0 var\(--ink\)$/.test(shadow.value), shadow.value).toBe(true);
+      for (const part of shadow.selector.split(",").map((x) => x.trim())) {
+        expect(part.replace(/:(hover|focus-visible|active)$/, "")).toMatch(/^\.(story-lead|subscribe|try)$/);
+      }
+    }
+    const lead = cssRule(css(), ".story-lead");
+    for (const rule of [
+      "padding: 1.25rem;",
+      "border: 1.5px solid var(--ink);",
+      "background: var(--surface);",
+      "box-shadow: 4px 4px 0 var(--ink);",
+    ]) {
+      expect(lead).toContain(rule);
+    }
+    expect(sheets()).not.toMatch(/gradient\(|backdrop-filter|filter:\s*drop-shadow|text-shadow/);
+  });
+
+  it("every animation and transition sits inside a reduced-motion or @supports guard", () => {
+    const decls = declarations(sheets());
+    const moving = decls.filter((d) => /^(animation|transition)/.test(d.prop) && d.value !== "none");
+    expect(moving.length).toBeGreaterThan(5);
+    for (const d of moving) {
+      const context = d.stack.join(" | ");
+      expect(context, `${d.selector} ${d.prop}`).toContain("@media (prefers-reduced-motion: no-preference)");
+      if (d.prop === "animation-timeline") expect(context).toMatch(/@supports \(animation-timeline: scroll\(\)\)/);
+      if (d.prop.startsWith("transition")) expect(d.value).toMatch(/120ms/);
+    }
+    // Nothing loops.
+    expect(sheets()).not.toMatch(/infinite|alternate/);
+    // The progress bar is invisible by default; only the edition view renders it.
+    const bar = cssRule(css(), ".progress");
+    for (const rule of ["position: fixed;", "top: 0;", "height: 3px;", "transform: scaleX(0);", "transform-origin: 0 50%;"]) {
+      expect(bar).toContain(rule);
+    }
+    expect(decls.some((d) => d.prop === "animation-timeline" && d.value === "scroll(root)")).toBe(true);
+    expect(decls.some((d) => d.prop === "animation-timeline" && d.value === "view()")).toBe(true);
+    for (const path of ["", "en", "2026-11-18"]) expect(page(DEMO, path)).toContain('<div class="progress" aria-hidden="true"></div>');
+    for (const path of ["arsiv", "kunye", "abone", "hafta/2026-W47", "konu/model"]) expect(page(DEMO, path)).not.toContain('class="progress"');
+    // Faded or offset states live only in keyframes, never as an element's default.
+    for (const d of decls.filter((x) => x.prop === "opacity")) expect(d.stack.join(" ")).toMatch(/@keyframes|@media print/);
+  });
+
+  it("the masthead shows the issue pill and the total sources", () => {
+    for (const [path, lang] of [["", "tr"], ["en", "en"], ["2026-11-18", "tr"]] as const) {
+      const html = page(DEMO, path);
+      const total = articles(html).map(sourceCount).reduce((a, b) => a + b, 0);
+      expect(text(html.match(/<span class="mh-rest label">([\s\S]*?)<\/span>/)![1])).toMatch(
+        new RegExp(`^· \\d+ ${lang === "tr" ? "haber" : "stories"} · ${COPY[lang].sources(total)} · ~\\d+ ${lang === "tr" ? "dk" : "min"}$`),
+      );
+    }
+    const pill = cssRule(css(), ".mh-no");
+    expect(pill).toContain("background: var(--accent);");
+    expect(pill).toContain("color: var(--surface);");
+    expect(pill).toContain("border-radius: 999px;");
   });
 
   it("every internal link in the built pages points at a file that exists", () => {

@@ -1,0 +1,46 @@
+---
+import { COPY } from "../lib/copy";
+import { routes } from "../lib/routes";
+import type { Lang } from "../lib/schema";
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const copy = COPY[lang];
+const page = copy.subscribe;
+const other: Lang = lang === "tr" ? "en" : "tr";
+if (!Astro.site) throw new Error("the subscribe page needs `site` in astro.config.mjs");
+// The feeds' absolute addresses on the configured site: what a feed reader is given.
+const feed = new URL(routes[lang].rss, Astro.site).href;
+const otherFeed = new URL(routes[other].rss, Astro.site).href;
+---
+
+<h1 class="kunye label"><span class="kunye-no">{copy.subscribeFree}</span></h1>
+
+<div class="prose">
+  <section>
+    {page.intro.map((paragraph) => <p>{paragraph}</p>)}
+  </section>
+  <section>
+    <h2>{page.feedHeading}</h2>
+    <p class="feed">
+      <code class="feed-url">{feed}</code>
+    </p>
+    <p>
+      <a href={feed} type="application/rss+xml">{copy.feedTitle}</a>
+    </p>
+  </section>
+  <section>
+    <h2>{page.stepsHeading}</h2>
+    <ol class="steps">
+      {page.steps.map((step) => <li>{step}</li>)}
+    </ol>
+    <p>
+      {page.otherFeed}{" "}
+      <a href={otherFeed} type="application/rss+xml" hreflang={other}>{page.otherFeedLink}</a>
+    </p>
+    <p>{page.noNewsletter}</p>
+  </section>
+</div>

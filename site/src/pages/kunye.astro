@@ -1,0 +1,19 @@
+---
+import Base from "../layouts/Base.astro";
+import AboutView from "../components/AboutView.astro";
+import { COPY } from "../lib/copy";
+import { routes } from "../lib/routes";
+
+const lang = "tr";
+const copy = COPY[lang];
+---
+
+<Base
+  lang={lang}
+  title={`${copy.about.title} · ${copy.siteName}`}
+  description={copy.about.description}
+  path={routes[lang].about}
+  alternate={routes.en.about}
+>
+  <AboutView lang={lang} />
+</Base>

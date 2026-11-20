@@ -1,18 +1,20 @@
 # The site
 
-`site/` is the public face of Radar: a static website, built with [Astro](https://astro.build), that shows the published stories as numbered daily editions in Turkish and English.
+`site/` is the public face of Radar: a static website, built with [Astro](https://astro.build), that shows the day's tech and AI news as numbered daily editions in Turkish and English. It is Yusuf Özkan's personal project: the top strip shows `ozkanyusuf.com` beside the wordmark, and the footer signs it with links to his site and GitHub account.
 
 Status: the site builds and runs on your machine, with demo data or against a local admin service. It has never been deployed. Nothing rebuilds it on a timer, and none is needed: the admin service's deploy hook rebuilds it when the published set changes, and no page depends on the clock. The [Deploy](#deploy) section was written from documentation and has not been run.
 
 ## What it is, and what it is not
 
 - It is static files. After the build there is no server code.
-- It has no JavaScript at all, no cookies, and makes no request to any third party. Fonts are served from the site itself: body text uses the reader's system font, and headings use one self-hosted font (Bricolage Grotesque).
+- It has no JavaScript at all, no cookies, and makes no request to any third party. Links that leave the site (sources, the try button, the owner's site, GitHub) open in a new tab. Fonts are served from the site itself: body text uses the reader's system font, and headings use one self-hosted font (Bricolage Grotesque).
 - It holds no secret and cannot change anything. All it knows is what the admin service's public endpoint returned at build time.
 - It does not promise a publishing hour. A story appears when the site is next built after the story was published.
-- A story carries **no label** saying whether a person read it. The method page (see [Pages](#pages)) explains that every story is written by a language model, and which kinds of story a person reads before they are published.
-- It has no page for a single story, no search, no e-mail subscription and no images. A story's permanent link is an anchor on its edition page, for example `/2026-11-20/#s-1a2b3c4d` (the anchor is `s-` plus the first 8 characters of the story's uid).
+- A story carries **no label** saying whether a person read it. The Künye page (About in English; see [Pages](#pages)) explains that every story is written by a language model, and which kinds of story a person reads before they are published.
+- It has no page for a single story, no search, no e-mail newsletter and no images. "Subscribe free" means the RSS feed: the subscribe page shows the feed address and asks for nothing. A story's permanent link is an anchor on its edition page, for example `/2026-11-20/#s-1a2b3c4d` (the anchor is `s-` plus the first 8 characters of the story's uid).
 - It is light only. There is no dark theme and no theme switch.
+- Each category has its own colour, used only for the story's category tag, its number and the bar beside a story opened from a link; the brand red stays for the mark, the issue label, the echo meter and link underlines. The lead story of an edition sits in a card with a hard shadow, and so do the two buttons (subscribe, try it).
+- Motion is CSS only and small: the echo meter's arcs light up in turn on load, buttons press, a thin reading-progress line fills at the top of an edition page, and later stories rise slightly as they scroll in. Nothing loops. All of it is off when the reader's system asks for reduced motion, and the scroll-driven parts only run in browsers that support them; without them every story is simply shown.
 
 ## Where the data comes from
 
@@ -52,7 +54,7 @@ Response, `200`:
 ```
 
 - `publish_mode` is `auto` when the agent published the story and `human` when a person approved it. `edited` is true when a person changed the text.
-- `texts` holds `tr`, `en` or both. Text is trimmed. A language whose title, summary or developer line is empty after trimming is left out, and a story with no usable language is not returned at all, so a page may hold fewer than `limit` stories.
+- `texts` holds `tr`, `en` or both. Text is trimmed. A language whose title, summary or last line (`dev_line`, shown on the site as "Neden önemli" / "Why it matters") is empty after trimming is left out, and a story with no usable language is not returned at all, so a page may hold fewer than `limit` stories.
 - `source_count` is a whole number and may be `0`.
 - `sources` lists only entries with a non-empty name (trimmed) and an `http:` or `https:` link; sources without a name are left out. `try_url` is `null` unless it is an `http:` or `https:` link.
 - Stories come newest `published_at` first, then by `uid`. `next` is an opaque cursor for the following page, or `null` after the last page. Pass it back unchanged as `cursor`.
@@ -65,7 +67,8 @@ The site reads every page with `limit=200`, follows `next` until it is `null`, a
 
 - An **edition** is the set of stories whose `published_at` falls on one calendar day in Istanbul (UTC+3, all year). A day with no stories has no edition.
 - **Numbers** count the days that have an edition, oldest first: the oldest edition is number 1. A page's address uses the date, never the number. If a story is taken down and its day becomes empty, the later numbers shift down by one, but no link breaks.
-- An edition page opens with a **masthead**: the issue number, the date in large type, the number of stories and the reading time. When there is more than one story it is followed by an **index** of the day's stories (a sticky rail beside the stories on wide screens). The first story is the **lead**.
+- An edition page opens with a **masthead**: the issue number, the date in large type, the number of stories, the total number of sources and the reading time. When there is more than one story it is followed by an **index** of the day's stories (a sticky rail beside the stories on wide screens). The first story is the **lead**.
+- Each story ends with one line under the label **Neden önemli** / **Why it matters**: why the news matters to a reader.
 - Inside an edition **every published story of the day is shown**, ordered by number of sources (most first), then by publish time. The site never hides a published story.
 - The **weekly digest** is the ten stories of one ISO week (Monday to Sunday, Istanbul days) with the most sources, ordered the same way. No model is involved.
 - A **topic page** lists one category's newest 30 stories.
@@ -81,7 +84,8 @@ The site reads every page with `limit=200`, follows `next` until it is `null`, a
 | `/konu/<category>/` | `/en/topic/<category>/` | A category's newest 30 stories |
 | `/hafta/` | `/en/week/` | The weekly digests |
 | `/hafta/YYYY-Www/` | `/en/week/YYYY-Www/` | One weekly digest |
-| `/yontem/` | `/en/method/` | How stories are collected, written and checked |
+| `/kunye/` | `/en/about/` | Künye / About: who makes Radar, and how stories are collected, written and checked |
+| `/abone/` | `/en/subscribe/` | Subscribe free: the RSS feed address and how to use it |
 | `/rss.xml` | `/en/rss.xml` | RSS feed, newest 50 stories |
 
 The build also writes `sitemap-index.xml` and `404.html`. Site copy, in both languages, lives in `site/src/lib/copy.ts`.

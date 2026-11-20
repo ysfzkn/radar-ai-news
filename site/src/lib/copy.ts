@@ -1,17 +1,18 @@
+import { OWNER } from "./routes";
 import type { Category, Lang } from "./schema";
 
 /** Every user-visible string of the site, Turkish and English side by side. */
 export interface Copy {
   siteName: string;
   tagline: string;
-  nav: { today: string; archive: string; week: string; method: string };
+  nav: { today: string; archive: string; week: string; about: string };
   issue(n: number): string;
   storyCount(n: number): string;
   minutes(n: number): string;
   sources(n: number): string;
   echoLabel(level: number, n: number): string;
-  /** The developer panel's heading; the feed adds a colon after it. */
-  forDevelopers: string;
+  /** The label of a story's last line; the feed adds a colon after it. */
+  whyItMatters: string;
   sourceLabel: string;
   tryIt: string;
   /** The heading of an edition's index of stories. */
@@ -23,8 +24,8 @@ export interface Copy {
   demo: string;
   /** The demo line's short form, put before the feed title in a demo build. */
   demoShort: string;
-  /** The accessible name of a story's number, a link to the story itself. */
-  storyLink: string;
+  /** The accessible name of a story's number (the two digits shown), a link to the story itself. */
+  storyLink(no: string): string;
   /** The name of the language switch in the top strip. */
   language: string;
   /** This language's code in the switch: "TR" / "EN". */
@@ -32,6 +33,15 @@ export interface Copy {
   skip: string;
   rss: string;
   sourceCode: string;
+  /** The owner's name, in the footer signature. */
+  owner: string;
+  /** The owner's site as shown beside the wordmark and in the footer. */
+  by: string;
+  github: string;
+  /** The subscribe button, in the top strip and under the end of an edition. */
+  subscribeFree: string;
+  /** The line before the button under the end of an edition. */
+  dontMiss: string;
   categories: Record<Category, string>;
   /** Index 0 is January. */
   months: readonly string[];
@@ -53,11 +63,12 @@ export interface Copy {
   notFoundHome: string;
   feedTitle: string;
   feedDescription: string;
-  method: Method;
+  about: About;
+  subscribe: Subscribe;
 }
 
-/** The method page: a few short sections, read top to bottom. */
-export interface Method {
+/** The Künye / About page: who makes Radar, then how a story is made, read top to bottom. */
+export interface About {
   title: string;
   description: string;
   sections: readonly {
@@ -66,23 +77,37 @@ export interface Method {
     /** The pipeline, in order. */
     steps?: readonly { name: string; text: string }[];
     after?: readonly string[];
-    link?: { text: string; href: string };
+    /** Links that leave the site, in one line under the section. */
+    links?: readonly { text: string; href: string }[];
   }[];
 }
 
-const ISSUES = "https://github.com/ysfzkn/radar-ai-news/issues";
+/** The subscribe page: what subscribing means today, the feed address and how to use it. */
+export interface Subscribe {
+  description: string;
+  intro: readonly string[];
+  feedHeading: string;
+  stepsHeading: string;
+  steps: readonly string[];
+  /** The sentence before the link to the other language's feed, and that link's text. */
+  otherFeed: string;
+  otherFeedLink: string;
+  noNewsletter: string;
+}
+
+const { site: SITE, github: GITHUB, repository: REPOSITORY, issues: ISSUES } = OWNER;
 
 export const COPY: Record<Lang, Copy> = {
   tr: {
     siteName: "Radar",
-    tagline: "Geliştiriciler için günün yapay zekâ haberleri. Beş dakika, gürültü yok.",
-    nav: { today: "Bugün", archive: "Arşiv", week: "Hafta", method: "Yöntem" },
+    tagline: "Günün teknoloji ve yapay zekâ haberleri. Beş dakika, gürültü yok.",
+    nav: { today: "Bugün", archive: "Arşiv", week: "Hafta", about: "Künye" },
     issue: (n) => `Sayı ${n}`,
     storyCount: (n) => `${n} haber`,
     minutes: (n) => `~${n} dk`,
     sources: (n) => `${n} kaynak`,
     echoLabel: (level, n) => `5 üzerinden ${level}: ${n} bağımsız kaynak`,
-    forDevelopers: "Geliştiriciler için",
+    whyItMatters: "Neden önemli",
     sourceLabel: "Kaynak:",
     tryIt: "Bugün dene",
     inThisIssue: "Bu sayıda",
@@ -92,12 +117,17 @@ export const COPY: Record<Lang, Copy> = {
     noEdition: "Henüz baskı yok.",
     demo: "Örnek veri: bu haberler gerçek değil.",
     demoShort: "Örnek veri",
-    storyLink: "Bu haberin bağlantısı",
+    storyLink: (no) => `${no} numaralı haberin bağlantısı`,
     language: "Dil",
     langShort: "TR",
     skip: "İçeriğe geç",
     rss: "RSS",
     sourceCode: "Kaynak kodu",
+    owner: "Yusuf Özkan",
+    by: "ozkanyusuf.com",
+    github: "GitHub",
+    subscribeFree: "Ücretsiz abone ol",
+    dontMiss: "Yarınki sayıyı kaçırma.",
     categories: {
       protocol: "Protokol",
       model: "Model",
@@ -136,16 +166,27 @@ export const COPY: Record<Lang, Copy> = {
     notFoundTitle: "Sayfa bulunamadı",
     notFoundText: "Sayfa bulunamadı.",
     notFoundHome: "Bugünün baskısına dön",
-    feedTitle: "Radar: günün yapay zekâ haberleri",
-    feedDescription: "Geliştiriciler için günün yapay zekâ haberleri.",
-    method: {
-      title: "Yöntem",
-      description: "Radar haberleri nasıl seçer, yazar ve denetler; neyi bir insana bırakır.",
+    feedTitle: "Radar: günün teknoloji ve yapay zekâ haberleri",
+    feedDescription: "Günün teknoloji ve yapay zekâ haberleri. Beş dakika, gürültü yok.",
+    about: {
+      title: "Künye",
+      description: "Radar'ı kim çıkarıyor; haberler nasıl seçiliyor, yazılıyor ve denetleniyor.",
       sections: [
+        {
+          heading: "Radar'ı kim çıkarıyor?",
+          paragraphs: [
+            "Radar, Yusuf Özkan'ın kişisel projesi. Her sayıyı o yayımlıyor; sitenin kaynak kodu herkese açık.",
+          ],
+          links: [
+            { text: "ozkanyusuf.com", href: SITE },
+            { text: "GitHub", href: GITHUB },
+            { text: "Radar'ın kaynak kodu", href: REPOSITORY },
+          ],
+        },
         {
           heading: "Radar nedir?",
           paragraphs: [
-            "Radar, geliştiriciler için her gün çıkan kısa ve numaralı bir yapay zekâ haberleri baskısıdır. Bir baskıda genellikle beş ile sekiz haber olur; her haber, bir geliştirici olarak senin için ne anlama geldiğini söyleyen tek bir satırla biter. Sonra baskı kapanır.",
+            "Radar, her gün çıkan kısa ve numaralı bir teknoloji ve yapay zekâ haberleri baskısıdır. Bir baskıda genellikle beş ile sekiz haber olur; her haber, neden önemli olduğunu söyleyen tek bir satırla biter. Sonra baskı kapanır.",
             "Türkçe ve İngilizce yayımlanır. İki dil aynı olgu kartından yazılır, bu yüzden aynı şeyi söyler.",
           ],
         },
@@ -199,7 +240,7 @@ export const COPY: Record<Lang, Copy> = {
           paragraphs: [
             "Yanlış ya da yanıltıcı bir haber gördüysen haberin bağlantısıyla birlikte bir issue aç. En değerli bildirim budur.",
           ],
-          link: { text: "GitHub'da issue aç", href: ISSUES },
+          links: [{ text: "GitHub'da issue aç", href: ISSUES }],
         },
         {
           heading: "Gizlilik",
@@ -209,18 +250,35 @@ export const COPY: Record<Lang, Copy> = {
         },
       ],
     },
+    subscribe: {
+      description: "Radar'ı RSS ile ücretsiz takip et: hesap yok, e-posta yok.",
+      intro: [
+        "Radar'a abone olmak bugün RSS beslemesini takip etmek demek: her gün yeni sayı, kullandığın akış okuyucusunda kendiliğinden belirir.",
+        "Ücretsiz. Hesap yok, e-posta adresi yok; hiçbir şey kaydedilmez.",
+      ],
+      feedHeading: "Besleme adresi",
+      stepsHeading: "Üç adımda",
+      steps: [
+        "Bir akış okuyucusu aç; çoğu ücretsizdir ve telefonda da çalışır.",
+        "Yeni bir abonelik ekle ve yukarıdaki adresi yapıştır.",
+        "Kaydet. Her yeni sayı okuyucuna kendiliğinden gelir.",
+      ],
+      otherFeed: "İngilizce sayıların ayrı bir beslemesi var:",
+      otherFeedLink: "İngilizce besleme",
+      noNewsletter: "E-posta bülteni yok; Radar'ı şimdilik yalnızca RSS ile takip edebilirsin.",
+    },
   },
   en: {
     siteName: "Radar",
-    tagline: "The day's AI and agentic news for developers. Five minutes, no noise.",
-    nav: { today: "Today", archive: "Archive", week: "Week", method: "Method" },
+    tagline: "The day's tech and AI news. Five minutes, no noise.",
+    nav: { today: "Today", archive: "Archive", week: "Week", about: "About" },
     issue: (n) => `Issue ${n}`,
     storyCount: (n) => (n === 1 ? "1 story" : `${n} stories`),
     minutes: (n) => `~${n} min`,
     sources: (n) => (n === 1 ? "1 source" : `${n} sources`),
     echoLabel: (level, n) =>
       `${level} of 5: ${n} independent ${n === 1 ? "source" : "sources"}`,
-    forDevelopers: "For developers",
+    whyItMatters: "Why it matters",
     sourceLabel: "Source:",
     tryIt: "Try it today",
     inThisIssue: "In this issue",
@@ -230,12 +288,17 @@ export const COPY: Record<Lang, Copy> = {
     noEdition: "No edition yet.",
     demo: "Demo data: these stories are not real.",
     demoShort: "Demo data",
-    storyLink: "Link to this story",
+    storyLink: (no) => `Link to story ${no}`,
     language: "Language",
     langShort: "EN",
     skip: "Skip to content",
     rss: "RSS",
     sourceCode: "Source code",
+    owner: "Yusuf Özkan",
+    by: "ozkanyusuf.com",
+    github: "GitHub",
+    subscribeFree: "Subscribe free",
+    dontMiss: "Don't miss tomorrow's issue.",
     categories: {
       protocol: "Protocol",
       model: "Model",
@@ -274,16 +337,27 @@ export const COPY: Record<Lang, Copy> = {
     notFoundTitle: "Page not found",
     notFoundText: "Page not found.",
     notFoundHome: "Go to today's edition",
-    feedTitle: "Radar: the day's AI news",
-    feedDescription: "The day's AI and agentic news for developers.",
-    method: {
-      title: "Method",
-      description: "How Radar chooses, writes and checks its stories, and what it leaves to a person.",
+    feedTitle: "Radar: the day's tech and AI news",
+    feedDescription: "The day's tech and AI news. Five minutes, no noise.",
+    about: {
+      title: "About",
+      description: "Who makes Radar, and how its stories are chosen, written and checked.",
       sections: [
+        {
+          heading: "Who makes Radar?",
+          paragraphs: [
+            "Radar is a personal project by Yusuf Özkan. He publishes every issue, and the site's source code is open.",
+          ],
+          links: [
+            { text: "ozkanyusuf.com", href: SITE },
+            { text: "GitHub", href: GITHUB },
+            { text: "Radar's source code", href: REPOSITORY },
+          ],
+        },
         {
           heading: "What Radar is",
           paragraphs: [
-            "Radar is a short, numbered daily edition of AI news for developers. An edition usually has five to eight stories, and each one ends with a single line on what it means for you as a developer. Then the edition closes.",
+            "Radar is a short, numbered daily edition of tech and AI news. An edition usually has five to eight stories, and each one ends with a single line on why it matters. Then the edition closes.",
             "It is published in Turkish and English. Both are written from the same fact card, so they say the same thing.",
           ],
         },
@@ -337,7 +411,7 @@ export const COPY: Record<Lang, Copy> = {
           paragraphs: [
             "If a story is wrong or misleading, please open an issue with the story's link. It is the most valuable report there is.",
           ],
-          link: { text: "Open an issue on GitHub", href: ISSUES },
+          links: [{ text: "Open an issue on GitHub", href: ISSUES }],
         },
         {
           heading: "Privacy",
@@ -346,6 +420,23 @@ export const COPY: Record<Lang, Copy> = {
           ],
         },
       ],
+    },
+    subscribe: {
+      description: "Follow Radar for free with RSS: no account, no e-mail.",
+      intro: [
+        "Subscribing to Radar today means following its RSS feed: each day the new issue appears in your feed reader on its own.",
+        "It is free. No account, no e-mail address, nothing stored.",
+      ],
+      feedHeading: "Feed address",
+      stepsHeading: "In three steps",
+      steps: [
+        "Open a feed reader; most are free and work on a phone too.",
+        "Add a new subscription and paste the address above.",
+        "Save it. Every new issue arrives in your reader by itself.",
+      ],
+      otherFeed: "The Turkish issues have a feed of their own:",
+      otherFeedLink: "Turkish feed",
+      noNewsletter: "There is no e-mail newsletter; for now Radar is RSS only.",
     },
   },
 };

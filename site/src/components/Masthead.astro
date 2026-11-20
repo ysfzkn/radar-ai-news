@@ -1,7 +1,7 @@
 ---
 import Mark from "./Mark.astro";
 import { COPY } from "../lib/copy";
-import { routes } from "../lib/routes";
+import { EXTERNAL, OWNER, routes } from "../lib/routes";
 import type { Lang } from "../lib/schema";
 
 interface Props {
@@ -20,15 +20,25 @@ const links = [
   { href: routes[lang].home, text: copy.nav.today },
   { href: routes[lang].archive, text: copy.nav.archive },
   { href: routes[lang].weekIndex, text: copy.nav.week },
-  { href: routes[lang].method, text: copy.nav.method },
+  { href: routes[lang].about, text: copy.nav.about },
 ];
+const subscribe = routes[lang].subscribe;
 ---
 
+{/* Two rows: the name and whose it is, with the subscribe button; then the links and the language switch. */}
 <header class="top">
-  <a class="wordmark" href={routes[lang].home}>
-    <Mark />
-    {copy.siteName}
-  </a>
+  <div class="top-id">
+    <a class="wordmark" href={routes[lang].home}>
+      <Mark />
+      {copy.siteName}
+    </a>
+    <a class="by label" href={OWNER.site} {...EXTERNAL}>{copy.by}</a>
+  </div>
+  <div class="top-act">
+    <a class="subscribe label" href={subscribe} aria-current={subscribe === path ? "page" : undefined}>
+      {copy.subscribeFree}
+    </a>
+  </div>
   <nav class="top-nav">
     <ul class="nav label">
       {

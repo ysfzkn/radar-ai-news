@@ -24,10 +24,13 @@ const newer = isLatest ? null : next;
 const count = edition.stories.length;
 const hasIndex = count > 1;
 const weekday = weekdayName(edition.date, lang);
+const sources = edition.stories.reduce((sum, story) => sum + story.source_count, 0);
 ---
 
 <div class:list={["edition", { "edition-railed": hasIndex }]}>
-  {/* One h1 that reads "Sayı 4 · 20 Kasım 2026 Cuma · 5 haber · ~2 dk" in order; CSS sets it as three rows. */}
+  {/* A reading-progress line at the window's top; the stylesheet fills it with the scroll where it can. */}
+  <div class="progress" aria-hidden="true"></div>
+  {/* One h1 that reads "Sayı 4 · 20 Kasım 2026 Cuma · 5 haber · 22 kaynak · ~2 dk" in order; CSS sets it as three rows. */}
   <h1 class="masthead">
     <span class="mh-no label caps">{copy.issue(edition.number)}</span>
     <span class="mh-sep">{" · "}</span>
@@ -48,7 +51,7 @@ const weekday = weekdayName(edition.date, lang);
       }
     </time>
     <span class="mh-rest label">
-      {` · ${copy.storyCount(count)} · ${copy.minutes(readingMinutes(edition.stories, lang))}`}
+      {` · ${copy.storyCount(count)} · ${copy.sources(sources)} · ${copy.minutes(readingMinutes(edition.stories, lang))}`}
     </span>
   </h1>
 
@@ -69,6 +72,9 @@ const weekday = weekdayName(edition.date, lang);
       <EchoArcs level={5} width={88} height={28} />
       <p class="closed-text">{copy.closed}</p>
       <p class="closed-meta label">{copy.issue(edition.number)} · {copy.storyCount(count)}</p>
+      <p class="closed-sub">
+        {copy.dontMiss}{" "}<a class="subscribe label" href={routes[lang].subscribe}>{copy.subscribeFree}</a>
+      </p>
     </div>
     {
       (previous || newer) && (

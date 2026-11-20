@@ -8,7 +8,8 @@ const addresses = (r: (typeof routes)["tr"]) => [
   r.topic("protocol"),
   r.weekIndex,
   r.week("2026-W47"),
-  r.method,
+  r.about,
+  r.subscribe,
   r.rss,
 ];
 
@@ -21,7 +22,8 @@ describe("routes", () => {
       "/konu/protocol/",
       "/hafta/",
       "/hafta/2026-W47/",
-      "/yontem/",
+      "/kunye/",
+      "/abone/",
       "/rss.xml",
     ]);
     expect(addresses(routes.en)).toEqual([
@@ -31,9 +33,18 @@ describe("routes", () => {
       "/en/topic/protocol/",
       "/en/week/",
       "/en/week/2026-W47/",
-      "/en/method/",
+      "/en/about/",
+      "/en/subscribe/",
       "/en/rss.xml",
     ]);
+  });
+
+  it("routes: about and subscribe exist in both languages and method is gone", () => {
+    expect(routes.tr.about).toBe("/kunye/");
+    expect(routes.en.about).toBe("/en/about/");
+    expect(routes.tr.subscribe).toBe("/abone/");
+    expect(routes.en.subscribe).toBe("/en/subscribe/");
+    for (const lang of ["tr", "en"] as const) expect(Object.keys(routes[lang])).not.toContain("method");
   });
 
   it("links a story to its edition and anchor", () => {

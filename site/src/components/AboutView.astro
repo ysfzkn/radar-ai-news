@@ -1,19 +1,20 @@
 ---
 import { COPY } from "../lib/copy";
+import { EXTERNAL } from "../lib/routes";
 import type { Lang } from "../lib/schema";
 
 interface Props {
   lang: Lang;
 }
 
-const method = COPY[Astro.props.lang].method;
+const about = COPY[Astro.props.lang].about;
 ---
 
-<h1 class="kunye label"><span class="kunye-no">{method.title}</span></h1>
+<h1 class="kunye label"><span class="kunye-no">{about.title}</span></h1>
 
 <div class="prose">
   {
-    method.sections.map((section) => (
+    about.sections.map((section) => (
       <section>
         <h2>{section.heading}</h2>
         {section.paragraphs.map((paragraph) => <p>{paragraph}</p>)}
@@ -27,9 +28,16 @@ const method = COPY[Astro.props.lang].method;
           </ol>
         )}
         {section.after?.map((paragraph) => <p>{paragraph}</p>)}
-        {section.link && (
-          <p>
-            <a href={section.link.href}>{section.link.text}</a>
+        {section.links && (
+          <p class="prose-links">
+            {section.links.map((link, i) => (
+              <>
+                {i > 0 && " · "}
+                <a href={link.href} {...EXTERNAL}>
+                  {link.text}
+                </a>
+              </>
+            ))}
           </p>
         )}
       </section>

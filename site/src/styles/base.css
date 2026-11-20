@@ -48,7 +48,6 @@ a {
   text-decoration-color: var(--accent);
   text-decoration-thickness: 1px;
   text-underline-offset: 0.22em;
-  transition: text-decoration-thickness 120ms ease-out;
 }
 
 a:hover {
@@ -63,15 +62,6 @@ a:hover {
 ::selection {
   background: var(--accent-soft);
   color: var(--ink);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    transition: none !important;
-    animation: none !important;
-  }
 }
 
 /* The label voice: monospace, small, slightly spaced. Uppercase follows <html lang>. */
@@ -112,15 +102,52 @@ a:hover {
   stroke: var(--accent);
 }
 
-/* Top strip: wordmark left, text links right; links wrap below at phone width. */
+/* Top strip, two rows at every width: the wordmark and whose site it is, with the subscribe
+   button at the right; then the text links, with the language switch at the right. */
 .top {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-1) var(--space-5);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "id act"
+    "nav nav";
+  align-items: center;
+  gap: var(--space-3) var(--space-4);
   padding-block: var(--space-5) var(--space-3);
   border-bottom: 1px solid var(--line);
+}
+
+/* At phone width the owner's label sits under the wordmark; from 40em beside it. */
+.top-id {
+  grid-area: id;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.top-act {
+  grid-area: act;
+}
+
+@media (min-width: 40em) {
+  .top-id {
+    flex-direction: row;
+    align-items: baseline;
+    gap: var(--space-3);
+  }
+}
+
+.by {
+  padding-block: 0.35em;
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-decoration-color: transparent;
+}
+
+.by:hover,
+.by:focus-visible {
+  color: var(--ink);
+  text-decoration-color: var(--accent);
 }
 
 .wordmark {
@@ -135,11 +162,13 @@ a:hover {
   text-decoration: none;
 }
 
-/* The navigation, then the language switch beside it. */
+/* The navigation, then the language switch at the row's end. */
 .top-nav {
+  grid-area: nav;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-1) var(--space-3);
 }
 
@@ -221,7 +250,7 @@ a.lang-part:focus-visible {
   color: var(--warn);
 }
 
-/* Künye: the one-line heading of the week, archive, topic and method pages. */
+/* The one-line heading of the week, archive, topic, Künye and subscribe pages. */
 .kunye {
   padding-block: var(--space-5) var(--space-6);
   color: var(--muted);
@@ -255,7 +284,13 @@ a.lang-part:focus-visible {
   font-weight: 400;
 }
 
-/* A full-width empty item: the line break between the date and the count row. */
+/* Full-width empty items: the line breaks after the issue pill and between the date and the count row. */
+.masthead::before {
+  content: "";
+  flex-basis: 100%;
+  order: 1;
+}
+
 .masthead::after {
   content: "";
   flex-basis: 100%;
@@ -266,11 +301,14 @@ a.lang-part:focus-visible {
   display: contents;
 }
 
+/* The issue number: a small filled pill, white on the accent (5.5:1). */
 .mh-no {
-  flex-basis: 100%;
-  order: 1;
-  margin-bottom: var(--space-1);
-  color: var(--accent);
+  order: 0;
+  margin-bottom: var(--space-2);
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--surface);
   font-weight: 600;
 }
 
@@ -428,7 +466,7 @@ a.lang-part:focus-visible {
 }
 
 /* A story is an anchor: it stops a little below the window's top edge, and the story the
-   address points at gets an accent bar at its left, drawn outside its content. */
+   address points at gets a bar in its category's colour at its left, outside its content. */
 .story {
   position: relative;
   scroll-margin-top: 1.5rem;
@@ -439,8 +477,59 @@ a.lang-part:focus-visible {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: -0.625rem;
-  border-left: 3px solid var(--accent);
+  left: calc(-1 * var(--hang-pad));
+  border-left: 3px solid var(--cat, var(--accent));
+  transform-origin: top;
+}
+
+/* Category colour: one class on the story block (or list row, or topic heading) sets the pair
+   that its tag, its number and its target bar use. */
+.cat-protocol {
+  --cat: var(--cat-protocol);
+  --cat-soft: var(--cat-protocol-soft);
+}
+
+.cat-model {
+  --cat: var(--cat-model);
+  --cat-soft: var(--cat-model-soft);
+}
+
+.cat-framework {
+  --cat: var(--cat-framework);
+  --cat-soft: var(--cat-framework-soft);
+}
+
+.cat-tooling {
+  --cat: var(--cat-tooling);
+  --cat-soft: var(--cat-tooling-soft);
+}
+
+.cat-research {
+  --cat: var(--cat-research);
+  --cat-soft: var(--cat-research-soft);
+}
+
+.cat-security {
+  --cat: var(--cat-security);
+  --cat-soft: var(--cat-security-soft);
+}
+
+.cat-industry {
+  --cat: var(--cat-industry);
+  --cat-soft: var(--cat-industry-soft);
+}
+
+.cat-policy {
+  --cat: var(--cat-policy);
+  --cat-soft: var(--cat-policy-soft);
+}
+
+/* The lead story of an edition sits in a card: an ink outline on white with a hard shadow. */
+.story-lead {
+  padding: 1.25rem;
+  border: 1.5px solid var(--ink);
+  background: var(--surface);
+  box-shadow: 4px 4px 0 var(--ink);
 }
 
 .story-meta {
@@ -458,8 +547,11 @@ a.lang-part:focus-visible {
   font-weight: 600;
   letter-spacing: 0;
   line-height: 1;
-  color: var(--accent);
   font-variant-numeric: tabular-nums;
+}
+
+.story-no {
+  color: var(--cat, var(--accent));
 }
 
 /* The number links to its own story; the padding makes a 24px hit area and the negative
@@ -476,18 +568,22 @@ a.story-no:focus-visible {
 }
 
 .story-cat {
-  color: var(--ink);
+  color: var(--cat, var(--ink));
 }
 
-/* The category tag: outlined, it links to its topic page. */
-a.story-cat {
+/* The category tag: its colour on its tint inside a 1px outline; it links to its topic page.
+   A topic page's heading is the same tag. */
+a.story-cat,
+.topic-tag {
   padding: 0.125rem 0.5rem;
-  border: 1px solid var(--ink);
+  border: 1px solid var(--cat, var(--ink));
+  background: var(--cat-soft, transparent);
+  color: var(--cat, var(--ink));
   text-decoration-color: transparent;
 }
 
 a.story-cat:hover {
-  text-decoration-color: var(--accent);
+  text-decoration-color: currentColor;
 }
 
 .story-meta .echo {
@@ -496,10 +592,9 @@ a.story-cat:hover {
 
 /* From 48rem the number leaves the label row and hangs in a 3rem gutter left of the story. */
 @media (min-width: 48rem) {
-  /* The bar moves out to the far left of the gutter, left of the hanging number; on a
-     window just over 48rem, where the gutter is narrow, it stops short of the window edge. */
+  /* Where the gutter only just holds the number, the bar sits between the number and the text. */
   .story:target::before {
-    left: max(-3.75rem, calc((var(--measure) - 100vw) / 2 + 0.5rem));
+    left: calc(-0.6 * var(--hang-pad));
   }
 
   .story .story-no {
@@ -507,11 +602,26 @@ a.story-cat:hover {
     top: 0;
     right: 100%;
     width: 3rem;
-    padding-right: 0.625rem;
+    padding-right: var(--hang-pad);
     white-space: nowrap;
     text-align: right;
     font-size: 2rem;
     letter-spacing: -0.02em;
+  }
+
+  /* The lead's number stays outside its card, level with the card's first row. */
+  .story-lead .story-no {
+    top: 1.25rem;
+    right: calc(100% + 1.5px);
+  }
+}
+
+/* From 50rem the gutter is at least 4.375rem even beside a 20px scrollbar, so the bar moves out
+   to its far left: 0.5rem left of the hanging number, at least 0.5rem from the window edge, and
+   0.5rem from the rail on a railed page. */
+@media (min-width: 50rem) {
+  .story:target::before {
+    left: -3.5rem;
   }
 }
 
@@ -532,7 +642,6 @@ a.story-cat:hover {
 }
 
 .story-summary {
-  margin-bottom: var(--space-4);
   text-wrap: pretty;
 }
 
@@ -547,22 +656,24 @@ a.story-cat:hover {
   font-size: 1.1875rem;
 }
 
-/* The developer line: a quiet panel with an accent edge. */
-.story-dev {
+/* Why it matters: one line under the summary, led by an ink pill; no box. */
+.story-why {
+  margin-top: 0.75rem;
   margin-bottom: var(--space-4);
-  padding: 0.875rem;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--accent);
-}
-
-.story-dev p {
+  font-size: 1rem;
   text-wrap: pretty;
 }
 
-.story-dev-label {
-  margin-bottom: var(--space-1);
-  color: var(--accent);
+.why-label {
+  margin-right: 0.375rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--bg);
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  vertical-align: 0.0625rem;
 }
 
 .story-sources {
@@ -574,9 +685,9 @@ a.story-cat:hover {
   color: var(--ink);
 }
 
-/* The one call to action: an outlined label button on its own line under the sources. */
+/* The try link: a label button on its own line under the sources. */
 .story-try {
-  margin-top: 0.75rem;
+  margin-top: var(--space-3);
 }
 
 .try {
@@ -586,16 +697,41 @@ a.story-cat:hover {
   max-width: 100%;
   min-height: 2.25rem;
   padding: 0.375rem 0.75rem;
-  border: 1px solid var(--ink);
-  color: var(--ink);
   text-decoration: none;
 }
 
+.subscribe {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.25rem;
+  padding: 0.375rem 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+/* The two buttons are keys: an ink outline on white over a hard 3px shadow. Hover lifts the
+   key by a pixel, a press pushes it down onto its shadow. */
+.subscribe,
+.try {
+  border: 1.5px solid var(--ink);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 3px 3px 0 var(--ink);
+}
+
+.subscribe:hover,
+.subscribe:focus-visible,
 .try:hover,
 .try:focus-visible {
-  border-color: var(--ink);
-  background: var(--chip);
-  color: var(--ink);
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 var(--ink);
+}
+
+.subscribe:active,
+.try:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--ink);
 }
 
 .story-try-mark {
@@ -669,6 +805,16 @@ a.story-cat:hover {
   color: var(--muted);
 }
 
+/* Under the closing line: tomorrow's issue and the subscribe button. */
+.closed-sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2) var(--space-3);
+  margin-top: var(--space-5);
+}
+
 .pager {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -707,7 +853,6 @@ a.story-cat:hover {
   text-decoration-color: var(--accent);
   text-decoration-thickness: 1px;
   text-underline-offset: 0.22em;
-  transition: text-decoration-thickness 120ms ease-out;
 }
 
 .pager a:hover .pager-issue,
@@ -798,7 +943,7 @@ a.story-cat:hover {
   }
 }
 
-/* The method page: plain running text. */
+/* The Künye and subscribe pages: plain running text. */
 .prose h2 {
   margin-bottom: var(--space-3);
   font-family: var(--font-display);
@@ -836,15 +981,146 @@ a.story-cat:hover {
   font-weight: 650;
 }
 
+/* The feed address, selectable in one click. */
+.feed-url {
+  display: block;
+  padding: var(--space-3);
+  border: 1px solid var(--control-border);
+  background: var(--surface);
+  font-family: var(--font-label);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+/* Footer: the owner's signature, then the site's own links. */
 .foot {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--space-1) var(--space-5);
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
   margin-top: var(--space-6);
   padding-block: var(--space-4) var(--space-6);
   border-top: 1px solid var(--line);
   color: var(--muted);
+  text-align: center;
+}
+
+.foot-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-1) var(--space-5);
+}
+
+/* Links that leave the site get a small arrow where they sit in running text. */
+.sig a[target="_blank"]::after,
+.prose a[target="_blank"]::after {
+  content: "↗";
+  content: "↗" / "";
+  display: inline-block;
+  margin-left: 0.15em;
+  text-decoration: none;
+}
+
+/* The reading-progress line of an edition page: invisible unless the scroll can drive it. */
+.progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  width: 100%;
+  height: 3px;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  pointer-events: none;
+}
+
+/* Motion: only for readers who have not asked for less, and nothing loops. */
+@media (prefers-reduced-motion: no-preference) {
+  a,
+  .pager-issue,
+  .row-date {
+    transition: text-decoration-thickness 120ms ease-out;
+  }
+
+  .subscribe,
+  .try {
+    transition:
+      transform 120ms ease-out,
+      box-shadow 120ms ease-out;
+  }
+
+  /* The lit arcs of each echo meter come in one after another, once, on load. */
+  .echo .echo-on,
+  .index-list .echo-on {
+    animation: arc-in 240ms ease-out both;
+  }
+
+  .echo .echo-on:nth-child(2),
+  .index-list .echo-on:nth-child(2) {
+    animation-delay: 40ms;
+  }
+
+  .echo .echo-on:nth-child(3),
+  .index-list .echo-on:nth-child(3) {
+    animation-delay: 80ms;
+  }
+
+  .echo .echo-on:nth-child(4),
+  .index-list .echo-on:nth-child(4) {
+    animation-delay: 120ms;
+  }
+
+  .echo .echo-on:nth-child(5),
+  .index-list .echo-on:nth-child(5) {
+    animation-delay: 160ms;
+  }
+
+  .story:target::before {
+    animation: bar-grow 200ms ease-out both;
+  }
+
+  @supports (animation-timeline: scroll()) {
+    .progress {
+      animation: progress-fill linear both;
+      animation-timeline: scroll(root);
+    }
+
+    /* Stories after the lead rise a little as they come into view. */
+    .story:not(.story-lead) {
+      animation: story-rise linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 50%;
+    }
+  }
+}
+
+@keyframes arc-in {
+  from {
+    opacity: 0;
+    transform: translateX(-2px);
+  }
+}
+
+@keyframes bar-grow {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+@keyframes progress-fill {
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes story-rise {
+  from {
+    opacity: 0.6;
+    transform: translateY(8px);
+  }
 }
 
 /* Print: the edition as one plain column of ink on white. Nothing relies on a background,
@@ -857,6 +1133,24 @@ a.story-cat:hover {
   .foot,
   .skip {
     display: none;
+  }
+
+  .progress,
+  .top-act,
+  .by,
+  .closed-sub {
+    display: none;
+  }
+
+  .story-lead,
+  .subscribe,
+  .try {
+    box-shadow: none;
+  }
+
+  .story,
+  .echo-on {
+    animation: none;
   }
 
   body {
@@ -892,8 +1186,11 @@ a.story-cat:hover {
     break-after: avoid;
   }
 
-  .story-dev {
+  .why-label,
+  .mh-no {
     background: none;
+    color: var(--ink);
+    border: 1px solid var(--ink);
   }
 
   .story-sources a[href^="http"]::after,

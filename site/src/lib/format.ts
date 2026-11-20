@@ -1,5 +1,5 @@
 import { COPY } from "./copy";
-import type { Lang } from "./schema";
+import type { Category, Lang } from "./schema";
 
 /** Weekday index (0 = Sunday) of a "YYYY-MM-DD" date, by plain UTC arithmetic. */
 function weekdayOf(date: string): number {
@@ -92,4 +92,21 @@ export function httpUrl(url: string | null): string | null {
   } catch {
     return null;
   }
+}
+
+// The class that gives an element its category's colour, from the known list only.
+const CATEGORY_CLASS: Record<Category, string> = {
+  protocol: "cat-protocol",
+  model: "cat-model",
+  framework: "cat-framework",
+  tooling: "cat-tooling",
+  research: "cat-research",
+  security: "cat-security",
+  industry: "cat-industry",
+  policy: "cat-policy",
+};
+
+/** "cat-security" for "security"; the stylesheet maps it to the category's colour and tint. */
+export function categoryClass(category: Category): string {
+  return CATEGORY_CLASS[category];
 }

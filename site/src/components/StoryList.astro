@@ -2,7 +2,7 @@
 import Echo from "./Echo.astro";
 import { COPY } from "../lib/copy";
 import { istanbulDate } from "../lib/editions";
-import { shortDate } from "../lib/format";
+import { categoryClass, shortDate } from "../lib/format";
 import { storyLink } from "../lib/routes";
 import type { Lang, PublicStory } from "../lib/schema";
 
@@ -21,7 +21,7 @@ const copy = COPY[lang];
     stories.map((story) => {
       const date = istanbulDate(story.published_at);
       return (
-        <li>
+        <li class={categoryClass(story.category)}>
           <p class="story-meta label">
             <time datetime={date}>{shortDate(date, lang)}</time>{" "}
             <span class="story-cat caps">{copy.categories[story.category]}</span>{" "}

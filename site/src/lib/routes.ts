@@ -8,7 +8,10 @@ interface Routes {
   topic(category: string): string;
   weekIndex: string;
   week(id: string): string;
-  method: string;
+  /** Künye / About: who makes Radar and how a story is made. */
+  about: string;
+  /** How to follow Radar: the RSS feed. */
+  subscribe: string;
   rss: string;
 }
 
@@ -21,7 +24,8 @@ export const routes: Record<Lang, Routes> = {
     topic: (category) => `/konu/${category}/`,
     weekIndex: "/hafta/",
     week: (id) => `/hafta/${id}/`,
-    method: "/yontem/",
+    about: "/kunye/",
+    subscribe: "/abone/",
     rss: "/rss.xml",
   },
   en: {
@@ -31,7 +35,8 @@ export const routes: Record<Lang, Routes> = {
     topic: (category) => `/en/topic/${category}/`,
     weekIndex: "/en/week/",
     week: (id) => `/en/week/${id}/`,
-    method: "/en/method/",
+    about: "/en/about/",
+    subscribe: "/en/subscribe/",
     rss: "/en/rss.xml",
   },
 };
@@ -39,3 +44,14 @@ export const routes: Record<Lang, Routes> = {
 export function storyLink(lang: Lang, date: string, uid: string): string {
   return `${routes[lang].edition(date)}#${anchorId(uid)}`;
 }
+
+/** The attributes of every link that leaves the site: a new tab, no opener, no referrer. */
+export const EXTERNAL = { target: "_blank", rel: "noopener noreferrer" } as const;
+
+/** The owner's addresses, linked from the top strip, the footer and the Künye page. */
+export const OWNER = {
+  site: "https://ozkanyusuf.com",
+  github: "https://github.com/ysfzkn",
+  repository: "https://github.com/ysfzkn/radar-ai-news",
+  issues: "https://github.com/ysfzkn/radar-ai-news/issues",
+} as const;
