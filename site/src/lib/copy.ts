@@ -19,6 +19,12 @@ export interface Copy {
   tryIt: string;
   /** The heading of an edition's index of stories. */
   inThisIssue: string;
+  /** The scope of an edition: its name, the line under it and the readout's resting line. */
+  scope: {
+    label: string;
+    caption: string;
+    idle: string;
+  };
   closed: string;
   previous: string;
   next: string;
@@ -131,6 +137,11 @@ export const COPY: Record<Lang, Copy> = {
     sourceLabel: "Kaynak:",
     tryIt: "Bugün dene",
     inThisIssue: "Bu sayıda",
+    scope: {
+      label: "Bugünün radarı",
+      caption: "Merkeze yakın: daha çok kaynak",
+      idle: "Her nokta bir haber.",
+    },
     closed: "Baskı kapandı.",
     previous: "Önceki sayı",
     next: "Sonraki sayı",
@@ -317,6 +328,11 @@ export const COPY: Record<Lang, Copy> = {
     sourceLabel: "Source:",
     tryIt: "Try it today",
     inThisIssue: "In this issue",
+    scope: {
+      label: "Today's radar",
+      caption: "Nearer the centre: more sources",
+      idle: "Each blip is a story.",
+    },
     closed: "End of this edition.",
     previous: "Previous issue",
     next: "Next issue",

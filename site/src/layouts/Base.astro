@@ -15,9 +15,11 @@ interface Props {
   path: string;
   /** The same page in the other language, or null when it has none. */
   alternate: string | null;
+  /** An edition page: boot.js may open it with the sweep (once per browser session). */
+  opening?: boolean;
 }
 
-const { lang, title, description, path, alternate } = Astro.props;
+const { lang, title, description, path, alternate, opening = false } = Astro.props;
 const copy = COPY[lang];
 const other: Lang = lang === "tr" ? "en" : "tr";
 const absolute = (address: string) => new URL(address, Astro.site).href;
@@ -25,7 +27,7 @@ const { demo } = loadData();
 ---
 
 <!doctype html>
-<html lang={lang}>
+<html lang={lang} data-opening={opening ? "" : undefined}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />

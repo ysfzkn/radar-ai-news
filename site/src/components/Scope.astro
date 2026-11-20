@@ -1,0 +1,130 @@
+---
+import { COPY } from "../lib/copy";
+import { anchorId, type Edition } from "../lib/editions";
+import { categoryClass } from "../lib/format";
+import {
+  BLIP_DOT,
+  BLIP_HIT,
+  RING_RADIUS,
+  RING_SOURCES,
+  blipPoint,
+  placeBlips,
+  sweepStep,
+  type Ring,
+} from "../lib/scope";
+import type { Lang } from "../lib/schema";
+
+interface Props {
+  lang: Lang;
+  edition: Edition;
+}
+
+const { lang, edition } = Astro.props;
+const copy = COPY[lang];
+const placed = placeBlips(edition.stories);
+const blips = edition.stories.map((story, i) => {
+  const { ring, angle } = placed[i];
+  const { x, y } = blipPoint(ring, angle);
+  const no = String(i + 1).padStart(2, "0");
+  const title = story.texts[lang]!.title;
+  return {
+    n: i + 1,
+    no,
+    title,
+    ring,
+    href: `#${anchorId(story.uid)}`,
+    cat: categoryClass(story.category),
+    step: `sw-${sweepStep(angle)}`,
+    transform: `translate(${x} ${y})`,
+    sources: copy.sources(story.source_count),
+  };
+});
+
+// The plate's ticks: one every 5°, a longer one every 30°, from the rim inward.
+const RIM = 96;
+const ticks = (every: number, length: number, skip = 0) =>
+  Array.from({ length: 360 / every }, (_, i) => i * every)
+    .filter((deg) => !skip || deg % skip !== 0)
+    .map((deg) => {
+      const rad = (deg * Math.PI) / 180;
+      const [s, c] = [Math.sin(rad), -Math.cos(rad)];
+      const p = (r: number) => `${+(r * s).toFixed(2)} ${+(r * c).toFixed(2)}`;
+      return `M${p(RIM)}L${p(RIM - length)}`;
+    })
+    .join("");
+const minor = ticks(5, 2.5, 30);
+const major = ticks(30, 6);
+// Outermost first: each ring is a layer of its own, the inner ones nearer the reader.
+const rings: Ring[] = [3, 2, 1];
+---
+
+{/*
+  The instrument. Every blip is a link to its story. Without a stylesheet the `hidden` attribute
+  keeps the whole drawing out of the way and the plain list under it (EditionIndex) is the index;
+  the stylesheet shows the scope and hides that list on screen.
+*/}
+<section class="scope" aria-labelledby="scope-label" hidden>
+  <p class="scope-head label caps">
+    <span id="scope-label">{copy.scope.label}</span>
+    <span class="scope-count">{copy.storyCount(blips.length)}</span>
+  </p>
+  <div class="scope-stage">
+    <div class="scope-dish" data-scope-dish>
+      <svg class="scope-plate" viewBox="-100 -100 200 200" aria-hidden="true">
+        <circle class="plate-face" r={RIM}></circle>
+        <path class="plate-cross" d={`M${-RIM} 0H${RIM}M0 ${-RIM}V${RIM}`}></path>
+        {/* Where each ring would meet the plate: its raised layer shows above this trace. */}
+        {rings.map((ring) => <circle class="ring-trace" r={RING_RADIUS[ring]}></circle>)}
+        <path class="plate-minor" d={minor}></path>
+        <path class="plate-major" d={major}></path>
+      </svg>
+      <div class="scope-sweep" aria-hidden="true"></div>
+      {
+        rings.map((ring) => (
+          <svg class={`scope-layer layer-${ring}`} viewBox="-100 -100 200 200">
+            <g aria-hidden="true">
+              <circle class="ring" r={RING_RADIUS[ring]}></circle>
+              <text class="ring-label" x="2.5" y={-RING_RADIUS[ring] + 6.5}>
+                {RING_SOURCES[ring]}
+              </text>
+            </g>
+            {blips
+              .filter((blip) => blip.ring === ring)
+              .map((blip) => (
+                <a class={`blip b-${blip.n} ${blip.cat} ${blip.step}`} href={blip.href} aria-labelledby={`scope-t-${blip.n}`}>
+                  <g transform={blip.transform}>
+                    <circle class="blip-hit" r={BLIP_HIT}></circle>
+                    <circle class="blip-echo" r={BLIP_DOT}></circle>
+                    <circle class="blip-dot" r={BLIP_DOT}></circle>
+                    <text class="blip-no">{blip.no}</text>
+                  </g>
+                </a>
+              ))}
+          </svg>
+        ))
+      }
+    </div>
+  </div>
+  {/*
+    The readout: the title of the blip under the pointer or focus, else of the one the sweep passed
+    last. It is hidden from assistive tech as a whole, but each line is its blip's accessible name
+    (aria-labelledby reads hidden text), so no title has to go into an attribute.
+  */}
+  <p class="scope-readout" aria-hidden="true">
+    <span class="readout-idle">{copy.scope.idle}</span>
+    {
+      blips.map((blip) => (
+        <span class={`readout-line t-${blip.n} ${blip.cat} ${blip.step}`} id={`scope-t-${blip.n}`}>
+          <span class="readout-no">{blip.no}</span> {blip.title}{" "}
+          <span class="visually-hidden">({blip.sources})</span>
+        </span>
+      ))
+    }
+  </p>
+  <p class="scope-caption label">{copy.scope.caption}</p>
+</section>
+
+<script>
+  import "../scripts/scope";
+  import "../scripts/intro";
+</script>

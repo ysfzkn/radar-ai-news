@@ -5,6 +5,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { COPY } from "../src/lib/copy";
 import { routes } from "../src/lib/routes";
 import { CATEGORIES } from "../src/lib/schema";
+import { BLIP_HIT, RING_RADIUS, SCOPE_HALF } from "../src/lib/scope";
 
 // These tests read the files of finished builds. beforeAll runs four builds one after
 // another (never concurrently): the demo fixture, a hostile file, an empty file, and the
@@ -561,13 +562,16 @@ describe("built site", () => {
     expect(cssRule(sheet, ".row")).toContain("grid-template-columns: 4.75em minmax(0, 1fr);");
   });
 
-  it("the print rules hide the navigation, banner, index, pager and footer, and print source addresses", () => {
+  it("the print rules hide the navigation, banner, scope, pager and footer, and print source addresses", () => {
     const sheet = css();
     const print = printRules(sheet);
     // The print block closes the stylesheet, so nothing after it overrides it.
     expect(print.trimEnd().endsWith("}\n}") || print.trimEnd().endsWith("}\r\n}")).toBe(true);
-    const hidden = cssRule(print, ".top-nav,\n  .demo,\n  .index,\n  .pager,\n  .foot,\n  .skip");
+    const hidden = cssRule(print, ".top-nav,\n  .demo,\n  .scope,\n  .pager,\n  .foot,\n  .skip");
     expect(hidden).toContain("display: none;");
+    // The plain index is hidden on screen only, so it is what a printed edition lists.
+    const indexHidden = declarations(sheet).filter((d) => d.selector === ".index" && d.prop === "display");
+    expect(indexHidden.map((d) => `${d.stack.join(" | ")}: ${d.value}`)).toEqual(["@media screen | .index: none"]);
     expect(cssRule(print, "body")).toMatch(/background: var\(--surface\);[\s\S]*color: var\(--ink\);/);
     expect(cssRule(print, ".stories > li")).toContain("break-inside: avoid;");
     // Backgrounds do not print: the filled pills turn into outlined ink, and the shadows go.
@@ -606,6 +610,156 @@ describe("built site", () => {
       expect(html, path).not.toContain('class="index"');
       expect(text(html), path).not.toContain(COPY[lang].inThisIssue);
     }
+  });
+
+  it("every edition page has a scope whose blips link to its stories in order, inside the instrument, without script", () => {
+    const scopeOf = (html: string) => html.match(/<section class="scope" aria-labelledby="scope-label" hidden>([\s\S]*?)<\/section>/);
+    const cases = [
+      [DEMO, "", "tr"],
+      [DEMO, "en", "en"],
+      [DEMO, "2026-11-18", "tr"],
+      [DEMO, "en/2026-11-17", "en"],
+      // One story, with hostile text in its title.
+      [HOSTILE, "2026-11-20", "tr"],
+      [HOSTILE, "en/2026-11-20", "en"],
+    ] as const;
+    for (const [dir, path, lang] of cases) {
+      const html = page(dir, path);
+      const scope = scopeOf(html);
+      expect(scope, path).not.toBeNull();
+      const inner = scope![1];
+      expect(text(inner.match(/<p class="scope-head label caps">([\s\S]*?)<\/p>/)![1])).toBe(
+        `${COPY[lang].scope.label}${COPY[lang].storyCount(articles(html).length)}`,
+      );
+      expect(inner).toContain(`<p class="scope-caption label">${COPY[lang].scope.caption}</p>`);
+      // The links in story order (they sit in their ring's layer, so order by number).
+      const blips = [
+        ...inner.matchAll(/<a class="blip b-(\d+) cat-([a-z]+) sw-(\d+)" href="#([^"]+)" aria-labelledby="scope-t-(\d+)"><g transform="translate\(([-\d.]+) ([-\d.]+)\)">/g),
+      ].map(([, n, cat, step, id, named, x, y]) => ({ n: +n, cat, step: +step, id, named: +named, x: +x, y: +y }));
+      // A blip's name is its readout line: number, title and sources, so no title sits in an attribute.
+      const names = new Map(
+        [...inner.matchAll(/<span class="readout-line t-(\d+) cat-[a-z]+ sw-\d+" id="scope-t-(\d+)">([\s\S]*?)<span class="visually-hidden">([^<]*)<\/span><\/span>/g)].map(
+          ([, t, id, line, sources]) => {
+            expect(t).toBe(id);
+            return [+id, `${text(line)} ${sources}`];
+          },
+        ),
+      );
+      blips.sort((a, b) => a.n - b.n);
+      const list = articles(html);
+      expect(blips.map((b) => b.id), path).toEqual(list.map((a) => a.match(/<article id="([^"]+)"/)![1]));
+      blips.forEach((blip, i) => {
+        const article = list[i];
+        expect(article).toContain(`class="story${i === 0 ? " story-lead" : ""} cat-${blip.cat}"`);
+        const title = text(article.match(/<h2[^>]*>([\s\S]*?)<\/h2>/)![1]);
+        const no = String(i + 1).padStart(2, "0");
+        expect(blip.named).toBe(blip.n);
+        expect(names.get(blip.n)).toBe(`${no} ${title} (${COPY[lang].sources(sourceCount(article))})`);
+        // On a ring, and with its whole hit area inside the drawing.
+        const r = Math.hypot(blip.x, blip.y);
+        expect(Object.values(RING_RADIUS).some((ring) => Math.abs(ring - r) < 0.05), `${path} ${no} r=${r}`).toBe(true);
+        expect(Math.max(Math.abs(blip.x), Math.abs(blip.y)) + BLIP_HIT).toBeLessThanOrEqual(SCOPE_HALF);
+        expect(blip.step).toBeGreaterThanOrEqual(0);
+        expect(blip.step).toBeLessThan(24);
+      });
+      // The readout repeats each title as text for the eye only; the links carry the names.
+      expect(names.size).toBe(blips.length);
+      expect(inner).toMatch(/<p class="scope-readout" aria-hidden="true"><span class="readout-idle">/);
+      // The rings and the plate are drawings, hidden from assistive tech.
+      expect(inner).toMatch(/<svg class="scope-plate" viewBox="-100 -100 200 200" aria-hidden="true">/);
+      expect(inner.match(/<g aria-hidden="true"><circle class="ring" r="(32|56|80)"><\/circle><text class="ring-label"/g)).toHaveLength(3);
+    }
+    // Hostile text stays text in the scope too.
+    const hostile = scopeOf(page(HOSTILE, "2026-11-20"))![1];
+    expect(hostile).not.toMatch(/<script|<img/i);
+    // Pages that are not an edition have no scope.
+    for (const path of ["arsiv", "kunye", "abone", "hafta/2026-W47", "konu/model", "404.html"]) {
+      const file = path.endsWith(".html") ? readFileSync(join(DEMO, path), "utf8") : page(DEMO, path);
+      expect(file, path).not.toContain('class="scope"');
+    }
+  });
+
+  it("the scope's stylesheet shows it over its hidden attribute, times each blip to the sweep and pairs titles to blips", () => {
+    const sheet = css();
+    const decls = declarations(sheet);
+    // `hidden` keeps the drawing away when the stylesheet does not load; the stylesheet shows it.
+    expect(cssRule(sheet, ".scope")).toContain("display: block;");
+    // A step for every 15° of the 6 s turn.
+    for (let i = 0; i < 24; i++) {
+      expect(decls.find((d) => d.selector === `.sw-${i}` && d.prop === "--sweep-at")?.value).toBe(`${i * 250}ms`);
+    }
+    // The pointer's or the focus's blip shows its own title, for up to 16 stories.
+    const pairs = decls.find((d) => d.prop === "z-index" && d.value === "30 !important")!;
+    for (let n = 1; n <= 16; n++) {
+      expect(pairs.selector.split(", .scope:has").length).toBe(16);
+      expect(pairs.selector).toContain(`.b-${n}:is(:hover, :focus-visible)) .t-${n}`);
+    }
+    // At most 420px wide (26.25rem); the rail on a wide screen is 24rem.
+    expect(cssRule(sheet, ".scope")).toContain("max-width: 26.25rem;");
+    expect(sheet).toContain("grid-template-columns: 24rem minmax(0, var(--measure));");
+  });
+
+  it("the opening is decided by boot.js and never written into the markup", () => {
+    const boot = readFileSync(join(root, "public", "boot.js"), "utf8");
+    // Once per session, only where the page asks for it, skipped for reduced motion, back/forward,
+    // a hidden tab, and when storage fails; ended by a click, a key or 1500 ms.
+    for (const part of [
+      'd.hasAttribute("data-opening")',
+      'matchMedia("(prefers-reduced-motion: reduce)").matches',
+      'document.visibilityState === "hidden"',
+      'nav.type === "back_forward"',
+      'sessionStorage.getItem("radar:intro")',
+      'sessionStorage.setItem("radar:intro", "1")',
+      "} catch (e) {\n    return;\n  }",
+      'd.classList.add("intro")',
+      'addEventListener("pointerdown", end, true)',
+      'addEventListener("keydown", end, true)',
+      "setTimeout(end, 1500)",
+    ]) {
+      expect(boot.replace(/\r\n/g, "\n")).toContain(part);
+    }
+    expect(boot).not.toMatch(/localStorage|cookie/);
+    for (const dir of [DEMO, HOSTILE, EMPTY, REAL]) {
+      for (const file of htmlFiles(dir)) {
+        const html = readFileSync(file, "utf8");
+        const tag = html.match(/<html[^>]*>/)![0];
+        expect(tag, file).not.toMatch(/\bclass=/);
+        expect(html, file).not.toMatch(/class="[^"]*\bintro\b/);
+        // Only an edition page may open with the sweep.
+        expect(tag.includes("data-opening"), file).toBe(html.includes('<section class="scope"'));
+      }
+    }
+    // The ink cover lives in the reduced-motion guard and clears itself at 1500 ms if no script comes.
+    const cover = declarations(css()).filter((d) => d.selector === "html.intro body::before");
+    const screen = cover.filter((d) => d.stack[0] === "@media (prefers-reduced-motion: no-preference)");
+    expect(screen.map((d) => `${d.prop}: ${d.value}`)).toEqual([
+      'content: ""',
+      "position: fixed",
+      "inset: 0",
+      "z-index: 100",
+      "background: var(--ink)",
+      "animation: intro-hold 0s 1500ms forwards",
+    ]);
+    expect(cover.every((d) => d.stack[0] === "@media (prefers-reduced-motion: no-preference)" || d.stack[0] === "@media print")).toBe(true);
+    expect(cssRule(css(), "html:not(.intro) .intro-canvas")).toContain("display: none;");
+  });
+
+  it("the scripts write story text with textContent only and keep no storage but the opening's key", () => {
+    const dir = join(root, "src", "scripts");
+    for (const name of readdirSync(dir)) {
+      const source = readFileSync(join(dir, name), "utf8");
+      expect(source, name).not.toMatch(/innerHTML|outerHTML|insertAdjacentHTML|document\.write|localStorage|document\.cookie|\beval\(/);
+      // CSSOM custom properties only, never a style attribute.
+      expect(source, name).not.toMatch(/setAttribute\(\s*["']style|\.style\.(?!setProperty)/);
+    }
+    const intro = readFileSync(join(dir, "intro.ts"), "utf8");
+    expect(intro).toContain('matchMedia("(prefers-reduced-motion: reduce)")');
+    expect(intro).toContain("const BUDGET = 1200;");
+    const scope = readFileSync(join(dir, "scope.ts"), "utf8");
+    expect(scope).toContain('matchMedia("(prefers-reduced-motion: reduce)")');
+    expect(scope).toContain('matchMedia("(pointer: fine)")');
+    expect(scope).toContain("const MAX_TILT = 6;");
+    expect(scope).toContain("const READ_AFTER = 2000;");
   });
 
   it("the first story of an edition is marked as the lead and no story on a week page is", () => {
@@ -656,6 +810,7 @@ describe("built site", () => {
     const meterArcs = [2, 10.5, 19, 27.5, 36].map((x) => `d="M${x} 1.5A8.5 8.5 0 0 1 ${x} 12.5"`);
     let marks = 0;
     let meters = 0;
+    let scopes = 0;
     for (const file of [DEMO, REAL].flatMap(htmlFiles)) {
       const html = readFileSync(file, "utf8");
       for (const [svg] of html.matchAll(/<svg[\s\S]*?<\/svg>/g)) {
@@ -665,6 +820,8 @@ describe("built site", () => {
           const inner = svg.slice(svg.indexOf(">") + 1, -"</svg>".length);
           expect(inner, file).toBe(markArcs);
           marks++;
+        } else if (/^<svg class="scope-(plate|layer layer-[123])" viewBox="-100 -100 200 200"/.test(svg)) {
+          scopes++;
         } else {
           expect(svg, file).toMatch(/^<svg class="echo-arcs" viewBox="0 0 44 14"/);
           for (const arc of meterArcs) expect(svg, file).toContain(arc);
@@ -674,6 +831,8 @@ describe("built site", () => {
     }
     expect(marks).toBeGreaterThan(20);
     expect(meters).toBeGreaterThan(50);
+    // Four drawings per edition page (plate and three ring layers): 4 dates in two languages, plus two homes.
+    expect(scopes).toBe(2 * (4 * 2 + 2) * 4);
     // Before the wordmark: 20 px, hidden from screen readers.
     const strip = page(DEMO, "").match(/<a class="wordmark"[\s\S]*?<\/svg>/)![0];
     expect(strip).toMatch(/<svg class="mark" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">/);
@@ -718,7 +877,7 @@ describe("built site", () => {
     }
   });
 
-  it("every page loads /boot.js first in the head; only the archive pages load another script", () => {
+  it("every page loads /boot.js first in the head; only the edition and archive pages load another script", () => {
     expect(readFileSync(join(root, "public", "boot.js"), "utf8")).toContain("classList.add");
     for (const dir of [DEMO, HOSTILE, EMPTY, REAL]) {
       for (const file of htmlFiles(dir)) {
@@ -728,8 +887,10 @@ describe("built site", () => {
         expect(srcs[0], file).toBe("/boot.js");
         expect(head, file).toContain('<script src="/boot.js"></script>');
         const archive = /[\\/](arsiv|archive)[\\/]index\.html$/.test(file);
-        expect(srcs.length, file).toBe(archive ? 2 : 1);
-        if (archive) expect(srcs[1], file).toMatch(/^\/_astro\/[^"]+\.js$/);
+        const edition = html.includes('<section class="scope"');
+        expect(srcs.length, file).toBe(archive || edition ? 2 : 1);
+        if (archive) expect(srcs[1], file).toMatch(/^\/_astro\/ArchiveView[^"]+\.js$/);
+        if (edition) expect(srcs[1], file).toMatch(/^\/_astro\/Scope[^"]+\.js$/);
       }
     }
   });
@@ -1330,21 +1491,35 @@ describe("built site", () => {
     // Exactly three consumers: the tag, the hanging number and the target bar.
     const users = decls.filter((d) => /var\(--cat(-soft)?[,)]/.test(d.value)).map((d) => d.selector);
     for (const selector of users) {
-      expect(selector).toMatch(/^(a\.story-cat, \.topic-tag|\.story-cat|\.story-no|\.story:target::before|\.chip|\.chip\[aria-checked="true"\])$/);
+      expect(selector).toMatch(
+        /^(a\.story-cat, \.topic-tag|\.story-cat|\.story-no|\.story:target::before|\.chip|\.chip\[aria-checked="true"\]|\.blip-dot|\.blip-echo|\.blip\.is-read \.blip-(dot|no)|\.readout-no)$/,
+      );
     }
     expect(new Set(users)).toEqual(
-      new Set(["a.story-cat, .topic-tag", ".story-cat", ".story-no", ".story:target::before", ".chip", '.chip[aria-checked="true"]']),
+      new Set([
+        "a.story-cat, .topic-tag",
+        ".story-cat",
+        ".story-no",
+        ".story:target::before",
+        ".chip",
+        '.chip[aria-checked="true"]',
+        ".blip-dot",
+        ".blip-echo",
+        ".blip.is-read .blip-dot",
+        ".blip.is-read .blip-no",
+        ".readout-no",
+      ]),
     );
   });
 
-  it("only the lead card, the subscribe button and the try button have a box-shadow, and none is blurred", () => {
+  it("only the lead card, the scope, the subscribe button and the try button have a box-shadow, and none is blurred", () => {
     const shadows = declarations(sheets()).filter((d) => d.prop === "box-shadow");
     expect(shadows.length).toBeGreaterThan(3);
     for (const shadow of shadows) {
       expect(shadow.value === "none" || /^\d+px \d+px 0 var\(--ink\)$/.test(shadow.value), shadow.value).toBe(true);
       for (const part of shadow.selector.split(",").map((x) => x.trim())) {
         expect(part.replace(/:(hover|focus-visible|active)$/, "").replace(/\[aria-current="page"\]$/, "")).toMatch(
-          /^(\.story-lead \.try|\.(story-lead|subscribe|try))$/,
+          /^(\.story-lead \.try|\.(story-lead|scope|subscribe|try))$/,
         );
         if (part.startsWith(".story-lead .try")) expect(shadow.value).toBe("none");
       }
@@ -1387,7 +1562,16 @@ describe("built site", () => {
     expect(chip.selector.split(", ").sort()).toEqual([".story-lead .try:focus-visible", ".story-lead .try:hover"]);
     expect(inLead.some((d) => /^border/.test(d.prop))).toBe(false);
     expect(cssRule(css(), ".subscribe,\n.try")).toContain("box-shadow: 3px 3px 0 var(--ink);");
-    expect(sheets()).not.toMatch(/gradient\(|backdrop-filter|filter:\s*drop-shadow|text-shadow/);
+    // The scope matches the lead: 3px, then 4px from 48rem.
+    expect(cssRule(css(), ".scope")).toContain("box-shadow: 3px 3px 0 var(--ink);");
+    expect(
+      shadows.find((d) => d.selector === ".scope" && d.stack[0] === "@media (min-width: 48rem)")?.value,
+    ).toBe("4px 4px 0 var(--ink)");
+    // One gradient on the site: the sweep's fade.
+    const gradients = declarations(sheets()).filter((d) => /gradient\(/.test(d.value));
+    expect(gradients.map((d) => `${d.selector} ${d.prop}`)).toEqual([".scope-sweep background"]);
+    expect(gradients[0].value).toMatch(/^conic-gradient\(transparent 0deg \d+deg, var\(--sweep\) 360deg\)$/);
+    expect(sheets().replace(gradients[0].value, "")).not.toMatch(/gradient\(|backdrop-filter|filter:\s*drop-shadow|text-shadow/);
   });
 
   it("every animation and transition sits inside a reduced-motion or @supports guard", () => {
@@ -1400,8 +1584,11 @@ describe("built site", () => {
       if (d.prop === "animation-timeline") expect(context).toMatch(/@supports \(animation-timeline: scroll\(\)\)/);
       if (d.prop.startsWith("transition")) expect(d.value).toMatch(/120ms/);
     }
-    // Nothing loops.
-    expect(sheets()).not.toMatch(/infinite|alternate/);
+    // Nothing loops but the scope's one 6 s clock: the sweep, each blip's echo and the readout.
+    expect(sheets()).not.toMatch(/alternate/);
+    const loops = decls.filter((d) => /infinite/.test(d.value));
+    expect(loops.map((d) => d.selector).sort()).toEqual([".blip-echo", ".readout-line", ".scope-sweep"]);
+    for (const d of loops) expect(d.value, d.selector).toMatch(/^[a-z-]+ 6s .*infinite$/);
     // The progress bar is invisible by default; only the edition view renders it.
     const bar = cssRule(css(), ".progress");
     for (const rule of ["position: fixed;", "top: 0;", "height: 3px;", "transform: scaleX(0);", "transform-origin: 0 50%;"]) {
@@ -1433,11 +1620,27 @@ describe("built site", () => {
     // first keyframe: no keyframe fades a lit arc or a story below half strength.
     const keyframes = decls.filter((d) => d.stack[0]?.startsWith("@keyframes"));
     expect(new Set(keyframes.map((d) => d.stack[0]))).toEqual(
-      new Set(["@keyframes arc-in", "@keyframes bar-grow", "@keyframes progress-fill", "@keyframes story-rise"]),
+      new Set([
+        "@keyframes arc-in",
+        "@keyframes bar-grow",
+        "@keyframes progress-fill",
+        "@keyframes story-rise",
+        "@keyframes scope-sweep",
+        "@keyframes blip-ping",
+        "@keyframes scope-readout",
+        "@keyframes intro-hold",
+      ]),
     );
     const fades = keyframes.filter((d) => d.prop === "opacity");
-    expect(fades.map((d) => d.stack[0]).sort()).toEqual(["@keyframes arc-in", "@keyframes story-rise"]);
-    for (const d of fades) expect(Number(d.value), `${d.stack[0]} ${d.selector}`).toBeGreaterThanOrEqual(0.5);
+    expect([...new Set(fades.map((d) => d.stack[0]))].sort()).toEqual([
+      "@keyframes arc-in",
+      "@keyframes blip-ping",
+      "@keyframes story-rise",
+    ]);
+    // The blip's echo is a ring that leaves and vanishes; what carries information never fades far.
+    for (const d of fades.filter((x) => x.stack[0] !== "@keyframes blip-ping")) {
+      expect(Number(d.value), `${d.stack[0]} ${d.selector}`).toBeGreaterThanOrEqual(0.5);
+    }
     const arc = keyframes.filter((d) => d.stack[0] === "@keyframes arc-in");
     expect(arc.map((d) => `${d.selector} ${d.prop}: ${d.value}`)).toEqual([
       "from opacity: 0.5",

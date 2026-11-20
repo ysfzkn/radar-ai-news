@@ -361,10 +361,18 @@ a.lang-part:focus-visible {
   color: var(--muted);
 }
 
-/* The index of the day: under the masthead, or in the left rail on a wide screen. */
+/* The plain index of the day: the list a page shows without its stylesheet, and on paper. On
+   screen the scope above it carries the same links, so the list stays out of sight and out of
+   the accessibility tree (no link is announced twice). */
 .index {
   padding-block: var(--space-5);
   border-bottom: 1px solid var(--line);
+}
+
+@media screen {
+  .index {
+    display: none;
+  }
 }
 
 .index-label {
@@ -412,12 +420,12 @@ a.lang-part:focus-visible {
 }
 
 @media (min-width: 72rem) {
-  /* Rail 16rem, gap 4rem, reading column 40rem. The rail needs 21.5rem left of the centred
-     column (with 1.5rem to the window edge); where the screen is narrower, the column moves
-     right by --rail-shift, and on a railed page the top strip, banner and footer move with it.
-     100vw counts a scrollbar, so the edge keeps a little less where there is one. */
+  /* Rail 24rem (the scope), gap 4rem, reading column 40rem. The rail needs 29.5rem left of the
+     centred column (with 1.5rem to the window edge); where the screen is narrower, the column
+     moves right by --rail-shift, and on a railed page the top strip, banner and footer move with
+     it. 100vw counts a scrollbar, so the edge keeps a little less where there is one. */
   .page {
-    --rail-shift: max(0rem, calc(21.5rem - (100vw - var(--measure)) / 2));
+    --rail-shift: max(0rem, calc(29.5rem - (100vw - var(--measure)) / 2));
   }
 
   .page:has(.edition-railed) > :is(.top, .demo, .foot) {
@@ -427,33 +435,27 @@ a.lang-part:focus-visible {
 
   .edition-railed {
     display: grid;
-    grid-template-columns: 16rem minmax(0, var(--measure));
+    grid-template-columns: 24rem minmax(0, var(--measure));
     grid-template-areas:
       "rail head"
       "rail body"
       "rail end";
     column-gap: 4rem;
     align-items: start;
-    width: 60rem;
-    margin-left: calc(var(--rail-shift) - 20rem);
+    width: 68rem;
+    margin-left: calc(var(--rail-shift) - 28rem);
   }
 
   .edition-railed .masthead {
     grid-area: head;
   }
 
-  .edition-railed .index {
+  /* The scope stays in view beside the stories, so the reader watches its blips turn hollow. */
+  .edition-railed .scope {
     grid-area: rail;
     position: sticky;
     top: 1.5rem;
-    max-height: calc(100vh - 3rem);
-    overflow-y: auto;
-    margin-top: var(--space-5);
-    padding-block: var(--space-3) var(--space-4);
-    /* Room for the focus ring, which the scroll box would otherwise clip. */
-    padding-right: 0.375rem;
-    border-top: 3px solid var(--ink);
-    border-bottom: 0;
+    max-width: none;
   }
 
   .edition-railed .stories {
@@ -463,6 +465,384 @@ a.lang-part:focus-visible {
   .edition-railed .end {
     grid-area: end;
   }
+}
+
+/* The scope: the edition's stories as blips on a radar, seen slightly from above. A card in the
+   lead's language (ink outline, white, hard shadow) holding a plate, three range rings and a
+   sweep. Each ring is a layer of its own, the inner ones nearer the reader; every blip is a link
+   to its story in its category's colour, nearer the centre the more sources it has.
+   The markup carries `hidden`, so a page without its stylesheet shows the plain list instead;
+   `display` here overrides it. */
+.scope {
+  display: block;
+  max-width: 26.25rem;
+  margin-top: var(--space-5);
+  padding: var(--space-3);
+  border: 1.5px solid var(--ink);
+  background: var(--surface);
+  box-shadow: 3px 3px 0 var(--ink);
+  /* The turning sweep's square box reaches past the plate at its corners; it must not widen the page. */
+  overflow: hidden;
+}
+
+@media (min-width: 48rem) {
+  .scope {
+    box-shadow: 4px 4px 0 var(--ink);
+  }
+}
+
+.scope-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.scope-head > :first-child {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* The resting tilt shows the plate from a little above; scripts/scope.ts adds the pointer's
+   tilt through --tilt-x and --tilt-y. */
+.scope-stage {
+  perspective: 75rem;
+}
+
+.scope-dish {
+  position: relative;
+  aspect-ratio: 1;
+  transform: rotateX(calc(14deg + var(--tilt-x, 0deg))) rotateY(var(--tilt-y, 0deg));
+  transform-style: preserve-3d;
+}
+
+.scope-dish > * {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.scope-plate {
+  fill: none;
+  stroke-linecap: round;
+}
+
+.plate-face {
+  fill: var(--bg);
+  stroke: var(--ink);
+  stroke-width: 1.25;
+}
+
+.plate-cross {
+  stroke: var(--line);
+  stroke-width: 0.6;
+}
+
+.ring-trace {
+  stroke: var(--line);
+  stroke-width: 1.4;
+}
+
+.plate-minor {
+  stroke: var(--control-border);
+  stroke-width: 0.45;
+}
+
+.plate-major {
+  stroke: var(--ink);
+  stroke-width: 0.9;
+}
+
+/* The sweep turns once in 6 s (clockwise from straight up): a fading wedge behind an accent edge. */
+.scope-sweep {
+  inset: 2%;
+  width: auto;
+  height: auto;
+  border-radius: 50%;
+  background: conic-gradient(transparent 0deg 285deg, var(--sweep) 360deg);
+  transform: translateZ(1px);
+}
+
+.scope-sweep::after {
+  content: "";
+  position: absolute;
+  left: calc(50% - 0.75px);
+  top: 0;
+  width: 1.5px;
+  height: 50%;
+  background: var(--accent);
+}
+
+.scope-layer {
+  overflow: visible;
+  pointer-events: none;
+}
+
+.layer-3 {
+  transform: translateZ(0.5rem);
+}
+
+.layer-2 {
+  transform: translateZ(1rem);
+}
+
+.layer-1 {
+  transform: translateZ(1.5rem);
+}
+
+.ring {
+  fill: none;
+  stroke: var(--control-border);
+  stroke-width: 0.6;
+}
+
+.layer-1 .ring {
+  stroke: var(--ink);
+}
+
+.ring-label {
+  fill: var(--muted);
+  font-family: var(--font-label);
+  font-size: 5.5px;
+  letter-spacing: 0.04em;
+}
+
+/* A blip: a 33px target (at phone width) around a dot with the story's number. Once its story
+   has been read for two seconds the dot turns hollow. */
+.blip {
+  cursor: pointer;
+  outline: none;
+  pointer-events: auto;
+  text-decoration: none;
+}
+
+.blip-hit {
+  fill: transparent;
+}
+
+.blip-dot {
+  fill: var(--cat);
+  stroke: var(--surface);
+  stroke-width: 1.25;
+}
+
+.blip-no {
+  fill: var(--surface);
+  font-family: var(--font-display);
+  font-size: 7px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.blip-echo {
+  fill: none;
+  stroke: var(--cat);
+  stroke-width: 0.8;
+  visibility: hidden;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.blip:hover .blip-dot,
+.blip:focus-visible .blip-dot {
+  stroke: var(--ink);
+  stroke-width: 1.5;
+}
+
+.blip:focus-visible .blip-hit {
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+
+.blip.is-read .blip-dot {
+  fill: var(--surface);
+  stroke: var(--cat);
+  stroke-width: 1.5;
+}
+
+.blip.is-read .blip-no {
+  fill: var(--cat);
+}
+
+/* The readout under the plate: two lines, the resting line under a stack of titles. Only the
+   blip under the pointer or focus, else the one the sweep passed last, is on top. */
+.scope-readout {
+  position: relative;
+  height: calc(2 * 1.35em + var(--space-2));
+  margin-top: var(--space-2);
+  border-top: 1px solid var(--line);
+  font-family: var(--font-label);
+  font-size: 0.8125rem;
+  line-height: 1.35;
+}
+
+.readout-idle,
+.readout-line {
+  position: absolute;
+  inset: var(--space-2) 0 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.readout-idle {
+  color: var(--muted);
+}
+
+.readout-line {
+  visibility: hidden;
+  overflow-wrap: anywhere;
+}
+
+.readout-no {
+  color: var(--cat);
+  font-weight: 700;
+}
+
+/* The pointer's or the focus's blip wins over the sweep: important, as the sweep's own value
+   comes from an animation, which a plain declaration cannot override. */
+.scope:has(.b-1:is(:hover, :focus-visible)) .t-1,
+.scope:has(.b-2:is(:hover, :focus-visible)) .t-2,
+.scope:has(.b-3:is(:hover, :focus-visible)) .t-3,
+.scope:has(.b-4:is(:hover, :focus-visible)) .t-4,
+.scope:has(.b-5:is(:hover, :focus-visible)) .t-5,
+.scope:has(.b-6:is(:hover, :focus-visible)) .t-6,
+.scope:has(.b-7:is(:hover, :focus-visible)) .t-7,
+.scope:has(.b-8:is(:hover, :focus-visible)) .t-8,
+.scope:has(.b-9:is(:hover, :focus-visible)) .t-9,
+.scope:has(.b-10:is(:hover, :focus-visible)) .t-10,
+.scope:has(.b-11:is(:hover, :focus-visible)) .t-11,
+.scope:has(.b-12:is(:hover, :focus-visible)) .t-12,
+.scope:has(.b-13:is(:hover, :focus-visible)) .t-13,
+.scope:has(.b-14:is(:hover, :focus-visible)) .t-14,
+.scope:has(.b-15:is(:hover, :focus-visible)) .t-15,
+.scope:has(.b-16:is(:hover, :focus-visible)) .t-16 {
+  visibility: visible !important;
+  z-index: 30 !important;
+}
+
+.scope-caption {
+  margin-top: var(--space-1);
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+/* Where the sweep is when it passes a blip: 15° steps of its 6 s turn, set by the blip's class. */
+.sw-0 {
+  --sweep-at: 0ms;
+}
+
+.sw-1 {
+  --sweep-at: 250ms;
+}
+
+.sw-2 {
+  --sweep-at: 500ms;
+}
+
+.sw-3 {
+  --sweep-at: 750ms;
+}
+
+.sw-4 {
+  --sweep-at: 1000ms;
+}
+
+.sw-5 {
+  --sweep-at: 1250ms;
+}
+
+.sw-6 {
+  --sweep-at: 1500ms;
+}
+
+.sw-7 {
+  --sweep-at: 1750ms;
+}
+
+.sw-8 {
+  --sweep-at: 2000ms;
+}
+
+.sw-9 {
+  --sweep-at: 2250ms;
+}
+
+.sw-10 {
+  --sweep-at: 2500ms;
+}
+
+.sw-11 {
+  --sweep-at: 2750ms;
+}
+
+.sw-12 {
+  --sweep-at: 3000ms;
+}
+
+.sw-13 {
+  --sweep-at: 3250ms;
+}
+
+.sw-14 {
+  --sweep-at: 3500ms;
+}
+
+.sw-15 {
+  --sweep-at: 3750ms;
+}
+
+.sw-16 {
+  --sweep-at: 4000ms;
+}
+
+.sw-17 {
+  --sweep-at: 4250ms;
+}
+
+.sw-18 {
+  --sweep-at: 4500ms;
+}
+
+.sw-19 {
+  --sweep-at: 4750ms;
+}
+
+.sw-20 {
+  --sweep-at: 5000ms;
+}
+
+.sw-21 {
+  --sweep-at: 5250ms;
+}
+
+.sw-22 {
+  --sweep-at: 5500ms;
+}
+
+.sw-23 {
+  --sweep-at: 5750ms;
+}
+
+/* The opening's canvas (scripts/intro.ts) shows only while <html> carries `intro`. */
+.intro-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 101;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+html:not(.intro) .intro-canvas {
+  display: none;
 }
 
 /* The stories. */
@@ -1297,6 +1677,40 @@ a.heat-day:hover {
     animation: bar-grow 200ms ease-out both;
   }
 
+  /* The scope keeps turning while it is in view: the sweep, the echo of each blip it passes
+     and the readout's title follow one 6 s clock. Off screen it stands still. */
+  .scope-sweep {
+    animation: scope-sweep 6s linear infinite;
+  }
+
+  .blip-echo {
+    animation: blip-ping 6s ease-out infinite;
+    animation-delay: var(--sweep-at, 0ms);
+  }
+
+  .readout-line {
+    animation: scope-readout 6s steps(24, end) infinite;
+    animation-delay: var(--sweep-at, 0ms);
+  }
+
+  .scope.is-away :is(.scope-sweep, .blip-echo, .readout-line) {
+    animation-play-state: paused;
+  }
+
+  /* The opening's first frame is ink, painted before the page; scripts/intro.ts takes over with
+     its canvas. Should the script never come, the cover clears itself at 1500 ms. */
+  html.intro body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: var(--ink);
+    animation: intro-hold 0s 1500ms forwards;
+  }
+
+  html.intro.intro-live body::before {
+    content: none;
+  }
   @supports (animation-timeline: scroll()) {
     .progress {
       animation: progress-fill linear both;
@@ -1340,6 +1754,51 @@ a.heat-day:hover {
   }
 }
 
+@keyframes scope-sweep {
+  from {
+    transform: translateZ(1px) rotate(0turn);
+  }
+
+  to {
+    transform: translateZ(1px) rotate(1turn);
+  }
+}
+
+/* A ring that leaves the blip as the sweep passes; it is gone a third of the turn later. */
+@keyframes blip-ping {
+  from {
+    visibility: visible;
+    opacity: 0.9;
+    transform: scale(1);
+  }
+
+  35% {
+    visibility: hidden;
+    opacity: 0;
+    transform: scale(2.2);
+  }
+}
+
+/* A title comes to the top of the readout as the sweep passes its blip and sinks one place for
+   every later 15° step, so the last one passed is always on top. */
+@keyframes scope-readout {
+  from {
+    visibility: visible;
+    z-index: 24;
+  }
+
+  to {
+    visibility: visible;
+    z-index: 0;
+  }
+}
+
+@keyframes intro-hold {
+  to {
+    visibility: hidden;
+  }
+}
+
 /* Print: the edition as one plain column of ink on white. Nothing relies on a background,
    which browsers drop by default; the echo meters are strokes and print as they are. */
 @media print {
@@ -1350,7 +1809,7 @@ a.heat-day:hover {
 
   .top-nav,
   .demo,
-  .index,
+  .scope,
   .pager,
   .foot,
   .skip {
@@ -1376,8 +1835,16 @@ a.heat-day:hover {
   .index-list .echo-on,
   .story:target::before,
   .progress,
-  .story:not(.story-lead) {
+  .story:not(.story-lead),
+  .scope-sweep,
+  .blip-echo,
+  .readout-line,
+  html.intro body::before {
     animation: none;
+  }
+
+  html.intro body::before {
+    content: none;
   }
 
   .story:not(.story-lead),

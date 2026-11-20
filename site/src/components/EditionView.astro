@@ -1,6 +1,7 @@
 ---
 import EditionIndex from "./EditionIndex.astro";
 import EchoArcs from "./EchoArcs.astro";
+import Scope from "./Scope.astro";
 import Story from "./Story.astro";
 import { COPY } from "../lib/copy";
 import { readingMinutes, type Edition } from "../lib/editions";
@@ -22,12 +23,15 @@ const { lang, edition, previous, next, isLatest } = Astro.props;
 const copy = COPY[lang];
 const newer = isLatest ? null : next;
 const count = edition.stories.length;
+// The scope stands in the rail for any edition; the plain list under it, for no stylesheet and
+// print, only where there is more than one story to list.
+const hasScope = count > 0;
 const hasIndex = count > 1;
 const weekday = weekdayName(edition.date, lang);
 const sources = edition.stories.reduce((sum, story) => sum + story.source_count, 0);
 ---
 
-<div class:list={["edition", { "edition-railed": hasIndex }]}>
+<div class:list={["edition", { "edition-railed": hasScope }]}>
   {/* A reading-progress line at the window's top; the stylesheet fills it with the scroll where it can. */}
   <div class="progress" aria-hidden="true"></div>
   {/* One h1 that reads "Sayı 4 · 20 Kasım 2026 Cuma · 5 haber · 22 kaynak · ~2 dk" in order; CSS sets it as three rows. */}
@@ -55,6 +59,7 @@ const sources = edition.stories.reduce((sum, story) => sum + story.source_count,
     </span>
   </h1>
 
+  {hasScope && <Scope lang={lang} edition={edition} />}
   {hasIndex && <EditionIndex lang={lang} edition={edition} />}
 
   <ol class="stories" role="list">

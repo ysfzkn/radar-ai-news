@@ -92,6 +92,10 @@
   --heat-3: #5a5b5b;
   --heat-4: #17181a;
 
+  /* The scope's sweep: the accent at a fifth of its strength over the plate, the one fade on the
+     site (it trails the sweep's leading edge). */
+  --sweep: color-mix(in srgb, var(--accent) 20%, transparent);
+
   --font-body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-display: "Bricolage Grotesque Variable", "Bricolage Fallback", var(--font-body);
   --font-label: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
