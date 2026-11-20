@@ -1,8 +1,8 @@
 import { html } from "hono/html";
 import { COPY } from "../copy";
 import { CATEGORIES, PUBLISH_LIMITS, isHttpUrl, type Lang } from "../schema";
-import { NOTE_MAX, type StoryFull } from "../stories";
-import { categoryLabel, externalLink, formatDate, storyPath, timeLeft, type View } from "./layout";
+import { NOTE_MAX, restorable, type Position, type StoryFull, type Tab } from "../stories";
+import { categoryLabel, externalLink, formatDate, listHref, storyHref, storyPath, timeLeft, type View } from "./layout";
 import { reasonList } from "./reasons";
 
 type TextSet = StoryFull["texts"][Lang];
@@ -107,16 +107,25 @@ function sources(s: StoryFull): View {
 </section>`;
 }
 
+// "14 / 90" under a field, counted as the server counts (trimmed), in the danger colour over the
+// limit. app.js keeps it live; it never disables a button: the server is the judge.
+export function counter(id: string, value: string, limit: number): View {
+  const n = value.trim().length;
+  return html`<p class="${n > limit ? "counter over" : "counter"}" id="${id}_count">${n} / ${limit}</p>`;
+}
+
 function textField(lang: Lang, field: TextField, value: string): View {
   const id = `${lang}_${field}`;
   const limit = PUBLISH_LIMITS[field];
-  const over = value.length > limit;
   return html`<div class="field">
 <label for="${id}">${COPY.fields[field]}</label>
 <textarea id="${id}" name="${id}" rows="${ROWS[field]}" lang="${lang}" data-limit="${limit}" aria-describedby="${id}_count">${value}</textarea>
-<p class="${over ? "counter warn" : "counter"}" id="${id}_count">${value.length} / ${limit}</p>
+${counter(id, value, limit)}
 </div>`;
 }
+
+// The try link's limit, as the ingest contract and the edit check have it.
+const URL_MAX = 2000;
 
 const versionField = (s: StoryFull) => html`<input type="hidden" name="version" value="${s.version}">`;
 
@@ -146,7 +155,7 @@ ${sourceLink(s)}
 ${unsavedNotice}
 <div class="bar-buttons">
 ${save("secondary")}
-<button type="submit" class="primary" form="${FORM_ID}" formaction="${storyPath(s.uid)}/approve" aria-describedby="approve-note">${COPY.approve}</button>
+<button type="submit" class="primary" id="approve-button" form="${FORM_ID}" formaction="${storyPath(s.uid)}/approve" aria-describedby="approve-note">${COPY.approve}</button>
 </div>
 </div>`;
 }
@@ -172,8 +181,9 @@ ${versionField(s)}
 </div>
 <div class="field">
 <label for="try_url">${COPY.fact.tryUrl}</label>
-<input id="try_url" name="try_url" type="url" inputmode="url" value="${d.try_url}" aria-describedby="try_url_hint">
+<input id="try_url" name="try_url" type="url" inputmode="url" value="${d.try_url}" data-limit="${URL_MAX}" aria-describedby="try_url_hint try_url_count">
 <p class="hint" id="try_url_hint">${COPY.tryUrlHint}</p>
+${counter("try_url", d.try_url, URL_MAX)}
 </div>
 </div>
 <p class="hint">${COPY.limitHint}</p>
@@ -184,30 +194,50 @@ ${actionBar(s)}
 </section>`;
 }
 
+function noteField(id: string, label: string, required: boolean): View {
+  return html`<div class="field">
+<label for="${id}">${label}</label>
+<textarea id="${id}" name="note" rows="2" maxlength="${NOTE_MAX}"${required ? html` required` : ""} data-limit="${NOTE_MAX}" aria-describedby="${id}_count"></textarea>
+${counter(id, "", NOTE_MAX)}
+</div>`;
+}
+
 function rejectCard(s: StoryFull): View {
-  return html`<section class="danger-card" aria-labelledby="decide-h">
+  return html`<section class="danger-card" id="reject-card" aria-labelledby="decide-h">
 <h2 id="decide-h">${COPY.decisionHeading}</h2>
 <form method="post" action="${storyPath(s.uid)}/reject" class="stack">
 ${versionField(s)}
-<div class="field">
-<label for="reject_note">${COPY.rejectNote}</label>
-<textarea id="reject_note" name="note" rows="2" maxlength="${NOTE_MAX}"></textarea>
-</div>
+${noteField("reject_note", COPY.rejectNote, false)}
 <div class="actions"><button type="submit" class="danger">${COPY.reject}</button></div>
 </form>
 </section>`;
 }
 
-function takeDownCard(s: StoryFull): View {
+function takeDownCard(s: StoryFull, tab: Tab): View {
   return html`<section class="danger-card" aria-labelledby="decide-h">
 <h2 id="decide-h">${COPY.decisionHeading}</h2>
 <form method="post" action="${storyPath(s.uid)}/unpublish" class="stack">
 ${versionField(s)}
-<div class="field">
-<label for="unpublish_note">${COPY.unpublishNote}</label>
-<textarea id="unpublish_note" name="note" rows="2" maxlength="${NOTE_MAX}" required></textarea>
-</div>
+${tab === "edition" ? html`<input type="hidden" name="from" value="edition">` : ""}
+${noteField("unpublish_note", COPY.unpublishNote, true)}
 <div class="actions"><button type="submit" class="danger">${COPY.unpublish}</button></div>
+</form>
+</section>`;
+}
+
+// A rejected story can go back to the queue while its 72 hours last; after that the page says why not.
+function restoreCard(s: StoryFull, now: Date): View {
+  if (!restorable(s, now))
+    return html`<section class="panel restore-card" aria-labelledby="restore-h">
+<h2 id="restore-h">${COPY.restoreHeading}</h2>
+<p>${COPY.restoreExpired}</p>
+</section>`;
+  return html`<section class="panel restore-card" aria-labelledby="restore-h">
+<h2 id="restore-h">${COPY.restoreHeading}</h2>
+<form method="post" action="${storyPath(s.uid)}/restore" class="stack">
+${versionField(s)}
+<p class="hint">${COPY.restoreNote}</p>
+<div class="actions"><button type="submit" id="restore-button">${COPY.restore}</button></div>
 </form>
 </section>`;
 }
@@ -247,9 +277,44 @@ ${e.note ? html`<p class="note">${e.note}</p>` : ""}
 // One column below 64rem (head, reasons, fact card, sources, form, preview, decision card, history,
 // by CSS order); from 64rem the side column (reasons to history) sits sticky on the right of the form.
 // `dirty`: the draft holds typed text that is not saved (app.js then starts in the unsaved state).
-export function storyView(s: StoryFull, now: Date, draft: Draft = draftFrom(s), dirty = false): View {
+// The way back to the list, and the story's place in it with the stories either side.
+function storyTop(s: StoryFull, tab: Tab, position: Position | null): View {
+  const back =
+    tab === "edition"
+      ? html`<a href="${listHref("edition")}">${COPY.backToEdition}</a>`
+      : html`<a href="${listHref(s.status)}">${COPY.back}</a>`;
+  const nav = position
+    ? html`<nav class="story-nav" aria-label="${COPY.storyNav}">
+${position.prev ? html`<a class="nav-link" id="story-prev" rel="prev" href="${storyHref(position.prev, tab)}">${COPY.prevStory}</a>` : ""}
+<span class="nav-pos"><span class="visually-hidden">${COPY.position}: </span>${position.index} / ${position.total}</span>
+${position.next ? html`<a class="nav-link" id="story-next" rel="next" href="${storyHref(position.next, tab)}">${COPY.nextStory}</a>` : ""}
+</nav>`
+    : "";
+  return html`<div class="story-top"><p class="back">${back}</p>${nav}</div>`;
+}
+
+export interface StoryNav {
+  tab: Tab;
+  position: Position | null;
+}
+
+export function storyView(
+  s: StoryFull,
+  now: Date,
+  draft: Draft = draftFrom(s),
+  dirty = false,
+  nav: StoryNav = { tab: s.status, position: null },
+): View {
   const editable = s.status === "review" || s.status === "published";
-  return html`<p class="back"><a href="/admin?status=${s.status}">${COPY.back}</a></p>
+  const decision =
+    s.status === "review"
+      ? rejectCard(s)
+      : s.status === "published"
+        ? takeDownCard(s, nav.tab)
+        : s.status === "rejected"
+          ? restoreCard(s, now)
+          : "";
+  return html`${storyTop(s, nav.tab, nav.position)}
 <article class="story">
 <div class="story-head">
 <h1 class="story-title">${textsOf(s, "tr").title}</h1>
@@ -264,7 +329,7 @@ ${history(s)}
 </div>
 <div class="story-main">
 ${editable ? editForm(s, draft, dirty) : readOnlyTexts(s)}
-${s.status === "review" ? rejectCard(s) : s.status === "published" ? takeDownCard(s) : ""}
+${decision}
 </div>
 </article>`;
 }

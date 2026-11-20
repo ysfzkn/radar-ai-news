@@ -380,7 +380,7 @@ describe("admin screen", () => {
     expect(pub).not.toContain("Kaydet ve onayla");
   });
 
-  it("rejected and expired stories render no form", async () => {
+  it("rejected and expired stories render no edit form; only a rejected one offers the restore form", async () => {
     const rejected = await seed();
     await rejectStory(env.DB, rejected, 1, "Kaynak zayıf", "owner@example.com", new Date());
     const expired = await seed({ ageMs: 73 * HOUR });
@@ -390,7 +390,8 @@ describe("admin screen", () => {
       const res = await get(`/admin/stories/${uid}`);
       expect(res.status).toBe(200);
       const body = await res.text();
-      expect(body).not.toContain("<form");
+      const forms = body.match(/<form [^>]*>/g) ?? [];
+      expect(forms).toEqual(uid === rejected ? [`<form method="post" action="/admin/stories/${uid}/restore" class="stack">`] : []);
       expect(body).not.toContain("<textarea");
       expect(body).toContain("A2UI 1.0 aday sürümü yayında");
     }
@@ -768,23 +769,28 @@ describe("review screen", () => {
     }
   });
 
-  it("the review queue has a summary line with the count and the soonest deadline; other tabs do not", async () => {
-    expect(await (await get("/admin")).text()).not.toContain("haber bekliyor");
+  it("the review queue has a status strip with the count, today's count, the oldest's age and the next expiry; other tabs do not", async () => {
+    expect(await (await get("/admin")).text()).toContain('<dt>İlk süre dolumu</dt><dd>—</dd>');
     await seed({ ageMs: 10 * HOUR });
     await seed({ ageMs: 68.5 * HOUR });
     await seed({ status: "published" });
     const body = await (await get("/admin")).text();
-    expect(body).toContain('<p class="queue-summary">2 haber bekliyor · en yakın süre 3 sa</p>');
-    expect(body.indexOf("queue-summary")).toBeLessThan(body.indexOf('<ul class="cards">'));
+    const strip = body.slice(body.indexOf('<dl class="strip">'), body.indexOf("</dl>"));
+    expect(strip).toContain('<div class="stat"><dt>Bekleyen</dt><dd>2</dd></div>');
+    expect(strip).toContain('<div class="stat"><dt>Bugün yayınlanan</dt><dd>1</dd></div>');
+    expect(strip).toContain('<div class="stat"><dt>En eski bekleyen</dt><dd>68 sa önce</dd></div>');
+    expect(strip).toContain('<div class="stat warn-stat"><dt>İlk süre dolumu</dt><dd>3 sa içinde</dd></div>');
+    expect(body.indexOf('class="strip"')).toBeLessThan(body.indexOf('<ul class="cards">'));
     for (const status of ["published", "rejected", "expired"]) {
-      expect(await (await get(`/admin?status=${status}`)).text()).not.toContain("haber bekliyor");
+      expect(await (await get(`/admin?status=${status}`)).text()).not.toContain('class="strip"');
     }
   });
 
-  it("the summary on page 2 still counts the whole queue and names its soonest deadline", async () => {
+  it("the strip on page 2 still counts the whole queue and names its soonest deadline", async () => {
     await seedQueue(51); // the oldest is 60 hours old: 12 hours left
     const body = await (await get("/admin?status=review&page=2")).text();
-    expect(body).toContain("51 haber bekliyor · en yakın süre 11 sa");
+    expect(body).toContain("<dt>Bekleyen</dt><dd>51</dd>");
+    expect(body).toContain('<div class="stat"><dt>İlk süre dolumu</dt><dd>11 sa içinde</dd></div>');
   });
 
   it("a card shows the main source's host, and nothing for a non-http source url", async () => {
@@ -1042,8 +1048,9 @@ describe("feedback and foresight", () => {
     ])
       expect(js).toContain(s);
     expect(js.indexOf("if (!form) return;")).toBeGreaterThan(-1);
-    expect(js.indexOf('addEventListener("keydown"')).toBeGreaterThan(js.indexOf("if (!form) return;"));
-    expect(js.indexOf('addEventListener("keydown"')).toBeGreaterThan(js.indexOf("if (save)"));
+    // The save key's listener is the last keydown listener (the shortcuts' one comes before the form check).
+    expect(js.lastIndexOf('addEventListener("keydown"')).toBeGreaterThan(js.indexOf("if (!form) return;"));
+    expect(js.lastIndexOf('addEventListener("keydown"')).toBeGreaterThan(js.indexOf("if (save)"));
     const uid = await seed();
     const body = await (await get(`/admin/stories/${uid}`)).text();
     expect(body).toMatch(/<button [^>]*id="save-button"[^>]*formaction="[^"]*\/edit"[^>]*>Kaydet<\/button>/);
@@ -1062,9 +1069,11 @@ describe("feedback and foresight", () => {
     expect(await (await get("/admin/nothing")).text()).toContain("<title>(2) Bulunamadı · Radar · Onay</title>");
   });
 
-  it("the empty review queue shows the brand mark", async () => {
+  it("the empty review queue shows the brand mark and an all-done state", async () => {
     const body = await (await get("/admin")).text();
-    expect(body).toMatch(/<div class="empty"><svg class="mark"[^>]*>[\s\S]*?<\/svg><p>Bekleyen haber yok\.<\/p><\/div>/);
+    expect(body).toMatch(
+      /<div class="empty all-done"><svg class="mark"[^>]*>[\s\S]*?<\/svg><p class="empty-title">Hepsi tamam\.<\/p><p>Bekleyen haber yok\.<\/p><p><a href="\/admin\/edition">Bugünkü baskıya bak<\/a><\/p><\/div>/,
+    );
     const other = await (await get("/admin?status=rejected")).text();
     expect(other).toContain('<div class="empty"><p>Bu listede haber yok.</p></div>');
   });
@@ -1113,7 +1122,7 @@ describe("feedback and foresight", () => {
 
   it("Ctrl+S in a field of another form leaves that form alone and keeps the browser default", async () => {
     const js = await (await get("/admin/app.js")).text();
-    const handler = js.slice(js.indexOf('addEventListener("keydown"'));
+    const handler = js.slice(js.lastIndexOf('addEventListener("keydown"'));
     expect(handler).toMatch(/var target = event\.target;\s*if \(target && target\.form && target\.form !== form\) return;/);
     expect(handler.indexOf("target.form !== form")).toBeLessThan(handler.indexOf("preventDefault()"));
   });

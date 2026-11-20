@@ -151,27 +151,94 @@ export async function counts(db: D1Database): Promise<Record<Status, number>> {
 // Rows per queue page.
 export const PAGE_SIZE = 50;
 
+// The queue's search: `q` over the Turkish and English titles, `cat` one known category.
+export interface QueueFilter {
+  q: string;
+  cat: string | null;
+}
+
+export const NO_FILTER: QueueFilter = { q: "", cat: null };
+export const QUERY_MAX = 100;
+
+// Trimmed and cut to QUERY_MAX UTF-16 units, as an input's maxlength counts them, never inside a
+// surrogate pair; an unknown category is no category.
+export function queueFilter(rawQ: string | undefined, rawCat: string | undefined): QueueFilter {
+  const chars = Array.from((rawQ ?? "").trim());
+  let q = "";
+  for (const ch of chars) {
+    if (q.length + ch.length > QUERY_MAX) break;
+    q += ch;
+  }
+  const cat = (CATEGORIES as readonly string[]).find((c) => c === rawCat) ?? null;
+  return { q: q.trim(), cat };
+}
+
+// A LIKE pattern that matches `q` anywhere, with the escape character, % and _ taken literally.
+export const likePattern = (q: string): string => `%${q.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
+
+// D1 refuses a LIKE pattern over 50 bytes; a longer word is matched with instr() instead (also
+// literal, but case-sensitive).
+const LIKE_MAX_BYTES = 50;
+const MAX_TERMS = 10;
+const utf8Length = (value: string): number => new TextEncoder().encode(value).length;
+
+// The WHERE clauses and binds a filter adds to a query over `stories s`. Every word of `q` must
+// appear in the same title, Turkish or English (LIKE ignores case for ASCII letters only).
+function filterSql(f: QueueFilter): { sql: string; binds: unknown[] } {
+  const parts: string[] = [];
+  const binds: unknown[] = [];
+  if (f.cat) {
+    parts.push("AND s.category = ?");
+    binds.push(f.cat);
+  }
+  const terms = f.q.split(/\s+/).filter((t) => t !== "").slice(0, MAX_TERMS);
+  if (terms.length > 0) {
+    const tests = terms.map((term) => {
+      const like = likePattern(term);
+      if (utf8Length(like) <= LIKE_MAX_BYTES) {
+        binds.push(like);
+        return "f.title LIKE ? ESCAPE '\\'";
+      }
+      binds.push(term);
+      return "instr(f.title, ?) > 0";
+    });
+    parts.push(`AND EXISTS (SELECT 1 FROM story_texts f WHERE f.story_uid = s.uid AND ${tests.join(" AND ")})`);
+  }
+  return { sql: parts.join(" "), binds };
+}
+
+export async function countStories(db: D1Database, status: Status, filter: QueueFilter): Promise<number> {
+  const f = filterSql(filter);
+  const row = await db
+    .prepare(`SELECT COUNT(*) AS n FROM stories s WHERE s.status = ? ${f.sql}`)
+    .bind(status, ...f.binds)
+    .first<{ n: number }>();
+  return row?.n ?? 0;
+}
+
 export async function listStories(
   db: D1Database,
   status: Status,
   limit = PAGE_SIZE,
   offset = 0,
+  filter: QueueFilter = NO_FILTER,
 ): Promise<StorySummary[]> {
   const order =
     status === "review"
       ? "s.created_at ASC, s.uid ASC"
       : "COALESCE(s.decided_at, s.published_at, s.created_at) DESC, s.uid ASC";
+  const f = filterSql(filter);
   const { results } = await db
     .prepare(
       `SELECT s.uid, s.category, s.status, s.publish_mode, s.reasons, s.source_url, s.source_count, s.edited,
               s.created_at, t.title AS title_tr
          FROM stories s
          LEFT JOIN story_texts t ON t.story_uid = s.uid AND t.lang = 'tr'
-        WHERE s.status = ?
+        WHERE s.status = ? ${f.sql}
         ORDER BY ${order}
         LIMIT ? OFFSET ?`,
     )
-    .bind(status, limit, offset)
+    .bind(status, ...f.binds, limit, offset)
     .all<Row & { title_tr: string }>();
   return results.map((r) => ({
     uid: r.uid,
@@ -446,6 +513,162 @@ export async function unpublishStory(
     note: trimmed,
     at: now.toISOString(),
   });
+}
+
+// Undoes a rejection (a take-down included): the story goes back to the review queue with the
+// expiry it always had, so a story whose 72 hours have passed is refused and stays rejected.
+export async function restoreStory(
+  db: D1Database,
+  uid: string,
+  version: number,
+  actor: string,
+  now: Date,
+): Promise<Result> {
+  const pre = await precheck(db, uid, version, ["rejected"]);
+  if (!pre.row) return pre.result!;
+  if (now.getTime() - Date.parse(pre.row.created_at) >= TTL_MS) return fail("expired");
+  return runTransition(db, {
+    uid,
+    version,
+    from: ["rejected"],
+    to: "review",
+    decided: false,
+    set: { sql: "decided_at = NULL", binds: [] },
+    action: "restored",
+    actor,
+    note: null,
+    at: now.toISOString(),
+  });
+}
+
+// Whether a rejected story can still go back to the queue at `now`.
+export const restorable = (s: { status: Status; created_at: string }, now: Date): boolean =>
+  s.status === "rejected" && now.getTime() - Date.parse(s.created_at) < TTL_MS;
+
+// The review story to show after a decision on the story that stood at `after`: the next one in
+// queue order, or else the first of the queue (stories skipped earlier); null when none waits.
+// Stories past their window are expired first, as opening the queue does.
+export async function nextInQueue(
+  db: D1Database,
+  after: { created_at: string; uid: string },
+  now: Date,
+): Promise<string | null> {
+  await expireStale(db, now);
+  const next = await db
+    .prepare(
+      `SELECT uid FROM stories WHERE status = 'review' AND (created_at > ? OR (created_at = ? AND uid > ?))
+        ORDER BY created_at ASC, uid ASC LIMIT 1`,
+    )
+    .bind(after.created_at, after.created_at, after.uid)
+    .first<{ uid: string }>();
+  if (next) return next.uid;
+  const first = await db
+    .prepare("SELECT uid FROM stories WHERE status = 'review' ORDER BY created_at ASC, uid ASC LIMIT 1")
+    .first<{ uid: string }>();
+  return first?.uid ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Today's edition, the queue's numbers, a story's place in its list
+// ---------------------------------------------------------------------------
+
+export type Tab = Status | "edition";
+
+const ISTANBUL_OFFSET_MS = 3 * 60 * 60 * 1000; // UTC+3 all year
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// Today in Istanbul as a half-open UTC range of ISO strings.
+export function istanbulDay(now: Date): { start: string; end: string } {
+  const start = Math.floor((now.getTime() + ISTANBUL_OFFSET_MS) / DAY_MS) * DAY_MS - ISTANBUL_OFFSET_MS;
+  return { start: new Date(start).toISOString(), end: new Date(start + DAY_MS).toISOString() };
+}
+
+export interface EditionRow {
+  uid: string;
+  category: string;
+  title_tr: string;
+  published_at: string;
+  version: number;
+  publish_mode: "auto" | "human" | null;
+}
+
+// The stories published today, in the public endpoint's order (published_at newest first, then uid).
+export async function listEdition(db: D1Database, now: Date): Promise<EditionRow[]> {
+  const day = istanbulDay(now);
+  const { results } = await db
+    .prepare(
+      `SELECT s.uid, s.category, s.published_at, s.version, s.publish_mode, t.title AS title_tr
+         FROM stories s
+         LEFT JOIN story_texts t ON t.story_uid = s.uid AND t.lang = 'tr'
+        WHERE s.status = 'published' AND s.published_at >= ? AND s.published_at < ?
+        ORDER BY s.published_at DESC, s.uid ASC`,
+    )
+    .bind(day.start, day.end)
+    .all<EditionRow>();
+  return results.map((r) => ({ ...r, title_tr: r.title_tr ?? "" }));
+}
+
+export async function publishedToday(db: D1Database, now: Date): Promise<number> {
+  const day = istanbulDay(now);
+  const row = await db
+    .prepare("SELECT COUNT(*) AS n FROM stories WHERE status = 'published' AND published_at >= ? AND published_at < ?")
+    .bind(day.start, day.end)
+    .first<{ n: number }>();
+  return row?.n ?? 0;
+}
+
+// A tab's rows and their order, as the queue and the edition list them. Only constants go into SQL.
+function tabScope(tab: Tab, now: Date): { where: string; binds: unknown[]; key: string; desc: boolean } {
+  if (tab === "review") return { where: "s.status = 'review'", binds: [], key: "s.created_at", desc: false };
+  if (tab === "edition") {
+    const day = istanbulDay(now);
+    return {
+      where: "s.status = 'published' AND s.published_at >= ? AND s.published_at < ?",
+      binds: [day.start, day.end],
+      key: "s.published_at",
+      desc: true,
+    };
+  }
+  return { where: "s.status = ?", binds: [tab], key: "COALESCE(s.decided_at, s.published_at, s.created_at)", desc: true };
+}
+
+export interface Position {
+  index: number; // 1-based
+  total: number;
+  prev: string | null;
+  next: string | null;
+}
+
+// Where a story stands in a tab's order; null when it is not in that tab.
+export async function storyPosition(db: D1Database, uid: string, tab: Tab, now: Date): Promise<Position | null> {
+  const t = tabScope(tab, now);
+  const own = await db
+    .prepare(`SELECT ${t.key} AS k FROM stories s WHERE s.uid = ? AND ${t.where}`)
+    .bind(uid, ...t.binds)
+    .first<{ k: string }>();
+  if (!own) return null;
+  const k = t.key;
+  const before = t.desc ? `(${k} > ? OR (${k} = ? AND s.uid < ?))` : `(${k} < ? OR (${k} = ? AND s.uid < ?))`;
+  const after = t.desc ? `(${k} < ? OR (${k} = ? AND s.uid > ?))` : `(${k} > ? OR (${k} = ? AND s.uid > ?))`;
+  const forward = t.desc ? `${k} DESC, s.uid ASC` : `${k} ASC, s.uid ASC`;
+  const backward = t.desc ? `${k} ASC, s.uid DESC` : `${k} DESC, s.uid DESC`;
+  const at = [own.k, own.k, uid];
+  const [total, ahead, prev, next] = await db.batch<{ n?: number; uid?: string }>([
+    db.prepare(`SELECT COUNT(*) AS n FROM stories s WHERE ${t.where}`).bind(...t.binds),
+    db.prepare(`SELECT COUNT(*) AS n FROM stories s WHERE ${t.where} AND ${before}`).bind(...t.binds, ...at),
+    db
+      .prepare(`SELECT s.uid FROM stories s WHERE ${t.where} AND ${before} ORDER BY ${backward} LIMIT 1`)
+      .bind(...t.binds, ...at),
+    db
+      .prepare(`SELECT s.uid FROM stories s WHERE ${t.where} AND ${after} ORDER BY ${forward} LIMIT 1`)
+      .bind(...t.binds, ...at),
+  ]);
+  return {
+    index: (ahead?.results[0]?.n ?? 0) + 1,
+    total: total?.results[0]?.n ?? 0,
+    prev: prev?.results[0]?.uid ?? null,
+    next: next?.results[0]?.uid ?? null,
+  };
 }
 
 // ---------------------------------------------------------------------------

@@ -90,9 +90,9 @@ p { margin: 0; }
 .brand-suffix { color: var(--muted); font-weight: 500; }
 .who { flex-basis: 100%; padding-bottom: var(--space-2); overflow-wrap: anywhere; }
 
-/* Tabs */
+/* Tabs: one scrolling row on a phone, wrapped from 40rem. */
 .tabs {
-  display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-2);
+  display: flex; gap: var(--space-2);
   list-style: none; margin: var(--space-4) 0 var(--space-5); padding: 0;
 }
 .tabs a {
@@ -118,6 +118,8 @@ p { margin: 0; }
   border: 1px dashed var(--control-border); border-radius: 0.75rem;
 }
 .empty .mark { display: block; width: 28px; height: 28px; margin: 0 auto var(--space-3); }
+.empty-title { margin-bottom: var(--space-1); color: var(--ink); font-size: var(--text-lg); font-weight: 700; }
+.empty a { display: inline-flex; align-items: center; min-height: var(--tap); color: var(--ink); font-weight: 600; }
 
 /* Queue */
 .cards { display: grid; gap: var(--space-3); list-style: none; margin: 0; padding: 0; }
@@ -147,7 +149,48 @@ p { margin: 0; }
   .card-title a:focus-visible { outline: none; }
   .card:has(.card-title a:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 }
-.queue-summary { margin-bottom: var(--space-3); color: var(--muted); font-size: var(--text-sm); }
+/* A waiting story with under six hours left: the warn colour on its edge as well as its chip. */
+.card:has(.chip.warn) { border-left: 3px solid var(--warn); }
+/* The row j and k have moved to. */
+.card.is-selected { border-color: var(--ink); outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Status strip */
+.strip-wrap { margin-top: 0; }
+.strip { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin: 0 0 var(--space-4); }
+.stat { min-width: 0; padding: var(--space-3); background: var(--surface); border: 1px solid var(--line); border-radius: 0.75rem; }
+.stat dt { color: var(--muted); font-size: var(--text-sm); }
+.stat dd { margin: 0; font-size: var(--text-lg); font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.stat.warn-stat { background: var(--warn-soft); border-color: var(--warn-soft); }
+.stat.warn-stat dd { color: var(--warn); }
+
+/* Search and category chips */
+.search { margin-bottom: var(--space-3); }
+.search-row { display: flex; gap: var(--space-2); }
+.search-row input { flex: 1; min-width: 0; }
+.search-row button { flex: none; }
+.filter-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); list-style: none; margin: 0 0 var(--space-4); padding: 0; }
+.chip-link {
+  display: inline-flex; align-items: center; min-height: 2.25rem; padding: 0 var(--space-3);
+  background: var(--chip); color: var(--ink); border: 1px solid transparent; border-radius: 999px;
+  font-size: var(--text-sm); font-weight: 500; text-decoration: none; transition: border-color 120ms ease;
+}
+.chip-link:hover { border-color: var(--control-border); }
+.chip-link[aria-current="true"] { background: var(--ink); border-color: var(--ink); color: var(--surface); font-weight: 600; }
+.results { margin: calc(-1 * var(--space-2)) 0 var(--space-3); color: var(--muted); font-size: var(--text-sm); }
+.results strong { color: var(--ink); font-weight: 600; }
+.clear { display: inline-flex; align-items: center; min-height: var(--tap); margin-left: var(--space-2); color: var(--ink); font-weight: 600; }
+
+/* Today's edition */
+.page-title { font-size: var(--text-xl); font-weight: 700; letter-spacing: -0.01em; }
+.page-date { color: var(--muted); font-weight: 500; }
+.page-intro { margin: var(--space-1) 0 var(--space-4); }
+.edition-row .takedown { position: relative; z-index: 1; margin-top: var(--space-2); }
+.takedown summary {
+  display: inline-flex; align-items: center; min-height: var(--tap); cursor: pointer;
+  color: var(--danger); font-size: var(--text-sm); font-weight: 600;
+}
+.takedown[open] { padding: 0 var(--space-3) var(--space-3); background: var(--danger-soft); border-radius: var(--radius); }
+.takedown .danger { background: var(--surface); }
 .reasons { list-style: none; margin: 0; padding: 0; overflow-wrap: anywhere; }
 .reasons li + li { margin-top: var(--space-2); }
 .reasons .chip { margin-right: var(--space-1); }
@@ -166,6 +209,20 @@ p { margin: 0; }
 /* Story: one column below 64rem; the side column's sections fall into the page order. */
 .back { margin: calc(-1 * var(--space-2)) 0 var(--space-2); }
 .back a { display: inline-flex; align-items: center; min-height: var(--tap); color: var(--muted); }
+/* Back to the list, then the story's place in it with the stories either side. */
+.story-top {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 0 var(--space-3); margin: calc(-1 * var(--space-2)) 0 var(--space-2);
+}
+.story-top .back { margin: 0; }
+.story-nav { display: flex; align-items: center; gap: var(--space-1); margin-left: auto; }
+.nav-link {
+  display: inline-flex; align-items: center; min-height: var(--tap); padding: 0 var(--space-3);
+  background: var(--chip); border: 1px solid transparent; border-radius: 999px;
+  font-size: var(--text-sm); font-weight: 600; text-decoration: none; white-space: nowrap; transition: border-color 120ms ease;
+}
+.nav-link:hover { border-color: var(--control-border); }
+.nav-pos { padding: 0 var(--space-2); color: var(--muted); font-size: var(--text-sm); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .story { display: flex; flex-direction: column; gap: var(--space-4); }
 .story-side { display: contents; }
 .story-main { display: contents; }
@@ -218,7 +275,7 @@ fieldset.lang-group { margin: 0; min-width: 0; }
 .lang-group legend { float: left; width: 100%; padding: 0; font-size: var(--text-lg); margin-bottom: var(--space-3); }
 .lang-group legend + * { clear: both; }
 .lang-group .field + .field { margin-top: var(--space-4); }
-input[type="url"], select, textarea {
+input[type="url"], input[type="search"], select, textarea {
   display: block; width: 100%; min-height: var(--tap); padding: var(--space-2) var(--space-3);
   font: inherit; color: var(--ink); background: var(--surface);
   border: 1px solid var(--control-border); border-radius: var(--radius);
@@ -226,7 +283,8 @@ input[type="url"], select, textarea {
 textarea { resize: vertical; line-height: 1.5; }
 input:focus-visible, select:focus-visible, textarea:focus-visible { border-color: var(--accent); }
 .counter { text-align: right; margin-top: var(--space-1); font-variant-numeric: tabular-nums; }
-.counter.warn { color: var(--warn); }
+/* Over the limit: the danger colour; the server still decides. */
+.counter.over { color: var(--danger); font-weight: 600; }
 .hint { margin-top: var(--space-1); }
 .check { display: flex; align-items: center; gap: var(--space-3); min-height: var(--tap); }
 .check input { width: 1.375rem; height: 1.375rem; margin: 0; accent-color: var(--ink); flex: none; }
@@ -260,17 +318,68 @@ button:hover { border-color: var(--ink); }
 .bar-buttons button { width: 100%; padding: 0 var(--space-3); }
 .bar-buttons button:only-child { grid-column: 1 / -1; }
 
-/* Reject and take-down */
+/* Footer: the keyboard hint, shown by the script when the shortcut sheet can open. */
+.foot { padding-bottom: var(--space-5); }
+.kbd-hint {
+  min-height: 2rem; padding: 0 var(--space-3); font-size: var(--text-sm); font-weight: 500;
+  color: var(--muted); background: transparent; border-color: var(--line);
+}
+.kbd-hint[hidden] { display: none; }
+kbd {
+  display: inline-block; min-width: 1.5em; padding: 0.0625rem 0.375rem; text-align: center;
+  font: 600 0.8125rem / 1.4 var(--font); color: var(--ink); background: var(--surface);
+  border: 1px solid var(--control-border); border-bottom-width: 2px; border-radius: 0.25rem;
+}
+.sheet {
+  width: min(28rem, calc(100% - 2 * var(--space-4))); padding: var(--space-5);
+  color: var(--ink); background: var(--surface); border: 1px solid var(--ink); border-radius: 0.75rem;
+}
+.sheet::backdrop { background: rgb(23 24 26 / 0.4); }
+.sheet h2 { margin-bottom: var(--space-3); color: var(--ink); font-size: var(--text-lg); letter-spacing: 0; }
+.keys { display: grid; grid-template-columns: max-content 1fr; gap: var(--space-2) var(--space-4); margin: 0 0 var(--space-3); }
+.keys dt { white-space: nowrap; }
+.keys dd { margin: 0; }
+.sheet .actions { margin-top: var(--space-4); justify-content: flex-end; }
+
+/* Reject, take-down and restore */
 .danger-card { padding: var(--space-4); background: var(--danger-soft); border-radius: 0.75rem; }
 .danger-card h2 { color: var(--danger); }
 .danger-card .danger { background: var(--surface); }
 .danger:hover, .danger-card .danger:hover { background: var(--danger); color: var(--surface); }
 
+/* Up to 40rem (640 px): the tabs scroll sideways; the decision bar is fixed to the bottom of the
+   screen, with large targets and room kept under the page so it never covers the last field. */
+@media (max-width: 40rem) {
+  .tabs {
+    flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
+    margin-left: calc(-1 * var(--space-4)); margin-right: calc(-1 * var(--space-4)); padding: 0 var(--space-4);
+  }
+  .tabs::-webkit-scrollbar, .filter-chips::-webkit-scrollbar { display: none; }
+  .tabs li, .filter-chips li { flex: none; }
+  .filter-chips {
+    flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
+    margin-left: calc(-1 * var(--space-4)); margin-right: calc(-1 * var(--space-4)); padding: 0 var(--space-4);
+  }
+  .tabs { margin-bottom: var(--space-4); }
+  .stat { padding: var(--space-2) var(--space-3); }
+  .stat dd { font-size: var(--text-md); }
+  .action-bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; margin: 0;
+    padding: var(--space-2) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+  }
+  .bar-buttons button { min-height: 3rem; }
+  body:has(.action-bar) { padding-bottom: 11rem; }
+  html:has(.action-bar) { scroll-padding-bottom: 11.5rem; }
+  .card { padding: var(--space-4) var(--space-4) var(--space-5); }
+  .foot { display: none; }
+}
+
 @media (min-width: 40rem) {
   html { scroll-padding-top: 4.5rem; }
   html:has(.action-bar) { scroll-padding-bottom: 5.5rem; }
   .who { flex-basis: auto; padding-bottom: 0; }
-  .tabs { display: flex; flex-wrap: wrap; }
+  .tabs { flex-wrap: wrap; }
+  .strip { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .primary { width: auto; }
   .action-bar { flex-direction: row; align-items: center; justify-content: space-between; flex-wrap: wrap; column-gap: var(--space-4); }
   .source-link { margin-left: 0; }
@@ -301,8 +410,8 @@ button:hover { border-color: var(--ink); }
 }
 `;
 
-// Live counters, the unsaved-changes notice, the live preview and the save key. The page works
-// without it; the server enforces every limit.
+// Live counters, the keyboard shortcuts, the unsaved-changes notice, the live preview and the save
+// key. The page works without it; the server enforces every limit.
 export const JS = `"use strict";
 document.addEventListener("DOMContentLoaded", function () {
   // A confirmation is shown once: the done hint leaves the address, so a refresh does not repeat it.
@@ -315,18 +424,102 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
-  var fields = document.querySelectorAll("textarea[data-limit]");
+  // Counted as the server counts (trimmed). Over the limit the counter turns red; no button is
+  // switched off, since the server is the judge.
+  var fields = document.querySelectorAll("[data-limit]");
   Array.prototype.forEach.call(fields, function (field) {
     var limit = Number(field.getAttribute("data-limit"));
     var counter = document.getElementById(field.id + "_count");
     if (!counter || !limit) return;
     var update = function () {
-      var n = field.value.length;
+      var n = field.value.trim().length;
       counter.textContent = n + " / " + limit;
-      counter.classList.toggle("warn", n > limit);
+      counter.classList.toggle("over", n > limit);
     };
     field.addEventListener("input", update);
     update();
+  });
+
+  // Keyboard shortcuts. None of them sends a form: "a" and "r" only move the focus, so a decision
+  // still needs its own Enter or click. Ignored while typing in a field and with Ctrl, Cmd or Alt
+  // held; Shift only for "?", which most keyboards need it for.
+  var sheet = document.getElementById("shortcuts");
+  var canShow = !!sheet && typeof sheet.showModal === "function";
+  var toggleSheet = function () {
+    if (!canShow) return;
+    if (sheet.open) sheet.close();
+    else sheet.showModal();
+  };
+  var opener = document.getElementById("shortcuts-open");
+  if (opener && canShow) {
+    opener.hidden = false;
+    opener.addEventListener("click", toggleSheet);
+  }
+  var closer = document.getElementById("shortcuts-close");
+  if (closer && canShow) closer.addEventListener("click", function () { sheet.close(); });
+
+  // On a phone the tabs and the category chips scroll sideways: bring the current one into view
+  // (sideways only, so a restored page position is left alone).
+  var marked = document.querySelectorAll('.tabs [aria-current="page"], .filter-chips [aria-current]');
+  Array.prototype.forEach.call(marked, function (el) {
+    var row = el.closest ? el.closest("ul") : null;
+    if (!row || row.scrollWidth <= row.clientWidth) return;
+    var shift = el.getBoundingClientRect().right - row.getBoundingClientRect().right;
+    if (shift > 0) row.scrollLeft += shift + 16;
+  });
+
+  var rows = document.querySelectorAll(".cards > .card");
+  var current = -1;
+  var rowLink = function (row) { return row ? row.querySelector(".card-title a") : null; };
+  var select = function (index) {
+    if (rows.length === 0) return false;
+    var next = Math.max(0, Math.min(rows.length - 1, index));
+    if (current >= 0 && rows[current]) rows[current].classList.remove("is-selected");
+    current = next;
+    rows[current].classList.add("is-selected");
+    var link = rowLink(rows[current]);
+    if (link) link.focus();
+    return true;
+  };
+  var typing = function (el) {
+    if (!el || typeof el.tagName !== "string") return false;
+    var tag = el.tagName.toLowerCase();
+    return tag === "input" || tag === "textarea" || tag === "select" || el.isContentEditable === true;
+  };
+  var go = function (link) {
+    if (link) link.click();
+    return !!link;
+  };
+  var focusOn = function (id) {
+    var el = document.getElementById(id);
+    if (el) el.focus();
+    return !!el;
+  };
+  document.addEventListener("keydown", function (event) {
+    if (event.ctrlKey || event.metaKey || event.altKey || event.isComposing) return;
+    var target = event.target;
+    if (typing(target)) return;
+    var key = event.key;
+    if (key === "?") {
+      if (canShow) {
+        event.preventDefault();
+        toggleSheet();
+      }
+      return;
+    }
+    if (event.shiftKey || (canShow && sheet.open)) return;
+    var handled = false;
+    if (key === "j") handled = select(current + 1);
+    else if (key === "k") handled = select(current < 0 ? 0 : current - 1);
+    else if (key === "Enter") {
+      // On the selected row's link the browser follows it itself; from nowhere in particular, here.
+      var onPage = !target || target === document.body || target === document.documentElement;
+      if (onPage && current >= 0) handled = go(rowLink(rows[current]));
+    }
+    else if ((key === "n" || key === "p") && !event.repeat) handled = go(document.getElementById(key === "n" ? "story-next" : "story-prev"));
+    else if (key === "a") handled = focusOn("approve-button");
+    else if (key === "r") handled = focusOn("reject_note");
+    if (handled) event.preventDefault();
   });
 
   var form = document.getElementById("story-form");

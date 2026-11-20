@@ -10,21 +10,31 @@ import type { Lang, Status } from "./schema";
 import {
   approveStory,
   counts,
+  countStories,
   editStory,
   expireStale,
   getStory,
+  listEdition,
   listStories,
+  nextInQueue,
   PAGE_SIZE,
+  publishedToday,
+  queueFilter,
   rejectStory,
+  restoreStory,
+  storyPosition,
   unpublishStory,
   type EditPatch,
   type Failure,
+  type QueueFilter,
   type Result,
   type StoryFull,
+  type Tab,
 } from "./stories";
 import { CSS, JS } from "./views/assets";
-import { STATUSES, layout, storyPath, type View } from "./views/layout";
-import { queueView, type QueueSummary } from "./views/queue";
+import { editionView } from "./views/edition";
+import { STATUSES, formatDay, layout, listHref, storyPath, type View } from "./views/layout";
+import { queueView, type QueueStrip } from "./views/queue";
 import { draftFrom, notFoundView, storyView, type Draft } from "./views/story";
 
 type AppEnv = { Bindings: Env; Variables: { identity: Identity } };
@@ -69,7 +79,7 @@ app.get("/admin/app.css", (c) => c.body(CSS, 200, { "Content-Type": "text/css; c
 app.get("/admin/app.js", (c) => c.body(JS, 200, { "Content-Type": "text/javascript; charset=utf-8" }));
 
 // The confirmations a redirect may ask for with ?done=; any other value says nothing.
-const DONE = ["saved", "approved", "rejected", "unpublished"] as const;
+const DONE = ["saved", "approved", "rejected", "unpublished", "restored", "next_approved", "next_rejected"] as const;
 type Done = (typeof DONE)[number];
 
 function doneMessage(c: Ctx): string | undefined {
@@ -84,15 +94,19 @@ async function page(
   c: Ctx,
   p: {
     title: string;
-    active: Status | null;
+    active: Tab | null;
     body: View;
     message?: string;
     done?: string | undefined;
     counts?: Record<Status, number>;
+    today?: number;
+    filter?: QueueFilter;
   },
   status: ContentfulStatusCode = 200,
 ): Promise<Response> {
-  const shell = layout({ ...p, email: c.get("identity").email, counts: p.counts ?? (await counts(c.env.DB)) });
+  const all = p.counts ?? (await counts(c.env.DB));
+  const edition = p.today ?? (await publishedToday(c.env.DB, new Date()));
+  const shell = layout({ ...p, email: c.get("identity").email, counts: { ...all, edition } });
   return c.html(shell, status);
 }
 
@@ -105,26 +119,43 @@ function pageNumber(raw: string | undefined): number {
   return n <= MAX_PAGE ? n : 1;
 }
 
+// ?q= and ?cat= of the queue's search, validated (see queueFilter).
+const filterOf = (c: Ctx): QueueFilter => queueFilter(c.req.query("q"), c.req.query("cat"));
+
 app.get("/admin", async (c) => {
   const asked = c.req.query("status");
   const status: Status = STATUSES.find((s) => s === asked) ?? "review";
   const current = pageNumber(c.req.query("page"));
+  const filter = filterOf(c);
+  const filtered = filter.q !== "" || filter.cat !== null;
   const now = new Date();
   await expireStale(c.env.DB, now);
   // One row more than a page tells whether a next page exists.
-  const rows = await listStories(c.env.DB, status, PAGE_SIZE + 1, (current - 1) * PAGE_SIZE);
+  const rows = await listStories(c.env.DB, status, PAGE_SIZE + 1, (current - 1) * PAGE_SIZE, filter);
   const all = await counts(c.env.DB);
-  let summary: QueueSummary | null = null;
-  if (status === "review" && rows.length > 0) {
-    // The review queue is ordered oldest first, so its first story expires soonest.
-    const first = current === 1 ? rows[0] : (await listStories(c.env.DB, "review", 1, 0))[0];
-    if (first) summary = { count: all.review, soonestExpiry: first.expires_at };
+  const today = await publishedToday(c.env.DB, now);
+  let strip: QueueStrip | null = null;
+  if (status === "review") {
+    // The whole queue, whatever the search: oldest first, so its first story also expires soonest.
+    const first = (await listStories(c.env.DB, "review", 1, 0))[0];
+    strip = { waiting: all.review, today, oldest: first ? { created_at: first.created_at, expires_at: first.expires_at } : null };
   }
-  const body = queueView(status, rows.slice(0, PAGE_SIZE), now, { current, hasMore: rows.length > PAGE_SIZE }, summary);
-  return page(c, { title: COPY.tabs[status], active: status, body, counts: all, done: doneMessage(c) });
+  const total = filtered ? await countStories(c.env.DB, status, filter) : null;
+  const body = queueView(status, rows.slice(0, PAGE_SIZE), now, { current, hasMore: rows.length > PAGE_SIZE }, { filter, total, strip });
+  return page(c, { title: COPY.tabs[status], active: status, body, counts: all, today, filter, done: doneMessage(c) });
+});
+
+app.get("/admin/edition", async (c) => {
+  const now = new Date();
+  const rows = await listEdition(c.env.DB, now);
+  const body = editionView(rows, formatDay(now));
+  return page(c, { title: COPY.editionHeading, active: "edition", body, today: rows.length, filter: filterOf(c), done: doneMessage(c) });
 });
 
 // The story page from a fresh read, optionally with a message and the user's own form values.
+// The list it steps through is today's edition when the page was opened from there
+// (`from=edition`, matched against the known name, never used as an address) and the story is in
+// it; otherwise the tab of the story's own status.
 async function storyPage(
   c: Ctx,
   uid: string,
@@ -132,16 +163,25 @@ async function storyPage(
   message?: string,
   draft?: Draft,
   done?: string,
+  from?: string,
 ): Promise<Response> {
   const story = await getStory(c.env.DB, uid);
   if (!story) return page(c, { title: COPY.notFoundTitle, active: null, body: notFoundView() }, 404);
-  const body = storyView(story, new Date(), draft, draft !== undefined && differs(story, draft));
+  const now = new Date();
+  let tab: Tab = story.status;
+  let position = null;
+  if (from === "edition") {
+    position = await storyPosition(c.env.DB, uid, "edition", now);
+    if (position) tab = "edition";
+  }
+  position ??= await storyPosition(c.env.DB, uid, story.status, now);
+  const body = storyView(story, now, draft, draft !== undefined && differs(story, draft), { tab, position });
   const title = story.texts.tr?.title ?? COPY.notFoundTitle;
-  return page(c, { title, active: story.status, body, done, ...(message ? { message } : {}) }, status);
+  return page(c, { title, active: tab, body, done, ...(message ? { message } : {}) }, status);
 }
 
 app.get("/admin/stories/:uid", (c) =>
-  storyPage(c, c.req.param("uid"), 200, undefined, undefined, doneMessage(c)),
+  storyPage(c, c.req.param("uid"), 200, undefined, undefined, doneMessage(c), c.req.query("from")),
 );
 
 interface Form {
@@ -236,6 +276,16 @@ function afterResult(
 
 const badRequest = (c: Ctx) => c.text(COPY.badRequest, 400);
 
+// After an approval or a rejection: the next story waiting in the queue (in queue order, after the
+// one just decided), or the queue itself, which then shows its all-done state. Built from a uid
+// read from the database and fixed paths only.
+async function afterDecision(c: Ctx, uid: string, kind: "approved" | "rejected"): Promise<string> {
+  const decided = await getStory(c.env.DB, uid);
+  const next = decided ? await nextInQueue(c.env.DB, { created_at: decided.created_at, uid }, new Date()) : null;
+  if (!next) return withDone("/admin", kind);
+  return withDone(storyPath(next), kind === "approved" ? "next_approved" : "next_rejected");
+}
+
 app.post("/admin/stories/:uid/edit", async (c) => {
   const uid = c.req.param("uid");
   const form = await readForm(c.req.raw);
@@ -277,8 +327,11 @@ app.post("/admin/stories/:uid/approve", async (c) => {
     }
   }
   const result = await approveStory(c.env.DB, uid, version, actor, new Date());
-  if (result.ok) notifySite(c.env, waiter(c));
-  if (result.ok || !saved) return afterResult(c, uid, result, withDone("/admin", "approved"), draft, ["review"]);
+  if (result.ok) {
+    notifySite(c.env, waiter(c));
+    return c.redirect(await afterDecision(c, uid, "approved"), 303);
+  }
+  if (!saved) return afterResult(c, uid, result, "/admin", draft, ["review"]);
   const message = `${COPY.savedNotApproved} ${failureMessage(result.error, result.detail)}`;
   return storyPage(c, uid, FAILURE_STATUS[result.error], message);
 });
@@ -296,7 +349,8 @@ app.post("/admin/stories/:uid/reject", async (c) => {
     c.get("identity").email,
     new Date(),
   );
-  return afterResult(c, uid, result, withDone("/admin", "rejected"));
+  if (result.ok) return c.redirect(await afterDecision(c, uid, "rejected"), 303);
+  return afterResult(c, uid, result, "/admin");
 });
 
 app.post("/admin/stories/:uid/unpublish", async (c) => {
@@ -312,7 +366,19 @@ app.post("/admin/stories/:uid/unpublish", async (c) => {
     new Date(),
   );
   if (result.ok) notifySite(c.env, waiter(c));
-  return afterResult(c, uid, result, withDone(storyPath(uid), "unpublished"));
+  // From today's edition the answer goes back there; `from` is compared with the one known name.
+  const back = form.text("from") === "edition" ? listHref("edition") : storyPath(uid);
+  return afterResult(c, uid, result, withDone(back, "unpublished"));
+});
+
+// "Geri al": a rejected story goes back to the queue, while its 72 hours last.
+app.post("/admin/stories/:uid/restore", async (c) => {
+  const uid = c.req.param("uid");
+  const form = await readForm(c.req.raw);
+  if (!form) return badRequest(c);
+  const result = await restoreStory(c.env.DB, uid, form.version, c.get("identity").email, new Date());
+  if (!result.ok && result.error === "expired") return storyPage(c, uid, FAILURE_STATUS.expired, COPY.restoreExpired);
+  return afterResult(c, uid, result, withDone(storyPath(uid), "restored"));
 });
 
 // Any other path under /admin: the not-found page, reached only after the middleware signed the user in.

@@ -1,5 +1,5 @@
 // Every piece of Turkish text on the admin screen lives here.
-import type { Failure } from "./stories";
+import type { Failure, Tab } from "./stories";
 import type { Lang, RISK_FLAGS, Status } from "./schema";
 
 export const COPY = {
@@ -11,7 +11,8 @@ export const COPY = {
     published: "Yayında",
     rejected: "Reddedilen",
     expired: "Süresi dolan",
-  } satisfies Record<Status, string>,
+    edition: "Bugün",
+  } satisfies Record<Tab, string>,
   statusLine: {
     review: "Onay bekliyor",
     published: "Yayında",
@@ -33,6 +34,9 @@ export const COPY = {
 
   queueHeading: "Haber kuyruğu",
   emptyReview: "Bekleyen haber yok.",
+  emptyReviewTitle: "Hepsi tamam.",
+  emptyToEdition: "Bugünkü baskıya bak",
+  emptyFiltered: "Aramaya uyan haber yok.",
   emptyOther: "Bu listede haber yok.",
   nextPage: "Sonraki sayfa",
   prevPage: "Önceki sayfa",
@@ -79,6 +83,7 @@ export const COPY = {
     rejected: "Reddedildi",
     unpublished: "Yayından kaldırıldı",
     expired: "Süresi doldu",
+    restored: "Kuyruğa döndürüldü",
   } as Record<string, string>,
   actors: { agent: "ajan", system: "sistem" } as Record<string, string>,
 
@@ -117,8 +122,64 @@ export const COPY = {
     approved: "Haber yayınlandı.",
     rejected: "Haber reddedildi.",
     unpublished: "Haber yayından kaldırıldı.",
+    restored: "Haber kuyruğa döndü.",
+    next_approved: "Onaylandı. Sıradaki haber.",
+    next_rejected: "Reddedildi. Sıradaki haber.",
   },
   previewHeading: "Sitede görünüm",
+
+  // The queue's search and category chips.
+  searchLabel: "Başlıkta ara",
+  searchPlaceholder: "Türkçe ya da İngilizce başlık",
+  searchButton: "Ara",
+  categoryFilter: "Kategoriye göre süz",
+  allCategories: "Tümü",
+  clearFilter: "Temizle",
+  results: (n: number) => `${n} sonuç`,
+
+  // The status strip over the review queue.
+  stripLabel: "Kuyruğun durumu",
+  stripWaiting: "Bekleyen",
+  stripToday: "Bugün yayınlanan",
+  stripOldest: "En eski bekleyen",
+  stripNextExpiry: "İlk süre dolumu",
+  stripNone: "—",
+  ago: (d: string) => `${d} önce`,
+  within: (d: string) => `${d} içinde`,
+
+  // Moving between stories.
+  storyNav: "Haberler arasında",
+  position: "Sıra",
+  prevStory: "← Önceki",
+  nextStory: "Sonraki →",
+  backToEdition: "Bugünkü baskıya dön",
+
+  // Undoing a rejection.
+  restoreHeading: "Geri al",
+  restore: "Geri al: kuyruğa döndür",
+  restoreNote: "Haber bekleyen listesine döner; kalan süresi değişmez.",
+  restoreExpired: "Geri alınamaz: haberin 72 saatlik inceleme süresi doldu.",
+
+  // Today's edition.
+  editionHeading: "Bugünkü baskı",
+  editionIntro: "Bugün yayınlanan haberler, sitede görünecekleri sırayla.",
+  editionEmpty: "Bugün henüz yayınlanan haber yok.",
+  editionTakeDown: "Yayından kaldır…",
+
+  // Keyboard.
+  kbdHint: "Klavye:",
+  shortcutsHeading: "Klavye kısayolları",
+  shortcuts: [
+    [["j", "k"], "Listede aşağı / yukarı"],
+    [["Enter"], "Seçili haberi aç"],
+    [["n", "p"], "Sonraki / önceki haber"],
+    [["a"], "Onay düğmesine git"],
+    [["r"], "Ret notuna git"],
+    [["?"], "Bu listeyi aç / kapat"],
+    [["Esc"], "Kapat"],
+  ] as [string[], string][],
+  shortcutsNote: "Kısayollar karar vermez: onaylamak ya da reddetmek için düğmeye ayrıca bas.",
+  close: "Kapat",
   previewDev: { tr: "Neden önemli", en: "Why it matters" } satisfies Record<Lang, string>,
 };
 
