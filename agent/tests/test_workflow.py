@@ -104,6 +104,7 @@ def test_the_state_file_is_handed_over_as_an_artifact():
         "name": "radar-state",
         "path": "${{ runner.temp }}/state.bin",
         "if-no-files-found": "error",
+        "overwrite": True,  # a re-run of the job replaces its earlier artifact
         "retention-days": 1,
     }
     push_steps = push_job()["steps"]

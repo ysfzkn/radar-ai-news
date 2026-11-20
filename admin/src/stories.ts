@@ -849,12 +849,13 @@ export async function listPublished(
   return { stories, next };
 }
 
-// Expires every review story aged 72 h or more. Idempotent: a second run finds nothing.
+// Expires review stories aged 72 h or more, oldest first, at most 25 a call (one batch each, kept
+// under D1's per-invocation query limit); the next call takes the rest. Idempotent.
 export async function expireStale(db: D1Database, now: Date): Promise<number> {
   const at = now.toISOString();
   const cutoff = new Date(now.getTime() - TTL_MS).toISOString();
   const { results } = await db
-    .prepare("SELECT uid, version FROM stories WHERE status = 'review' AND created_at <= ?")
+    .prepare("SELECT uid, version FROM stories WHERE status = 'review' AND created_at <= ? ORDER BY created_at LIMIT 25")
     .bind(cutoff)
     .all<{ uid: string; version: number }>();
   if (results.length === 0) return 0;

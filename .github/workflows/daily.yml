@@ -126,6 +126,7 @@ jobs:
           name: radar-state
           path: ${{ runner.temp }}/state.bin
           if-no-files-found: error
+          overwrite: true
           retention-days: 1
 
   # The only job with write access. It runs no uv, no dependency and no agent code: a

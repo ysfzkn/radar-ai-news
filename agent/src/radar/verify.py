@@ -180,7 +180,7 @@ _SHOWN = 60  # characters of an offending token quoted in the reason
 # Disguises a reader undoes: evil[.]com, evil(.)com, evil{.}com, evil[dot]com,
 # evil (dot) com, evil dot com, and ideographic full stops.
 _DISGUISED_DOT = re.compile(
-    r"\s*(?:\[\s*(?:\.|dot)\s*\]|\(\s*(?:\.|dot)\s*\)|\{\s*(?:\.|dot)\s*\})\s*"
+    r"[ \t]{0,3}(?:\[\s*(?:\.|dot)\s*\]|\(\s*(?:\.|dot)\s*\)|\{\s*(?:\.|dot)\s*\})[ \t]{0,3}"
     r"|(?<=[^\W_])\s+dot\s+(?=[^\W_])",
     re.IGNORECASE,
 )
