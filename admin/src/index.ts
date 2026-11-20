@@ -42,7 +42,7 @@ const SECURITY_HEADERS: Record<string, string> = {
     "default-src 'none'; style-src 'self'; script-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
   "Cache-Control": "no-store",
   "X-Content-Type-Options": "nosniff",
-  "Referrer-Policy": "no-referrer",
+  "Referrer-Policy": "same-origin",
 };
 
 function secure(res: Response): Response {
@@ -205,7 +205,8 @@ app.post("/admin/stories/:uid/approve", async (c) => {
   let saved = false;
   if (draft) {
     const story = await getStory(c.env.DB, uid);
-    if (story && differs(story, draft)) {
+    // Only a story in review is saved here; any other status goes straight to approveStory, which refuses it.
+    if (story?.status === "review" && differs(story, draft)) {
       const edited = await editStory(c.env.DB, uid, version, patchOf(draft), actor, new Date());
       if (!edited.ok) return afterResult(c, uid, edited, "/admin", draft);
       version += 1;

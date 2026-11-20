@@ -206,6 +206,15 @@ describe("admin screen", () => {
     expect(s).toMatchObject({ status: "review", version: 1 });
   });
 
+  it("refuses a POST whose Origin is the string null (a no-referrer form) and changes nothing", async () => {
+    const uid = await seed();
+    const res = await post(`/admin/stories/${uid}/approve`, { version: "1", checked: "on" }, "null");
+    expect(res.status).toBe(403);
+    const s = (await getStory(env.DB, uid))!;
+    expect(s).toMatchObject({ status: "review", version: 1 });
+    expect(actionsOf(s)).toEqual(["ingested"]);
+  });
+
   it("approve without the checkbox answers 400 and leaves the story in review", async () => {
     const uid = await seed();
     const res = await post(`/admin/stories/${uid}/approve`, { version: "1" });
@@ -341,7 +350,7 @@ describe("admin screen", () => {
     expect(await (await get(`/admin/stories/${rejected}`)).text()).toContain("Kaynak zayıf");
   });
 
-  it("sends the CSP, no-store, nosniff and no-referrer headers", async () => {
+  it("sends the CSP, no-store, nosniff and same-origin referrer headers", async () => {
     const uid = await seed();
     const responses = [
       await get("/admin"),
@@ -358,7 +367,7 @@ describe("admin screen", () => {
       );
       expect(res.headers.get("Cache-Control")).toBe("no-store");
       expect(res.headers.get("X-Content-Type-Options")).toBe("nosniff");
-      expect(res.headers.get("Referrer-Policy")).toBe("no-referrer");
+      expect(res.headers.get("Referrer-Policy")).toBe("same-origin");
     }
   });
 
@@ -542,6 +551,21 @@ describe("save and approve", () => {
     expect(s).toMatchObject({ status: "review", version: 1, edited: false });
     expect(s.texts.tr.title).toBe("A2UI 1.0 aday sürümü yayında");
     expect(actionsOf(s)).toEqual(["ingested"]);
+  });
+
+  it("approve with a changed title on a published story answers 409 and saves nothing", async () => {
+    const uid = await seed({ status: "published" });
+    const before = (await getStory(env.DB, uid))!;
+    const res = await post(`/admin/stories/${uid}/approve`, {
+      ...(await storedFields(uid)),
+      tr_title: "Başka başlık",
+      checked: "on",
+    });
+    expect(res.status).toBe(409);
+    const s = (await getStory(env.DB, uid))!;
+    expect(s.texts.tr.title).toBe(before.texts.tr.title);
+    expect(s.version).toBe(before.version);
+    expect(actionsOf(s)).toEqual(actionsOf(before));
   });
 
   it("approve without edit fields still approves the saved text", async () => {
