@@ -24,7 +24,7 @@ import {
 } from "./stories";
 import { CSS, JS } from "./views/assets";
 import { STATUSES, layout, storyPath, type View } from "./views/layout";
-import { queueView } from "./views/queue";
+import { queueView, type QueueSummary } from "./views/queue";
 import { draftFrom, notFoundView, storyView, type Draft } from "./views/story";
 
 type AppEnv = { Bindings: Env; Variables: { identity: Identity } };
@@ -70,10 +70,10 @@ app.get("/admin/app.js", (c) => c.body(JS, 200, { "Content-Type": "text/javascri
 
 async function page(
   c: Ctx,
-  p: { title: string; active: Status | null; body: View; message?: string },
+  p: { title: string; active: Status | null; body: View; message?: string; counts?: Record<Status, number> },
   status: ContentfulStatusCode = 200,
 ): Promise<Response> {
-  const shell = layout({ ...p, email: c.get("identity").email, counts: await counts(c.env.DB) });
+  const shell = layout({ ...p, email: c.get("identity").email, counts: p.counts ?? (await counts(c.env.DB)) });
   return c.html(shell, status);
 }
 
@@ -94,8 +94,15 @@ app.get("/admin", async (c) => {
   await expireStale(c.env.DB, now);
   // One row more than a page tells whether a next page exists.
   const rows = await listStories(c.env.DB, status, PAGE_SIZE + 1, (current - 1) * PAGE_SIZE);
-  const body = queueView(status, rows.slice(0, PAGE_SIZE), now, { current, hasMore: rows.length > PAGE_SIZE });
-  return page(c, { title: COPY.tabs[status], active: status, body });
+  const all = await counts(c.env.DB);
+  let summary: QueueSummary | null = null;
+  if (status === "review" && rows.length > 0) {
+    // The review queue is ordered oldest first, so its first story expires soonest.
+    const first = current === 1 ? rows[0] : (await listStories(c.env.DB, "review", 1, 0))[0];
+    if (first) summary = { count: all.review, soonestExpiry: first.expires_at };
+  }
+  const body = queueView(status, rows.slice(0, PAGE_SIZE), now, { current, hasMore: rows.length > PAGE_SIZE }, summary);
+  return page(c, { title: COPY.tabs[status], active: status, body, counts: all });
 });
 
 // The story page from a fresh read, optionally with a message and the user's own form values.
@@ -178,8 +185,19 @@ const FAILURE_STATUS: Record<Failure, ContentfulStatusCode> = {
   invalid: 400,
 };
 
+// A version conflict on a form with edit fields: the page shows what was typed, with the story's
+// current version, so the next save is a deliberate overwrite. A story that no longer takes edits
+// (rejected or expired meanwhile) is shown as it is now.
+async function conflictPage(c: Ctx, uid: string, draft: Draft): Promise<Response> {
+  const story = await getStory(c.env.DB, uid);
+  const editable = story?.status === "review" || story?.status === "published";
+  if (!editable) return storyPage(c, uid, FAILURE_STATUS.conflict, failureMessage("conflict"));
+  return storyPage(c, uid, FAILURE_STATUS.conflict, COPY.conflictKept, draft);
+}
+
 function afterResult(c: Ctx, uid: string, result: Result, success: string, draft?: Draft): Promise<Response> | Response {
   if (result.ok) return c.redirect(success, 303);
+  if (draft && result.error === "conflict") return conflictPage(c, uid, draft);
   const keep = draft && (result.error === "too_long" || result.error === "invalid") ? draft : undefined;
   return storyPage(c, uid, FAILURE_STATUS[result.error], failureMessage(result.error, result.detail), keep);
 }
@@ -220,7 +238,7 @@ app.post("/admin/stories/:uid/approve", async (c) => {
   }
   const result = await approveStory(c.env.DB, uid, version, actor, new Date());
   if (result.ok) notifySite(c.env, waiter(c));
-  if (result.ok || !saved) return afterResult(c, uid, result, "/admin");
+  if (result.ok || !saved) return afterResult(c, uid, result, "/admin", draft);
   const message = `${COPY.savedNotApproved} ${failureMessage(result.error, result.detail)}`;
   return storyPage(c, uid, FAILURE_STATUS[result.error], message);
 });

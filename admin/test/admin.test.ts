@@ -233,14 +233,59 @@ describe("admin screen", () => {
     expect(s.events.at(-1)).toMatchObject({ action: "approved", actor: "dev@localhost" });
   });
 
-  it("a stale version answers 409 and shows `Bu haber başka bir yerde değişti`", async () => {
+  it("an edit with a stale version answers 409, keeps the typed text, carries the current version and saves nothing", async () => {
     const uid = await seed();
-    const res = await post(`/admin/stories/${uid}/edit`, editFields(7));
+    const res = await post(`/admin/stories/${uid}/edit`, editFields(7, { tr_title: "Benim başlığım" }));
     expect(res.status).toBe(409);
     const body = await res.text();
-    expect(body).toContain("Bu haber başka bir yerde değişti. Güncel hâli aşağıda.");
-    expect(body).toContain("A2UI 1.0 aday sürümü yayında"); // the current text, not the stale form
-    expect(body).toContain('name="version" value="1"');
+    expect(body).toContain(COPY.conflictKept);
+    expect(body).not.toContain(COPY.failures.conflict);
+    expect(body).toMatch(/<textarea id="tr_title"[^>]*>Benim başlığım<\/textarea>/);
+    expect(body).toMatch(/<textarea id="en_summary"[^>]*>New summary\.<\/textarea>/);
+    expect(body).toContain("14 / 90"); // the counter follows the typed title
+    expect(body).toContain('name="version" value="1"'); // the story's current version
+    const s = (await getStory(env.DB, uid))!;
+    expect(s).toMatchObject({ status: "review", version: 1, edited: false });
+    expect(s.texts.tr.title).toBe("A2UI 1.0 aday sürümü yayında");
+    expect(actionsOf(s)).toEqual(["ingested"]);
+  });
+
+  it("a second save from that page succeeds and overwrites", async () => {
+    const uid = await seed();
+    // Someone else saves first.
+    expect((await post(`/admin/stories/${uid}/edit`, editFields(1, { tr_title: "Başkasının başlığı" }))).status).toBe(303);
+    const stale = await post(`/admin/stories/${uid}/edit`, editFields(1, { tr_title: "Benim başlığım" }));
+    expect(stale.status).toBe(409);
+    const body = await stale.text();
+    const version = body.match(/name="version" value="(\d+)"/)?.[1];
+    expect(version).toBe("2");
+    const again = await post(`/admin/stories/${uid}/edit`, editFields(Number(version), { tr_title: "Benim başlığım" }));
+    expect(again.status).toBe(303);
+    const s = (await getStory(env.DB, uid))!;
+    expect(s.version).toBe(3);
+    expect(s.texts.tr.title).toBe("Benim başlığım");
+  });
+
+  it("a stale edit of a story rejected meanwhile shows the plain conflict message and no form", async () => {
+    const uid = await seed();
+    await rejectStory(env.DB, uid, 1, null, "owner@example.com", new Date());
+    const res = await post(`/admin/stories/${uid}/edit`, editFields(1, { tr_title: "Benim başlığım" }));
+    expect(res.status).toBe(409);
+    const body = await res.text();
+    expect(body).toContain(COPY.failures.conflict);
+    expect(body).not.toContain(COPY.conflictKept);
+    expect(body).not.toContain("Benim başlığım");
+    expect(body).not.toContain("<textarea");
+  });
+
+  it("a stale reject still shows the plain conflict message", async () => {
+    const uid = await seed();
+    const res = await post(`/admin/stories/${uid}/reject`, { version: "7", note: "Benim notum" });
+    expect(res.status).toBe(409);
+    const body = await res.text();
+    expect(body).toContain(COPY.failures.conflict);
+    expect(body).not.toContain(COPY.conflictKept);
+    expect((await getStory(env.DB, uid))!.status).toBe("review");
   });
 
   it("rejects a version that is not a positive integer", async () => {
@@ -422,7 +467,7 @@ describe("admin screen", () => {
     const card = body.slice(body.indexOf('<li class="card">'));
     expect(card).toMatch(/<span class="chip[^"]*">Protokol<\/span>/);
     expect(card).toMatch(/<span class="chip warn">Kalan süre: 1 sa<\/span>/);
-    expect(card).toMatch(/>4 kaynak</);
+    expect(card).toMatch(/>4 kaynak · a2ui\.org</);
     expect(card.indexOf("Kalan süre")).toBeLessThan(card.indexOf("A2UI 1.0 aday sürümü yayında"));
   });
 
@@ -539,14 +584,16 @@ describe("save and approve", () => {
     expect(actionsOf(s)).toEqual(["ingested", "edited"]);
   });
 
-  it("save-and-approve with a stale version answers 409 and changes nothing", async () => {
+  it("save-and-approve with a stale version keeps the typed text too and publishes nothing", async () => {
     const uid = await seed();
     const fields = { ...(await storedFields(uid)), version: "7", tr_title: "Bayat başlık", checked: "on" };
     const res = await post(`/admin/stories/${uid}/approve`, fields);
     expect(res.status).toBe(409);
     const body = await res.text();
-    expect(body).toContain(COPY.failures.conflict);
+    expect(body).toContain(COPY.conflictKept);
     expect(body).not.toContain(COPY.savedNotApproved);
+    expect(body).toMatch(/<textarea id="tr_title"[^>]*>Bayat başlık<\/textarea>/);
+    expect(body).toContain('name="version" value="1"');
     const s = (await getStory(env.DB, uid))!;
     expect(s).toMatchObject({ status: "review", version: 1, edited: false });
     expect(s.texts.tr.title).toBe("A2UI 1.0 aday sürümü yayında");
@@ -612,5 +659,146 @@ describe("save and approve", () => {
     expect(body).not.toContain(COPY.approve);
     expect(body).not.toContain("/approve");
     expect(body).not.toContain('id="checked"');
+  });
+});
+
+const setSourceUrl = (uid: string, url: string) =>
+  env.DB.prepare("UPDATE stories SET source_url = ? WHERE uid = ?").bind(url, uid).run();
+
+// The action bar of a story page, from its opening tag to the end of the form.
+const actionBarOf = (body: string): string => {
+  const start = body.indexOf('<div class="action-bar');
+  return body.slice(start, body.indexOf("</form>", start));
+};
+
+describe("review screen", () => {
+  const REASONS = [
+    "risk: security_incident",
+    "verify: tr.title: too long (100 > 90)",
+    "verify: en.summary: number 40% not in source",
+    "plain note",
+  ];
+
+  it("shows reasons with a Turkish kind chip and marks only raw text as English", async () => {
+    const uid = await seed({ mutate: (s) => (s.reasons = REASONS) });
+    for (const path of ["/admin", `/admin/stories/${uid}`]) {
+      const body = await (await get(path)).text();
+      expect(body).toContain('<span class="chip risk">Risk</span> <span class="reason-text">güvenlik olayı</span>');
+      expect(body).toContain(
+        '<span class="chip verify">Doğrulama</span> <span class="reason-text">Türkçe başlık çok uzun (100 / 90)</span>',
+      );
+      expect(body).toContain(
+        '<span class="chip verify">Doğrulama</span> <span class="reason-text" lang="en">İngilizce özet: number 40% not in source</span>',
+      );
+      expect(body).toContain('<span class="chip">Not</span> <span class="reason-text" lang="en">plain note</span>');
+      expect(body).not.toContain('<ul class="reasons" lang="en">');
+    }
+  });
+
+  it("escapes a hostile reason inside the new reason markup", async () => {
+    const uid = await seed({
+      mutate: (s) =>
+        (s.reasons = ["risk: <img src=x onerror=alert(1)>", 'verify: tr.title: "><script>alert(1)</script>', "<b>x</b>"]),
+    });
+    for (const path of ["/admin", `/admin/stories/${uid}`]) {
+      const body = await (await get(path)).text();
+      expect(body).toContain("&lt;img src=x onerror=alert(1)&gt;");
+      expect(body).toContain("Türkçe başlık: &quot;&gt;&lt;script&gt;");
+      expect(body).toContain("&lt;b&gt;x&lt;/b&gt;");
+      expect(body).not.toContain("<img");
+      expect(body).not.toContain("<script>alert");
+      expect(body).not.toContain("<b>x");
+    }
+  });
+
+  it("the review queue has a summary line with the count and the soonest deadline; other tabs do not", async () => {
+    expect(await (await get("/admin")).text()).not.toContain("haber bekliyor");
+    await seed({ ageMs: 10 * HOUR });
+    await seed({ ageMs: 68.5 * HOUR });
+    await seed({ status: "published" });
+    const body = await (await get("/admin")).text();
+    expect(body).toContain('<p class="queue-summary">2 haber bekliyor · en yakın süre 3 sa</p>');
+    expect(body.indexOf("queue-summary")).toBeLessThan(body.indexOf('<ul class="cards">'));
+    for (const status of ["published", "rejected", "expired"]) {
+      expect(await (await get(`/admin?status=${status}`)).text()).not.toContain("haber bekliyor");
+    }
+  });
+
+  it("the summary on page 2 still counts the whole queue and names its soonest deadline", async () => {
+    await seedQueue(51); // the oldest is 60 hours old: 12 hours left
+    const body = await (await get("/admin?status=review&page=2")).text();
+    expect(body).toContain("51 haber bekliyor · en yakın süre 11 sa");
+  });
+
+  it("a card shows the main source's host, and nothing for a non-http source url", async () => {
+    const good = await seed({ mutate: (s) => (s.source_url = "https://www.example.com/post?id=1") });
+    const bad = await seed({ mutate: (s) => (s.texts.tr.title = "Kötü kaynak") });
+    await setSourceUrl(bad, "javascript:alert(1)");
+    const body = await (await get("/admin")).text();
+    const cards = body.split('<li class="card">').slice(1);
+    const goodCard = cards.find((c) => c.includes(good))!;
+    const badCard = cards.find((c) => c.includes(bad))!;
+    expect(goodCard).toContain('<p class="meta">4 kaynak · www.example.com</p>');
+    expect(badCard).toContain('<p class="meta">4 kaynak</p>');
+    expect(body).not.toContain("javascript:");
+  });
+
+  it("the action bar links to the main source with rel noopener noreferrer on a review story only", async () => {
+    const review = await seed();
+    const bar = actionBarOf(await (await get(`/admin/stories/${review}`)).text());
+    const link = `<a class="source-link" href="https://a2ui.org/blog/1-0-rc" target="_blank" rel="noopener noreferrer">${COPY.openSource}</a>`;
+    expect(COPY.openSource).toBe("Kaynağı aç ↗");
+    expect(bar).toContain(link);
+    expect(bar.indexOf('id="checked"')).toBeLessThan(bar.indexOf(link));
+    expect(bar.indexOf(link)).toBeLessThan(bar.indexOf(`>${COPY.save}<`));
+
+    const published = await seed({ status: "published" });
+    expect(await (await get(`/admin/stories/${published}`)).text()).not.toContain(COPY.openSource);
+
+    const bad = await seed();
+    await setSourceUrl(bad, "javascript:alert(1)");
+    const badBody = await (await get(`/admin/stories/${bad}`)).text();
+    expect(badBody).not.toContain(COPY.openSource);
+    expect(badBody).not.toContain('href="javascript:');
+  });
+
+  it("the stylesheet has no box-shadow", async () => {
+    const css = await (await get("/admin/app.css")).text();
+    expect(css).not.toContain("box-shadow");
+    expect(css).toMatch(/\.action-bar \{[^}]*border-top: 1px solid var\(--line\)/);
+  });
+
+  it("the page carries the hidden unsaved-changes notice and the script toggles a dirty class", async () => {
+    for (const status of ["review", "published"] as const) {
+      const uid = await seed({ status });
+      const bar = actionBarOf(await (await get(`/admin/stories/${uid}`)).text());
+      expect(bar).toContain(`<p class="unsaved" id="unsaved" role="status" hidden>${COPY.unsaved}</p>`);
+    }
+    expect(COPY.unsaved).toBe("Kaydedilmemiş değişiklik var");
+    const js = await (await get("/admin/app.js")).text();
+    expect(js).toContain('getElementById("story-form")');
+    expect(js).toContain('classList.toggle("dirty"');
+    expect(js).toContain(".hidden = !dirty");
+    expect(js).toContain('addEventListener("beforeunload"');
+    expect(js).toContain('removeEventListener("beforeunload"');
+    expect(js).toContain('addEventListener("submit"');
+    expect(js).toContain("data-limit"); // the live counters stay
+  });
+
+  it("the brand is the radar mark: an 18 px inline svg with three lit arcs, hidden from assistive tech", async () => {
+    const body = await (await get("/admin")).text();
+    const svg = body.match(/<svg [^>]*>[\s\S]*?<\/svg>/)?.[0] ?? "";
+    expect(svg).toContain('class="mark"');
+    expect(svg).toContain('viewBox="0 0 24 24"');
+    expect(svg).toContain('width="18" height="18"');
+    expect(svg).toContain('aria-hidden="true"');
+    expect(svg).toContain('<circle class="mark-dot" cx="4" cy="20" r="2"/>');
+    expect(svg.match(/class="mark-lit"/g)?.length).toBe(3);
+    expect(svg.match(/class="mark-dim"/g)?.length).toBe(2);
+    expect(svg).toContain('d="M4 15A5 5 0 0 1 9 20"');
+    expect(svg).toContain('d="M4 1A19 19 0 0 1 23 20"');
+    expect(svg).not.toMatch(/(fill|stroke|style)=/);
+    const css = await (await get("/admin/app.css")).text();
+    expect(css).not.toContain(".brand::before");
   });
 });

@@ -1,6 +1,6 @@
 // Every piece of Turkish text on the admin screen lives here.
 import type { Failure } from "./stories";
-import type { Lang, Status } from "./schema";
+import type { Lang, RISK_FLAGS, Status } from "./schema";
 
 export const COPY = {
   appName: "Radar · Onay",
@@ -96,6 +96,20 @@ export const COPY = {
     not_found: "Haber bulunamadı.",
   } satisfies Record<Exclude<Failure, "too_long">, string>,
   tooLong: (field: string) => `Yayınlamak için metin çok uzun: ${field}`,
+  conflictKept: "Bu haber başka bir yerde değişti. Yazdıkların aşağıda duruyor; kaydedersen diğer değişikliğin üzerine yazar.",
+
+  queueSummary: (count: number, soonest: string) => `${count} haber bekliyor · en yakın süre ${soonest}`,
+  openSource: "Kaynağı aç ↗",
+  unsaved: "Kaydedilmemiş değişiklik var",
+  reasonKinds: { verify: "Doğrulama", risk: "Risk", other: "Not" },
+  riskFlags: {
+    security_incident: "güvenlik olayı",
+    accusation: "suçlama",
+    funding_figure: "yatırım tutarı",
+    third_party_benchmark: "üçüncü taraf kıyaslaması",
+    regulation: "düzenleme",
+  } satisfies Record<(typeof RISK_FLAGS)[number], string>,
+  tooLongReason: (field: string, n: string, max: string) => `${field} çok uzun (${n} / ${max})`,
 };
 
 // "tr.summary" -> "Türkçe özet". Unknown details fall back to the raw path.

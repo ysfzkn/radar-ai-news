@@ -57,12 +57,20 @@ describe("ingest", () => {
     expect(event).toMatchObject({ version: 1, action: "ingested", actor: "agent", at: story!.received_at });
   });
 
-  it("stores an auto-published story with publish_mode 'auto' and published_at = created_at", async () => {
+  it("an auto-published story gets the ingest time as published_at and keeps its created_at", async () => {
     const body = clone();
     body.stories[0].status = "published";
+    const before = Date.now();
     expect((await post(body)).status).toBe(200);
     const story = await env.DB.prepare("SELECT * FROM stories").first<Json>();
-    expect(story).toMatchObject({ status: "published", publish_mode: "auto", published_at: story!.created_at });
+    expect(story).toMatchObject({
+      status: "published",
+      publish_mode: "auto",
+      created_at: "2026-11-19T12:00:00.000Z",
+      published_at: story!.received_at,
+    });
+    expect(story!.published_at).not.toBe(story!.created_at);
+    expect(Date.parse(story!.published_at)).toBeGreaterThanOrEqual(before);
   });
 
   it("normalises created_at to toISOString form", async () => {

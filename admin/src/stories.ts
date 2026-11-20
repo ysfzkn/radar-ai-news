@@ -37,7 +37,7 @@ export async function insertStories(
           JSON.stringify(s.sources),
           s.created_at,
           at,
-          published ? s.created_at : null,
+          published ? at : null, // an auto-published story goes live when it arrives
         ),
     );
     for (const lang of ["tr", "en"] as const) {
@@ -90,6 +90,7 @@ export interface StorySummary {
   title_tr: string;
   reasons: string[];
   source_count: number;
+  source_url: string;
   created_at: string;
   expires_at: string;
   edited: boolean;
@@ -99,7 +100,6 @@ export interface StoryFull extends Omit<StorySummary, "title_tr"> {
   version: number;
   score: IngestStory["score"];
   fact_card: IngestStory["fact_card"];
-  source_url: string;
   sources: { name: string; url: string; tier: number }[];
   texts: Record<Lang, TextSet>;
   published_at: string | null;
@@ -163,7 +163,7 @@ export async function listStories(
       : "COALESCE(s.decided_at, s.published_at, s.created_at) DESC, s.uid ASC";
   const { results } = await db
     .prepare(
-      `SELECT s.uid, s.category, s.status, s.publish_mode, s.reasons, s.source_count, s.edited,
+      `SELECT s.uid, s.category, s.status, s.publish_mode, s.reasons, s.source_url, s.source_count, s.edited,
               s.created_at, t.title AS title_tr
          FROM stories s
          LEFT JOIN story_texts t ON t.story_uid = s.uid AND t.lang = 'tr'
@@ -181,6 +181,7 @@ export async function listStories(
     title_tr: r.title_tr ?? "",
     reasons: JSON.parse(r.reasons) as string[],
     source_count: r.source_count,
+    source_url: r.source_url,
     created_at: r.created_at,
     expires_at: expiresAt(r.created_at),
     edited: r.edited === 1,

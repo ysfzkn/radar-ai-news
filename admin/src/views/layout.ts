@@ -19,12 +19,23 @@ export function formatDate(iso: string | null): string {
   return `${d.getUTCDate()} ${COPY.months[d.getUTCMonth()]} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
 }
 
-// Hours rounded down; under one hour, minutes. Never negative.
-export function timeLeft(expiresAt: string, now: Date): { text: string; warn: boolean } {
-  const left = Math.max(0, Date.parse(expiresAt) - now.getTime());
+const msLeft = (expiresAt: string, now: Date): number => Math.max(0, Date.parse(expiresAt) - now.getTime());
+
+// "14 sa": hours rounded down; under one hour, minutes. Never negative.
+export function durationLeft(expiresAt: string, now: Date): string {
+  const left = msLeft(expiresAt, now);
   const hours = Math.floor(left / 3_600_000);
-  const text = hours >= 1 ? COPY.hours(hours) : COPY.minutes(Math.floor(left / 60_000));
-  return { text: COPY.timeLeft(text), warn: left < WARN_MS };
+  return hours >= 1 ? COPY.hours(hours) : COPY.minutes(Math.floor(left / 60_000));
+}
+
+// "Kalan süre: 14 sa", and whether less than six hours are left.
+export function timeLeft(expiresAt: string, now: Date): { text: string; warn: boolean } {
+  return { text: COPY.timeLeft(durationLeft(expiresAt, now)), warn: msLeft(expiresAt, now) < WARN_MS };
+}
+
+// The host name of an http(s) URL; null for anything else.
+export function hostOf(url: string): string | null {
+  return isHttpUrl(url) ? new URL(url).hostname : null;
 }
 
 export const categoryLabel = (value: string): string => COPY.categories[value] ?? value;
@@ -37,6 +48,18 @@ export function externalLink(url: string, label: string = url): View {
 }
 
 export const storyPath = (uid: string): string => `/admin/stories/${encodeURIComponent(uid)}`;
+
+// The product's radar mark: a dot at the lower left and five quarter arcs around it, the three
+// inner ones lit. Built from constants only; its colours come from the stylesheet.
+const ARC_RADII = [5, 8.5, 12, 15.5, 19] as const;
+const LIT_ARCS = 3;
+
+function radarMark(): View {
+  const arcs = ARC_RADII.map(
+    (r, i) => html`<path class="${i < LIT_ARCS ? "mark-lit" : "mark-dim"}" d="M4 ${20 - r}A${r} ${r} 0 0 1 ${4 + r} 20"/>`,
+  );
+  return html`<svg class="mark" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><circle class="mark-dot" cx="4" cy="20" r="2"/>${arcs}</svg>`;
+}
 
 export interface Shell {
   title: string;
@@ -65,7 +88,7 @@ export function layout(p: Shell): View {
 <body>
 <header class="top">
 <div class="top-inner">
-<a class="brand" href="/admin"><span class="wordmark">${COPY.brand}</span> <span class="brand-suffix">${COPY.brandSuffix}</span></a>
+<a class="brand" href="/admin">${radarMark()}<span class="wordmark">${COPY.brand}</span> <span class="brand-suffix">${COPY.brandSuffix}</span></a>
 <span class="who">${p.email}</span>
 </div>
 </header>

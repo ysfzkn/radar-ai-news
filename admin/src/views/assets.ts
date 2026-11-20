@@ -84,7 +84,11 @@ p { margin: 0; }
   display: inline-flex; align-items: center; gap: var(--space-2); min-height: var(--tap);
   font-size: var(--text-lg); line-height: 1; text-decoration: none;
 }
-.brand::before { content: ""; flex: none; width: 0.625rem; height: 0.625rem; border-radius: 50%; background: var(--accent); }
+.mark { flex: none; width: 18px; height: 18px; }
+.mark path { fill: none; stroke-width: 1.75; stroke-linecap: round; }
+.mark-lit { stroke: var(--accent); }
+.mark-dim { stroke: var(--control-border); }
+.mark-dot { fill: var(--accent); }
 .wordmark { font-weight: 700; letter-spacing: -0.01em; }
 .brand-suffix { color: var(--muted); font-weight: 500; }
 .who { flex-basis: 100%; padding-bottom: var(--space-2); overflow-wrap: anywhere; }
@@ -130,6 +134,8 @@ p { margin: 0; }
 .chip.accent { background: var(--accent-soft); color: var(--accent); }
 .chip.warn { background: var(--warn-soft); color: var(--warn); font-weight: 600; }
 .chip.ok { background: var(--ok-soft); color: var(--ok); }
+.chip.risk { background: var(--danger-soft); color: var(--danger); }
+.chip.verify { background: var(--warn-soft); color: var(--warn); }
 .card-title {
   margin: var(--space-2) 0 var(--space-1); font-size: var(--text-lg); font-weight: 600;
   color: var(--ink); letter-spacing: 0; overflow-wrap: anywhere;
@@ -141,8 +147,10 @@ p { margin: 0; }
   .card-title a:focus-visible { outline: none; }
   .card:has(.card-title a:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 }
-.reasons { margin: 0; padding-left: var(--space-5); overflow-wrap: anywhere; }
-.reasons li + li { margin-top: var(--space-1); }
+.queue-summary { margin-bottom: var(--space-3); color: var(--muted); font-size: var(--text-sm); }
+.reasons { list-style: none; margin: 0; padding: 0; overflow-wrap: anywhere; }
+.reasons li + li { margin-top: var(--space-2); }
+.reasons .chip { margin-right: var(--space-1); }
 .card .reasons { margin-top: var(--space-2); font-size: var(--text-sm); }
 
 /* Paging */
@@ -167,8 +175,6 @@ p { margin: 0; }
 .chip.status { color: var(--ink); font-weight: 600; }
 main > section { margin-top: var(--space-6); }
 .panel { padding: var(--space-4); background: var(--surface); border: 1px solid var(--line); border-radius: 0.75rem; }
-.reasons-panel { background: var(--warn-soft); border-color: transparent; }
-.reasons-panel h2 { color: var(--warn); }
 .facts, .texts { margin: 0; }
 .facts dt, .texts dt { font-size: var(--text-sm); color: var(--muted); }
 .facts dd, .texts dd { margin: 0 0 var(--space-3); overflow-wrap: anywhere; }
@@ -214,7 +220,6 @@ button:hover { border-color: var(--ink); }
 .primary { background: var(--ink); border-color: var(--ink); color: var(--surface); width: 100%; }
 .primary:hover { background: #2c2e32; border-color: #2c2e32; }
 .danger { border-color: var(--danger); color: var(--danger); }
-.danger:hover { border-color: var(--danger); box-shadow: inset 0 0 0 1px var(--danger); }
 
 /* The action bar sticks to the bottom of the viewport while the form is on screen. */
 .action-bar {
@@ -222,8 +227,12 @@ button:hover { border-color: var(--ink); }
   display: flex; flex-direction: column; gap: var(--space-2);
   margin: var(--space-4) calc(-1 * var(--space-4)) 0; padding: var(--space-3) var(--space-4);
   background: var(--surface); border-top: 1px solid var(--line);
-  box-shadow: 0 -0.25rem 1rem rgb(23 24 26 / 0.05);
 }
+.action-bar.dirty { border-color: var(--warn); }
+.bar-check { display: flex; flex-wrap: wrap; align-items: center; column-gap: var(--space-4); }
+.source-link { display: inline-flex; align-items: center; min-height: var(--tap); font-weight: 500; margin-left: auto; }
+.unsaved { color: var(--warn); font-size: var(--text-sm); font-weight: 600; }
+.unsaved[hidden] { display: none; }
 .bar-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
 .bar-buttons button { width: 100%; padding: 0 var(--space-3); }
 .bar-buttons button:only-child { grid-column: 1 / -1; }
@@ -232,6 +241,7 @@ button:hover { border-color: var(--ink); }
 .danger-card { padding: var(--space-4); background: var(--danger-soft); border-radius: 0.75rem; }
 .danger-card h2 { color: var(--danger); }
 .danger-card .danger { background: var(--surface); }
+.danger:hover, .danger-card .danger:hover { background: var(--danger); color: var(--surface); }
 
 @media (min-width: 40rem) {
   html { scroll-padding-top: 4.5rem; }
@@ -239,7 +249,8 @@ button:hover { border-color: var(--ink); }
   .who { flex-basis: auto; padding-bottom: 0; }
   .tabs { display: flex; flex-wrap: wrap; }
   .primary { width: auto; }
-  .action-bar { flex-direction: row; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+  .action-bar { flex-direction: row; align-items: center; justify-content: space-between; flex-wrap: wrap; column-gap: var(--space-4); }
+  .source-link { margin-left: 0; }
   .bar-buttons { display: flex; margin-left: auto; }
   .bar-buttons button { width: auto; padding: 0 var(--space-5); }
 }
@@ -266,7 +277,8 @@ button:hover { border-color: var(--ink); }
 }
 `;
 
-// Live counters only. The page works without it; the server enforces every limit.
+// Live counters and the unsaved-changes notice. The page works without it; the server
+// enforces every limit.
 export const JS = `"use strict";
 document.addEventListener("DOMContentLoaded", function () {
   var fields = document.querySelectorAll("textarea[data-limit]");
@@ -282,5 +294,36 @@ document.addEventListener("DOMContentLoaded", function () {
     field.addEventListener("input", update);
     update();
   });
+
+  var form = document.getElementById("story-form");
+  if (!form) return;
+  var bar = form.querySelector(".action-bar");
+  var notice = document.getElementById("unsaved");
+  // The story's fields as typed; the checkbox and the hidden version are not story text.
+  var snapshot = function () {
+    var values = [];
+    Array.prototype.forEach.call(form.elements, function (el) {
+      if (el.name && el.type !== "hidden" && el.type !== "checkbox" && el.type !== "submit") values.push(el.value);
+    });
+    return JSON.stringify(values);
+  };
+  var initial = snapshot();
+  var dirty = false;
+  var onLeave = function (event) {
+    event.preventDefault();
+    event.returnValue = "";
+  };
+  var setDirty = function (next) {
+    if (next === dirty) return;
+    dirty = next;
+    if (bar) bar.classList.toggle("dirty", dirty);
+    if (notice) notice.hidden = !dirty;
+    if (dirty) window.addEventListener("beforeunload", onLeave);
+    else window.removeEventListener("beforeunload", onLeave);
+  };
+  var check = function () { setDirty(snapshot() !== initial); };
+  form.addEventListener("input", check);
+  form.addEventListener("change", check);
+  form.addEventListener("submit", function () { setDirty(false); });
 });
 `;

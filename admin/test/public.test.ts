@@ -10,13 +10,13 @@ type Json = Record<string, any>;
 const get = (path: string, init?: RequestInit) => app.fetch(new Request(`http://localhost${path}`, init), env);
 
 let n = 0;
-// Inserts one story; a published one gets `at` as created_at and published_at.
+// Inserts one story created and ingested at `at`, so a published one gets `at` as published_at.
 async function seed(status: string, at = "2026-11-20T05:00:00.000Z", uid?: string): Promise<string> {
   const s = structuredClone((sample as Json).stories[0]) as Json;
   s.uid = uid ?? (++n).toString(16).padStart(32, "c");
   s.status = status;
   s.created_at = at;
-  await insertStories(env.DB, [s as IngestStory], new Date("2026-11-20T06:00:00.000Z"));
+  await insertStories(env.DB, [s as IngestStory], new Date(at));
   return s.uid;
 }
 

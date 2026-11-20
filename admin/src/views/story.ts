@@ -1,8 +1,9 @@
 import { html } from "hono/html";
 import { COPY } from "../copy";
-import { CATEGORIES, PUBLISH_LIMITS, type Lang } from "../schema";
+import { CATEGORIES, PUBLISH_LIMITS, isHttpUrl, type Lang } from "../schema";
 import { NOTE_MAX, type StoryFull } from "../stories";
 import { categoryLabel, externalLink, formatDate, storyPath, timeLeft, type View } from "./layout";
+import { reasonList } from "./reasons";
 
 type TextSet = StoryFull["texts"][Lang];
 type TextField = keyof TextSet;
@@ -56,7 +57,7 @@ function reasons(s: StoryFull): View {
   if (s.reasons.length === 0) return html``;
   return html`<section class="panel reasons-panel" aria-labelledby="reasons-h">
 <h2 id="reasons-h">${COPY.reasonsHeading}</h2>
-<ul class="reasons" lang="en">${s.reasons.map((r) => html`<li>${r}</li>`)}</ul>
+${reasonList(s.reasons)}
 </section>`;
 }
 
@@ -98,13 +99,30 @@ function textField(lang: Lang, field: TextField, value: string): View {
 
 const versionField = (s: StoryFull) => html`<input type="hidden" name="version" value="${s.version}">`;
 
+// Shown by app.js while the form differs from what the page loaded with.
+const unsavedNotice = html`<p class="unsaved" id="unsaved" role="status" hidden>${COPY.unsaved}</p>`;
+
+// The main source, one click from the checkbox; only for an http(s) URL.
+const sourceLink = (s: StoryFull): View | string =>
+  isHttpUrl(s.source_url)
+    ? html`<a class="source-link" href="${s.source_url}" target="_blank" rel="noopener noreferrer">${COPY.openSource}</a>`
+    : "";
+
 // The buttons point at the one form; each picks its route with formaction.
 function actionBar(s: StoryFull): View {
   const save = (cls: string) =>
     html`<button type="submit" class="${cls}" form="${FORM_ID}" formaction="${storyPath(s.uid)}/edit">${COPY.save}</button>`;
-  if (s.status !== "review") return html`<div class="action-bar"><div class="bar-buttons">${save("primary")}</div></div>`;
+  if (s.status !== "review")
+    return html`<div class="action-bar">
+${unsavedNotice}
+<div class="bar-buttons">${save("primary")}</div>
+</div>`;
   return html`<div class="action-bar">
+<div class="bar-check">
 <div class="check"><input type="checkbox" id="checked" name="checked" value="on"><label for="checked">${COPY.checked}</label></div>
+${sourceLink(s)}
+</div>
+${unsavedNotice}
 <div class="bar-buttons">
 ${save("secondary")}
 <button type="submit" class="primary" form="${FORM_ID}" formaction="${storyPath(s.uid)}/approve" aria-describedby="approve-note">${COPY.approve}</button>
