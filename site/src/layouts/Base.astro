@@ -1,6 +1,7 @@
 ---
 import "../styles/tokens.css";
 import "../styles/base.css";
+import Horizon from "../components/Horizon.astro";
 import Masthead from "../components/Masthead.astro";
 import { COPY } from "../lib/copy";
 import { loadData } from "../lib/data";
@@ -63,6 +64,7 @@ const { demo } = loadData();
         <slot />
       </main>
       <footer class="foot label">
+        <Horizon />
         <p class="sig">
           {copy.owner}{" · "}<a href={OWNER.site} {...EXTERNAL}>{copy.by}</a>{" · "}<a
             href={OWNER.github}

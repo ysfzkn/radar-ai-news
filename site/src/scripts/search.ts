@@ -1,7 +1,22 @@
 // The archive search. It runs only on the archive pages, fetches its data on first use,
 // and writes story text to the page with textContent only.
-import { isEmptyQuery, readQuery, search, writeQuery, type SearchDoc, type SearchQuery } from "../lib/search";
+import {
+  MIN_ECHO,
+  arrowStep,
+  categoryOf,
+  fill,
+  highlight,
+  isEmptyQuery,
+  readQuery,
+  safeHref,
+  search,
+  writeQuery,
+  type SearchDoc,
+  type SearchQuery,
+} from "../lib/search";
+import type { Category } from "../lib/schema";
 
+/** The copy templates of `COPY[lang].search.templates`, with `{n}` where the number goes. */
 interface Labels {
   months: string[];
   sourceOne: string;
@@ -9,6 +24,7 @@ interface Labels {
   countNone: string;
   countOne: string;
   countMany: string;
+  more: string;
 }
 
 /** Most results written to the page at once. */
@@ -24,10 +40,18 @@ function start(root: HTMLElement): void {
   const clear = root.querySelector<HTMLButtonElement>("[data-clear]")!;
   const count = root.querySelector<HTMLElement>("[data-count]")!;
   const results = root.querySelector<HTMLElement>("[data-results]")!;
+  const more = root.querySelector<HTMLElement>("[data-more]")!;
+  const empty = root.querySelector<HTMLElement>("[data-empty]")!;
   const list = document.querySelector<HTMLElement>("[data-archive-list]")!;
-  const names = new Map(chips.map((chip) => [chip.dataset.category!, chip.textContent!.trim()]));
+  // The category names of this language, from the chips: shown on each result and searched too.
+  const names: Partial<Record<Category, string>> = {};
+  for (const chip of chips) {
+    const category = categoryOf(chip.dataset.category);
+    if (category) names[category] = chip.textContent!.trim();
+  }
+  const offered = [...month.options].map((option) => option.value).filter(Boolean);
 
-  let state: SearchQuery = readQuery(new URLSearchParams(location.search), lang);
+  let state: SearchQuery = readQuery(new URLSearchParams(location.search), lang, offered);
   let docs: SearchDoc[] | null = null;
   let pending: Promise<void> | null = null;
   let failed = false;
@@ -61,28 +85,48 @@ function start(root: HTMLElement): void {
     }
   }
 
+  /** Text with the query's matches in <mark>, built from text nodes only. */
+  function marked(parent: HTMLElement, text: string): HTMLElement {
+    for (const part of highlight(text, state.q)) {
+      if (part.hit) {
+        const mark = document.createElement("mark");
+        mark.textContent = part.text;
+        parent.append(mark);
+      } else {
+        parent.append(document.createTextNode(part.text));
+      }
+    }
+    return parent;
+  }
+
   function row(doc: SearchDoc): HTMLLIElement {
     const [y, m, d] = doc.d.split("-").map(Number);
-    const sources = doc.n === 1 ? labels.sourceOne : labels.sourceMany.replace("{n}", String(doc.n));
+    const sources = doc.n === 1 ? labels.sourceOne : fill(labels.sourceMany, doc.n);
+    // The category comes from JSON: it names a class only when it is one of the eight.
+    const category = categoryOf(doc.c);
     const li = document.createElement("li");
-    li.className = `result cat-${doc.c}`;
+    li.className = category ? `result cat-${category}` : "result";
     const meta = document.createElement("p");
     meta.className = "result-meta label";
-    const date = document.createElement("time");
-    date.dateTime = doc.d;
-    date.textContent = `${d} ${labels.months[m - 1]} ${y}`;
     const tag = document.createElement("span");
     tag.className = "result-cat caps";
-    tag.textContent = names.get(doc.c) ?? doc.c;
-    meta.append(date, " · ", tag, " · ", sources);
+    tag.textContent = (category && names[category]) || String(doc.c);
+    const date = document.createElement("time");
+    date.className = "result-date";
+    date.dateTime = String(doc.d);
+    date.textContent = `${d} ${labels.months[m - 1] ?? ""} ${y}`;
+    const count = document.createElement("span");
+    count.className = "result-sources";
+    count.textContent = sources;
+    meta.append(tag, " ", date, " · ", count);
+    const heading = document.createElement("h2");
+    heading.className = "result-title list-title";
     const title = document.createElement("a");
-    title.className = "result-title list-title";
-    title.href = doc.u.startsWith("/") && !doc.u.startsWith("//") ? doc.u : "/";
-    title.textContent = doc.t;
-    const summary = document.createElement("p");
+    title.href = safeHref(String(doc.u)) ?? "/";
+    heading.append(marked(title, String(doc.t)));
+    const summary = marked(document.createElement("p"), String(doc.s));
     summary.className = "result-summary";
-    summary.textContent = doc.s;
-    li.append(meta, title, summary);
+    li.append(meta, heading, summary);
     return li;
   }
 
@@ -90,20 +134,26 @@ function start(root: HTMLElement): void {
     if (isEmptyQuery(state) || failed || docs === null) {
       list.hidden = false;
       results.hidden = true;
+      more.hidden = true;
+      empty.hidden = true;
       results.replaceChildren();
       count.textContent = failed ? (root.dataset.failed ?? "") : "";
       return;
     }
-    const found = search(docs, state);
+    const found = search(docs, state, names);
     list.hidden = true;
-    results.hidden = false;
+    results.hidden = found.length === 0;
+    empty.hidden = found.length > 0;
     results.replaceChildren(...found.slice(0, LIMIT).map(row));
+    // The count is the true total; when more were found than are shown, the line under the list says so.
+    more.hidden = found.length <= LIMIT;
+    more.textContent = found.length > LIMIT ? fill(labels.more, LIMIT) : "";
     count.textContent =
       found.length === 0
         ? labels.countNone
         : found.length === 1
           ? labels.countOne
-          : labels.countMany.replace("{n}", String(found.length));
+          : fill(labels.countMany, found.length);
   }
 
   /** The state changed: mirror it to the address bar and show it. */
@@ -123,22 +173,17 @@ function start(root: HTMLElement): void {
     change();
   });
   echo.addEventListener("change", () => {
-    state = { ...state, minEcho: echo.checked ? 3 : 0 };
+    state = { ...state, minEcho: echo.checked ? MIN_ECHO : 0 };
     change();
   });
   chips.forEach((chip, i) => {
     chip.addEventListener("click", () => {
-      state = { ...state, category: (chip.dataset.category || null) as SearchQuery["category"] };
+      state = { ...state, category: categoryOf(chip.dataset.category) };
       sync();
       change();
     });
     chip.addEventListener("keydown", (event) => {
-      const step =
-        event.key === "ArrowRight" || event.key === "ArrowDown"
-          ? 1
-          : event.key === "ArrowLeft" || event.key === "ArrowUp"
-            ? -1
-            : 0;
+      const step = arrowStep(event);
       if (!step) return;
       event.preventDefault();
       const next = chips[(i + step + chips.length) % chips.length];

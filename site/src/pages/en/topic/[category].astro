@@ -1,10 +1,9 @@
 ---
 import Base from "../../../layouts/Base.astro";
-import StoryList from "../../../components/StoryList.astro";
+import TopicView from "../../../components/TopicView.astro";
 import { COPY } from "../../../lib/copy";
 import { loadData } from "../../../lib/data";
 import { byCategory, forLang } from "../../../lib/editions";
-import { categoryClass } from "../../../lib/format";
 import { routes } from "../../../lib/routes";
 import { CATEGORIES, type Category, type PublicStory } from "../../../lib/schema";
 
@@ -35,8 +34,5 @@ const name = copy.categories[category];
   path={routes[lang].topic(category)}
   alternate={routes.tr.topic(category)}
 >
-  <h1 class:list={["kunye label", categoryClass(category)]}>
-    <span class="topic-tag caps">{name}</span>
-  </h1>
-  {stories.length > 0 ? <StoryList lang={lang} stories={stories} /> : <p class="empty">{copy.topicEmpty}</p>}
+  <TopicView lang={lang} category={category} stories={stories} />
 </Base>

@@ -25,7 +25,9 @@ export interface Copy {
     caption: string;
     idle: string;
   };
+  /** The end of an edition: the closing line, and its reading time under it. */
   closed: string;
+  readTime(minutes: number): string;
   previous: string;
   next: string;
   noEdition: string;
@@ -70,10 +72,29 @@ export interface Copy {
     echo: string;
     clear: string;
     count(n: number): string;
+    /**
+     * What the search script writes, as templates with `{n}` where the number goes (filled by
+     * `fill` in lib/search.ts); a test keeps them equal to `sources` and `count`.
+     */
+    templates: {
+      sourceOne: string;
+      sourceMany: string;
+      countNone: string;
+      countOne: string;
+      countMany: string;
+      /** Under the list when more were found than are shown. */
+      more: string;
+    };
+    /** The empty state: a line and a hint. */
+    emptyTitle: string;
+    emptyHint: string;
     failed: string;
     /** The heat strip's name and one day's accessible name, for example "20 Kasım 2026, 6 haber". */
     heat: string;
     heatDay(date: string, n: number): string;
+    /** The two ends of the heat strip's key. */
+    heatLess: string;
+    heatMore: string;
   };
   topicTitle(category: string): string;
   topicEmpty: string;
@@ -142,7 +163,8 @@ export const COPY: Record<Lang, Copy> = {
       caption: "Merkeze yakın: daha çok kaynak",
       idle: "Her nokta bir haber.",
     },
-    closed: "Baskı kapandı.",
+    closed: "Bugünlük bu kadar.",
+    readTime: (n) => `${n} dk okuma`,
     previous: "Önceki sayı",
     next: "Sonraki sayı",
     noEdition: "Henüz baskı yok.",
@@ -197,9 +219,21 @@ export const COPY: Record<Lang, Copy> = {
       echo: "3+ kaynak",
       clear: "Temizle",
       count: (n) => (n === 0 ? "Sonuç yok." : `${n} sonuç`),
+      templates: {
+        sourceOne: "1 kaynak",
+        sourceMany: "{n} kaynak",
+        countNone: "Sonuç yok.",
+        countOne: "1 sonuç",
+        countMany: "{n} sonuç",
+        more: "İlk {n} sonuç gösteriliyor.",
+      },
+      emptyTitle: "Bu aramayla eşleşen haber yok.",
+      emptyHint: "Daha kısa bir sözcük dene ya da filtreleri temizle.",
       failed: "Arama şu an çalışmıyor; arşiv listesi aşağıda.",
       heat: "Son 26 hafta: her kare bir gün",
       heatDay: (date, n) => `${date}, ${n} haber`,
+      heatLess: "az",
+      heatMore: "çok",
     },
     topicTitle: (category) => `Konu: ${category}`,
     topicEmpty: "Bu konuda henüz haber yok.",
@@ -290,7 +324,9 @@ export const COPY: Record<Lang, Copy> = {
         {
           heading: "Gizlilik",
           paragraphs: [
-            "Bu site çerez kullanmaz ve üçüncü taraflardan hiçbir şey yüklemez: analitik, reklam, dış yazı tipi ya da betik yok. Her sayfa statik bir HTML dosyasıdır.",
+            "Bu site çerez kullanmaz, seni izlemez ve üçüncü taraflardan hiçbir şey yüklemez: analitik, reklam ya da dış yazı tipi yok. Her sayfa statik bir HTML dosyasıdır ve betik olmadan da eksiksiz çalışır.",
+            "Sitenin kendi küçük betiği yalnızca bir kolaylık ekler: arşivde arama (arama verisi bu siteden gelir), radar ekranının eğimi ve okunan haberlerin işareti, “Neden önemli” satırının belirişi ve günün ilk sayfasındaki kısa açılış. Hareketi azaltmayı seçtiysen hareketlerin hiçbiri oynamaz.",
+            "Açılışın bir kez gösterildiğini hatırlamak için tarayıcının oturum belleğine tek bir anahtar yazılır: radar:intro. Sekme kapanınca silinir. Başka hiçbir şey saklanmaz ve hiçbir yere gönderilmez.",
           ],
         },
       ],
@@ -333,7 +369,8 @@ export const COPY: Record<Lang, Copy> = {
       caption: "Nearer the centre: more sources",
       idle: "Each blip is a story.",
     },
-    closed: "End of this edition.",
+    closed: "That's all for today.",
+    readTime: (n) => `${n} min read`,
     previous: "Previous issue",
     next: "Next issue",
     noEdition: "No edition yet.",
@@ -388,9 +425,21 @@ export const COPY: Record<Lang, Copy> = {
       echo: "3+ sources",
       clear: "Clear",
       count: (n) => (n === 0 ? "No results." : n === 1 ? "1 result" : `${n} results`),
+      templates: {
+        sourceOne: "1 source",
+        sourceMany: "{n} sources",
+        countNone: "No results.",
+        countOne: "1 result",
+        countMany: "{n} results",
+        more: "Showing the first {n} results.",
+      },
+      emptyTitle: "No story matches this search.",
+      emptyHint: "Try a shorter word, or clear the filters.",
       failed: "Search is not working right now; the archive list is below.",
       heat: "The last 26 weeks: each square is a day",
       heatDay: (date, n) => `${date}, ${n === 1 ? "1 story" : `${n} stories`}`,
+      heatLess: "fewer",
+      heatMore: "more",
     },
     topicTitle: (category) => `Topic: ${category}`,
     topicEmpty: "No stories on this topic yet.",
@@ -481,7 +530,9 @@ export const COPY: Record<Lang, Copy> = {
         {
           heading: "Privacy",
           paragraphs: [
-            "This site sets no cookies and loads nothing from third parties: no analytics, no ads, no outside fonts or scripts. Every page is a static HTML file.",
+            "This site sets no cookies, does not track you and loads nothing from third parties: no analytics, no ads, no outside fonts. Every page is a static HTML file and is complete without scripts.",
+            "The site's own small script only adds conveniences: the archive search (its data comes from this site), the radar's tilt and the marks on stories you have read, the way the “Why it matters” line appears, and a short opening on the day's first page. If you have asked for less motion, none of it moves.",
+            "To remember that the opening has been shown, one key is written to the browser's session storage: radar:intro. It is gone when the tab closes. Nothing else is stored, and nothing is sent anywhere.",
           ],
         },
       ],

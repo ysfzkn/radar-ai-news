@@ -1,5 +1,7 @@
 ---
+import EchoArcs from "./EchoArcs.astro";
 import HeatStrip from "./HeatStrip.astro";
+import Mark from "./Mark.astro";
 import { COPY } from "../lib/copy";
 import type { Edition } from "../lib/editions";
 import { categoryClass, longDate } from "../lib/format";
@@ -29,16 +31,9 @@ for (const edition of editions) {
   }
 }
 
-// What the search script needs to write a result: month names, and the count and source
-// phrases with {n} where the number goes.
-const labels = {
-  months: copy.months,
-  sourceOne: copy.sources(1),
-  sourceMany: copy.sources(2).replace("2", "{n}"),
-  countNone: text.count(0),
-  countOne: text.count(1),
-  countMany: text.count(2).replace("2", "{n}"),
-};
+// What the search script needs to write a result: month names, and the copy's templates with
+// {n} where the number goes.
+const labels = { months: copy.months, ...text.templates };
 ---
 
 <h1 class="kunye label">
@@ -59,10 +54,14 @@ const labels = {
         data-labels={JSON.stringify(labels)}
       >
         <div class="search-field">
-          <label class="label caps" for="search-q">
+          <label class="search-label label caps" for="search-q">
             {text.label}
           </label>
-          <input class="search-input" id="search-q" type="search" name="q" autocomplete="off" />
+          {/* The input in a key's frame, led by the brand mark: the archive's own instrument. */}
+          <div class="search-box">
+            <Mark size={22} />
+            <input class="search-input" id="search-q" type="search" name="q" autocomplete="off" spellcheck="false" />
+          </div>
         </div>
         <div class="chips" role="radiogroup" aria-label={text.topics}>
           <button class="chip label caps" type="button" role="radio" aria-checked="true" data-category="">
@@ -99,6 +98,12 @@ const labels = {
         </div>
         <p class="search-count label" aria-live="polite" data-count />
         <ol class="list search-results" role="list" data-results hidden />
+        <p class="search-more label" data-more hidden />
+        <div class="search-empty" data-empty hidden>
+          <EchoArcs level={0} width={66} height={21} />
+          <p class="search-empty-title">{text.emptyTitle}</p>
+          <p class="search-empty-hint">{text.emptyHint}</p>
+        </div>
       </section>
       <HeatStrip lang={lang} editions={editions} />
     </>

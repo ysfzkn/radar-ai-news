@@ -1,0 +1,59 @@
+---
+import { EMBLEMS, EMBLEM_BOX, SHEET_SHADOW, TILE, TILE_SHADOW, type Sheet } from "../lib/emblems";
+import { categoryClass } from "../lib/format";
+import type { Category } from "../lib/schema";
+
+interface Props {
+  category: Category;
+  /** Rendered size in px: 96 in a topic page's header, 56 on the lead story's card. */
+  size: number;
+}
+
+const { category, size } = Astro.props;
+const drawing = EMBLEMS[category];
+const layers: { name: "mid" | "top"; sheets: Sheet[] }[] = [
+  { name: "mid", sheets: drawing.mid },
+  { name: "top", sheets: drawing.top },
+];
+const shadow = `translate(${SHEET_SHADOW} ${SHEET_SHADOW})`;
+---
+
+{/*
+  A paper cut-out, decoration only (the category's name is always written beside it): the tile,
+  then each sheet as its hard ink shadow and its face. The stylesheet colours the layers from the
+  category's colour and lets the faces lift off their shadows as the emblem scrolls into view.
+*/}
+<svg
+  class={`emblem ${categoryClass(category)}`}
+  viewBox={`0 0 ${EMBLEM_BOX} ${EMBLEM_BOX}`}
+  width={size}
+  height={size}
+  aria-hidden="true"
+>
+  <rect
+    class="em-shadow"
+    x={TILE.x + TILE_SHADOW}
+    y={TILE.y + TILE_SHADOW}
+    width={TILE.size}
+    height={TILE.size}
+    rx={TILE.radius}></rect>
+  <rect class="em-tile" x={TILE.x} y={TILE.y} width={TILE.size} height={TILE.size} rx={TILE.radius}></rect>
+  {
+    layers.map((layer) =>
+      layer.sheets.map((sheet) => (
+        <g class={`em-sheet em-${layer.name}`}>
+          <g class="em-shadow" transform={shadow}>
+            {sheet.map((cut) => (
+              <path class={cut.holes ? "em-holes" : undefined} d={cut.d}></path>
+            ))}
+          </g>
+          <g class="em-face">
+            {sheet.map((cut) => (
+              <path class={cut.holes ? "em-holes" : undefined} d={cut.d}></path>
+            ))}
+          </g>
+        </g>
+      )),
+    )
+  }
+</svg>

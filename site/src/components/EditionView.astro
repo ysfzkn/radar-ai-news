@@ -29,6 +29,8 @@ const hasScope = count > 0;
 const hasIndex = count > 1;
 const weekday = weekdayName(edition.date, lang);
 const sources = edition.stories.reduce((sum, story) => sum + story.source_count, 0);
+// Words ÷ 200, rounded up, counted at build.
+const minutes = readingMinutes(edition.stories, lang);
 ---
 
 <div class:list={["edition", { "edition-railed": hasScope }]}>
@@ -55,7 +57,7 @@ const sources = edition.stories.reduce((sum, story) => sum + story.source_count,
       }
     </time>
     <span class="mh-rest label">
-      {` · ${copy.storyCount(count)} · ${copy.sources(sources)} · ${copy.minutes(readingMinutes(edition.stories, lang))}`}
+      {` · ${copy.storyCount(count)} · ${copy.sources(sources)} · ${copy.minutes(minutes)}`}
     </span>
   </h1>
 
@@ -73,10 +75,14 @@ const sources = edition.stories.reduce((sum, story) => sum + story.source_count,
   </ol>
 
   <div class="end">
+    {/* The end of the edition: the closing line, its reading time, and a line that switches off like a screen. */}
     <div class="closed">
       <EchoArcs level={5} width={88} height={28} />
       <p class="closed-text">{copy.closed}</p>
-      <p class="closed-meta label">{copy.issue(edition.number)} · {copy.storyCount(count)}</p>
+      <p class="closed-meta label">
+        {copy.issue(edition.number)} · {copy.storyCount(count)} · {copy.readTime(minutes)}
+      </p>
+      <span class="screen-off" aria-hidden="true"></span>
       <p class="closed-sub">
         {copy.dontMiss}{" "}<a class="subscribe label" href={routes[lang].subscribe}>{copy.subscribeFree}</a>
       </p>

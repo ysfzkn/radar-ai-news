@@ -1,6 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { CATEGORIES } from "../src/lib/schema";
-import { fold, readQuery, search, writeQuery, type SearchDoc, type SearchQuery } from "../src/lib/search";
+import type { Category } from "../src/lib/schema";
+import {
+  arrowStep,
+  categoryOf,
+  fill,
+  fold,
+  highlight,
+  readQuery,
+  safeHref,
+  search,
+  writeQuery,
+  type SearchDoc,
+  type SearchQuery,
+} from "../src/lib/search";
 
 const doc = (over: Partial<SearchDoc>): SearchDoc => ({
   u: "/2026-11-20/#s-00000000",
@@ -101,5 +114,107 @@ describe("readQuery and writeQuery", () => {
     for (const category of CATEGORIES) {
       expect(readQuery(new URLSearchParams(`topic=${category}`), "en").category).toBe(category);
     }
+  });
+});
+
+// Carried over from the review of Tasks 1 and 2.
+describe("readQuery against the controls the page offers", () => {
+  it("ignores a month the select does not offer and an echo value other than 3", () => {
+    const months = ["2026-11", "2026-10"];
+    expect(readQuery(new URLSearchParams("ay=2026-11"), "tr", months).month).toBe("2026-11");
+    expect(readQuery(new URLSearchParams("ay=2026-09"), "tr", months).month).toBeNull();
+    expect(readQuery(new URLSearchParams("month=2025-01"), "en", months).month).toBeNull();
+    expect(readQuery(new URLSearchParams("yanki=3"), "tr", months).minEcho).toBe(3);
+    for (const value of ["1", "2", "4", "5", "03", "3.0"]) {
+      expect(readQuery(new URLSearchParams(`yanki=${value}`), "tr", months).minEcho, value).toBe(0);
+    }
+  });
+});
+
+describe("safeHref", () => {
+  it("links only same-site paths: a slash followed by anything but a slash or a backslash", () => {
+    expect(safeHref("/2026-11-20/#s-1a2b3c4d")).toBe("/2026-11-20/#s-1a2b3c4d");
+    expect(safeHref("/en/2026-11-20/#s-1")).toBe("/en/2026-11-20/#s-1");
+    for (const bad of ["//evil.example", "/\\evil.example", "/\\/x", "https://evil.example/", "javascript:alert(1)", "", "/", "x/y", " /a"]) {
+      expect(safeHref(bad), bad).toBeNull();
+    }
+  });
+});
+
+describe("arrowStep", () => {
+  const key = (k: string, mods: Partial<Record<"altKey" | "ctrlKey" | "metaKey" | "shiftKey", boolean>> = {}) => ({
+    key: k,
+    altKey: false,
+    ctrlKey: false,
+    metaKey: false,
+    shiftKey: false,
+    ...mods,
+  });
+  it("moves by one for the arrow keys", () => {
+    expect(arrowStep(key("ArrowRight"))).toBe(1);
+    expect(arrowStep(key("ArrowDown"))).toBe(1);
+    expect(arrowStep(key("ArrowLeft"))).toBe(-1);
+    expect(arrowStep(key("ArrowUp"))).toBe(-1);
+    expect(arrowStep(key("a"))).toBe(0);
+  });
+  it("ignores a press with Alt, Ctrl or Meta held", () => {
+    for (const mod of ["altKey", "ctrlKey", "metaKey"] as const) {
+      expect(arrowStep(key("ArrowLeft", { [mod]: true })), mod).toBe(0);
+      expect(arrowStep(key("ArrowRight", { [mod]: true })), mod).toBe(0);
+    }
+  });
+});
+
+describe("categoryOf", () => {
+  it("passes a known category and refuses anything else", () => {
+    for (const category of CATEGORIES) expect(categoryOf(category)).toBe(category);
+    for (const bad of ["weather", "model x", "model\"", "", "__proto__", "constructor", 3, null, undefined]) {
+      expect(categoryOf(bad), String(bad)).toBeNull();
+    }
+  });
+});
+
+describe("fill", () => {
+  it("puts the number where {n} stands", () => {
+    expect(fill("{n} kaynak", 7)).toBe("7 kaynak");
+    expect(fill("İlk {n} sonuç gösteriliyor.", 100)).toBe("İlk 100 sonuç gösteriliyor.");
+    expect(fill("no number", 2)).toBe("no number");
+  });
+});
+
+describe("search by the category's name", () => {
+  const names = { security: "Güvenlik", model: "Model" } as Partial<Record<Category, string>>;
+  const docs = [
+    doc({ u: "m", d: "2026-11-20", c: "model", t: "Güvenlik açığı kapandı", s: "x" }),
+    doc({ u: "s1", d: "2026-11-19", c: "security", t: "Bir sızıntı", s: "y" }),
+    doc({ u: "s2", d: "2026-11-18", c: "security", t: "Başka", s: "z" }),
+  ];
+  it("finds stories of a category by its name in the current language, title hits first", () => {
+    expect(search(docs, { ...none, q: "güvenlik" }, names).map((d) => d.u)).toEqual(["m", "s1", "s2"]);
+    expect(search(docs, { ...none, q: "GUVENLIK" }, names).map((d) => d.u)).toEqual(["m", "s1", "s2"]);
+    expect(search(docs, { ...none, q: "güvenlik sızıntı" }, names).map((d) => d.u)).toEqual(["s1"]);
+    // Without names the category is not searched.
+    expect(search(docs, { ...none, q: "güvenlik" }).map((d) => d.u)).toEqual(["m"]);
+  });
+});
+
+describe("highlight", () => {
+  const join = (parts: { text: string; hit: boolean }[]) => parts.map((p) => p.text).join("");
+  it("keeps the text identical and marks every folded match", () => {
+    const text = "İstanbul'da şifre: ISTANBUL ve ıstanbul";
+    const parts = highlight(text, "istanbul sifre");
+    expect(join(parts)).toBe(text);
+    expect(parts.filter((p) => p.hit).map((p) => p.text)).toEqual(["İstanbul", "şifre", "ISTANBUL", "ıstanbul"]);
+  });
+  it("merges overlapping matches and copes with markup in the text", () => {
+    const text = "<script>alert(1)</script> café";
+    const parts = highlight(text, "scri cript cafe");
+    expect(join(parts)).toBe(text);
+    expect(parts.filter((p) => p.hit).map((p) => p.text)).toEqual(["script", "script", "café"]);
+  });
+  it("returns the text as one plain part when nothing matches or the query is empty", () => {
+    expect(highlight("Başlık", "")).toEqual([{ text: "Başlık", hit: false }]);
+    expect(highlight("Başlık", "yok")).toEqual([{ text: "Başlık", hit: false }]);
+    expect(highlight("", "x")).toEqual([]);
   });
 });

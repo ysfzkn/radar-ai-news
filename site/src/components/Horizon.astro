@@ -1,0 +1,92 @@
+---
+// The horizon that closes every page: one line drawn at one weight, hills, a town and, on its
+// tallest roof, a small radar dish that turns; two or three birds drift above. Decoration only.
+// The drawing is 640 × 96 (the reading column at 1:1); on a narrow screen it keeps its height and
+// shows its middle, where the town and the dish are.
+
+/** One building on the skyline, left to right: where it starts, how wide, how tall, its roof. */
+type Roof = "flat" | "gable" | "step" | "spire";
+const GROUND = 90;
+const town: [number, number, number, Roof][] = [
+  [156, 22, 16, "gable"],
+  [178, 16, 30, "flat"],
+  [194, 26, 22, "step"],
+  [220, 14, 40, "spire"],
+  [234, 30, 18, "gable"],
+  [264, 20, 34, "flat"],
+  [284, 34, 26, "step"],
+  [318, 18, 46, "flat"],
+  [336, 24, 20, "gable"],
+  [360, 16, 30, "flat"],
+  // The tallest roof carries the dish.
+  [376, 32, 50, "flat"],
+  [408, 22, 26, "step"],
+  [430, 28, 18, "gable"],
+  [458, 16, 36, "spire"],
+  [474, 26, 22, "flat"],
+];
+
+const r = (v: number) => +v.toFixed(2);
+// The town as one outline along its roofs, from the ground at its left end to the ground at its right.
+let line = `M${town[0][0]} ${GROUND}`;
+for (const [x, w, h, roof] of town) {
+  const top = GROUND - h;
+  line += `V${top}`;
+  if (roof === "gable") line += `L${r(x + w / 2)} ${top - 7}L${x + w} ${top}`;
+  else if (roof === "step") line += `H${r(x + w * 0.3)}V${top - 6}H${r(x + w * 0.7)}V${top}H${x + w}`;
+  else if (roof === "spire") line += `H${r(x + w / 2 - 1.5)}L${r(x + w / 2)} ${top - 14}L${r(x + w / 2 + 1.5)} ${top}H${x + w}`;
+  else line += `H${x + w}`;
+}
+const end = town.at(-1)!;
+line += `V${GROUND}`;
+
+// A few lit windows on the taller buildings: short strokes, the engraver's hatching.
+const windows = town
+  .filter(([, , h]) => h >= 30)
+  .flatMap(([x, w, h]) =>
+    Array.from({ length: Math.floor((h - 10) / 8) }, (_, i) => `M${r(x + w * 0.3)} ${GROUND - h + 8 + i * 8}h${r(w * 0.4)}`),
+  )
+  .join("");
+
+// Hills either side of the town, behind it: they meet the ground where the town begins and ends.
+const hills =
+  `M0 ${GROUND - 14}C40 ${GROUND - 30} 96 ${GROUND - 28} 156 ${GROUND - 8}` +
+  `M${end[0] + end[1]} ${GROUND - 10}C540 ${GROUND - 34} 600 ${GROUND - 26} 640 ${GROUND - 18}`;
+
+// The dish on the tallest roof: a mast, a tilted bowl and its feed. It turns about the mast.
+const [dx, dw, dh] = town[10];
+const mastX = dx + dw / 2;
+const roof = GROUND - dh;
+const mast = `M${mastX} ${roof}V${roof - 10}M${mastX - 5} ${roof}L${mastX} ${roof - 6}L${mastX + 5} ${roof}`;
+const bowl = `M${mastX - 12} ${roof - 21}Q${mastX - 2} ${roof - 4} ${mastX + 11} ${roof - 13}Z`;
+const feed = `M${mastX - 0.5} ${roof - 12.5}L${mastX - 6} ${roof - 23}`;
+const tip = { cx: mastX - 6, cy: roof - 23 };
+
+// Three birds, the gull's two strokes, each drifting on its own slow course.
+const birds = [
+  { x: 286, y: 24, s: 1 },
+  { x: 304, y: 16, s: 0.8 },
+  { x: 318, y: 30, s: 0.65 },
+].map(({ x, y, s }) => `M${r(x - 6 * s)} ${y}Q${r(x - 3 * s)} ${r(y - 4 * s)} ${x} ${y}Q${r(x + 3 * s)} ${r(y - 4 * s)} ${r(x + 6 * s)} ${y}`);
+---
+
+<svg
+  class="horizon"
+  viewBox="0 0 640 96"
+  preserveAspectRatio="xMidYMax slice"
+  aria-hidden="true"
+>
+  <path class="hz-line" d={`M0 ${GROUND}H640`}></path>
+  <path class="hz-line hz-far" d={hills}></path>
+  <path class="hz-line" d={line}></path>
+  <path class="hz-line hz-fine" d={windows}></path>
+  <g class="hz-dish">
+    <path class="hz-line" d={mast}></path>
+    <g class="hz-turn">
+      <path class="hz-line" d={bowl}></path>
+      <path class="hz-line" d={feed}></path>
+      <circle class="hz-tip" cx={tip.cx} cy={tip.cy} r="1.6"></circle>
+    </g>
+  </g>
+  {birds.map((d, i) => <path class={`hz-line hz-bird hz-bird-${i + 1}`} d={d}></path>)}
+</svg>

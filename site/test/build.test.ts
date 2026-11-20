@@ -100,6 +100,9 @@ function wellFormed(xml: string): boolean {
   return stack.length === 0;
 }
 
+/** The search's "more" line as the script writes it. */
+const fillMore = (lang: "tr" | "en") => COPY[lang].search.templates.more.replace("{n}", "100");
+
 const items = (xml: string) => [...xml.matchAll(/<item>[\s\S]*?<\/item>/g)].map((m) => m[0]);
 
 /** Visible text of an HTML fragment: tags dropped, entities for &, <, >, quotes decoded. */
@@ -811,7 +814,10 @@ describe("built site", () => {
     let marks = 0;
     let meters = 0;
     let scopes = 0;
-    for (const file of [DEMO, REAL].flatMap(htmlFiles)) {
+    let emblems = 0;
+    let horizons = 0;
+    const files = [DEMO, REAL].flatMap(htmlFiles);
+    for (const file of files) {
       const html = readFileSync(file, "utf8");
       for (const [svg] of html.matchAll(/<svg[\s\S]*?<\/svg>/g)) {
         expect(svg, file).not.toMatch(/\s(fill|stroke|color|stop-color)="/);
@@ -822,6 +828,10 @@ describe("built site", () => {
           marks++;
         } else if (/^<svg class="scope-(plate|layer layer-[123])" viewBox="-100 -100 200 200"/.test(svg)) {
           scopes++;
+        } else if (/^<svg class="emblem cat-[a-z]+" viewBox="0 0 48 48" width="(56|96)" height="\1" aria-hidden="true">/.test(svg)) {
+          emblems++;
+        } else if (svg.startsWith('<svg class="horizon" viewBox="0 0 640 96" preserveAspectRatio="xMidYMax slice" aria-hidden="true">')) {
+          horizons++;
         } else {
           expect(svg, file).toMatch(/^<svg class="echo-arcs" viewBox="0 0 44 14"/);
           for (const arc of meterArcs) expect(svg, file).toContain(arc);
@@ -833,6 +843,9 @@ describe("built site", () => {
     expect(meters).toBeGreaterThan(50);
     // Four drawings per edition page (plate and three ring layers): 4 dates in two languages, plus two homes.
     expect(scopes).toBe(2 * (4 * 2 + 2) * 4);
+    // One emblem on each edition page (the lead's) and on each topic page; one horizon on every page.
+    expect(emblems).toBe(2 * ((4 * 2 + 2) + 8 * 2));
+    expect(horizons).toBe(files.length);
     // Before the wordmark: 20 px, hidden from screen readers.
     const strip = page(DEMO, "").match(/<a class="wordmark"[\s\S]*?<\/svg>/)![0];
     expect(strip).toMatch(/<svg class="mark" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">/);
@@ -856,9 +869,165 @@ describe("built site", () => {
   it("the end of an edition closes it and points to the neighbouring issues", () => {
     const html = page(DEMO, "2026-11-19");
     const end = html.match(/<div class="end">([\s\S]*?)<\/main>/)![1];
-    expect(text(end)).toMatch(/^Baskı kapandı\. ?Sayı 3 · \d+ haber ?Sonraki sayıyı kaçırma\. ?Ücretsiz abone ol ?← Önceki sayı/);
+    expect(text(end)).toMatch(/^Bugünlük bu kadar\. ?Sayı 3 · \d+ haber · \d+ dk okuma ?Sonraki sayıyı kaçırma\. ?Ücretsiz abone ol ?← Önceki sayı/);
+    // The reading time is the masthead's: words ÷ 200, rounded up, counted at build.
+    const minutes = (h: string) => h.match(/~(\d+) (?:dk|min)/)![1];
+    expect(text(end)).toContain(`${minutes(h1(html))} dk okuma`);
+    const en = page(DEMO, "en/2026-11-19");
+    expect(text(en.match(/<div class="closed">([\s\S]*?)<\/div>/)![1])).toMatch(
+      new RegExp(`^That's all for today\\. ?Issue 3 · \\d+ stories · ${minutes(h1(en))} min read`),
+    );
+    // The line that switches off is decoration, after the reading time.
+    expect(end).toMatch(/<p class="closed-meta label">[\s\S]*?<\/p>\s*<span class="screen-off" aria-hidden="true"><\/span>/);
     expect(end).toMatch(/<a class="pager-prev" href="\/2026-11-18\/" rel="prev">/);
     expect(end).toMatch(/<a class="pager-next" href="\/2026-11-20\/" rel="next">/);
+  });
+
+  it("the lead story carries its category's emblem at 56 px and each topic page opens with it at 96 px", () => {
+    for (const path of ["", "en", "2026-11-17", "en/2026-11-18"]) {
+      const list = articles(page(DEMO, path));
+      const category = list[0].match(/^<article id="[^"]+" class="story story-lead cat-([a-z]+)"/)![1];
+      const svgs = list[0].match(/<svg class="emblem[^"]*"[^>]*>/g)!;
+      expect(svgs, path).toEqual([`<svg class="emblem cat-${category}" viewBox="0 0 48 48" width="56" height="56" aria-hidden="true">`]);
+      // Between the label row and the headline, so the headline is still the article's first heading.
+      expect(list[0]).toMatch(/<\/p>\s*<svg class="emblem[\s\S]*?<\/svg>\s*<h2 class="story-title">/);
+      for (const article of list.slice(1)) expect(article, path).not.toContain('class="emblem');
+    }
+    for (const category of CATEGORIES) {
+      for (const path of [`konu/${category}`, `en/topic/${category}`]) {
+        const html = page(DEMO, path);
+        const head = html.match(/<div class="topic-head">([\s\S]*?)<\/h1>/)![1];
+        expect(head, path).toMatch(
+          new RegExp(`^\\s*<svg class="emblem cat-${category}" viewBox="0 0 48 48" width="96" height="96" aria-hidden="true">`),
+        );
+      }
+    }
+    // Each emblem is a tile and its sheets, each sheet a shadow and a face of the same cut-outs.
+    const svg = page(DEMO, "konu/security").match(/<svg class="emblem[\s\S]*?<\/svg>/)![0];
+    expect(svg).toContain('<rect class="em-tile"');
+    const sheets = [
+      ...svg.matchAll(
+        /<g class="em-sheet em-(mid|top)"><g class="em-shadow" transform="translate\(1.6 1.6\)">([\s\S]*?)<\/g><g class="em-face">([\s\S]*?)<\/g><\/g>/g,
+      ),
+    ];
+    expect(sheets.map((m) => m[1])).toEqual(["mid", "top"]);
+    for (const [, , shadow, face] of sheets) expect(shadow).toBe(face);
+    // The sheets lift on scroll only where a view timeline exists, and never under reduced motion.
+    const lift = declarations(css()).filter((d) => d.prop === "animation-timeline" && d.selector.includes(".em-"));
+    expect(lift.map((d) => d.stack.join(" | "))).toEqual([
+      "@media (prefers-reduced-motion: no-preference) | @supports (animation-timeline: scroll()) | .em-mid .em-face, .em-top .em-face",
+    ]);
+  });
+
+  it("every page ends with the horizon above the signature, hidden from assistive tech and from print", () => {
+    for (const file of [DEMO, EMPTY].flatMap(htmlFiles)) {
+      const foot = readFileSync(file, "utf8").match(/<footer class="foot label">([\s\S]*?)<\/footer>/)![1];
+      expect(foot, file).toMatch(/^\s*<svg class="horizon" [^>]*aria-hidden="true">[\s\S]*?<\/svg>\s*<p class="sig">/);
+      const horizon = foot.match(/<svg class="horizon"[\s\S]*?<\/svg>/)![0];
+      expect(horizon).not.toMatch(/<a\s|<text|tabindex/);
+      expect(horizon).toContain('class="hz-turn"');
+      expect(horizon.match(/class="hz-line hz-bird hz-bird-\d"/g)).toHaveLength(3);
+    }
+    const print = printRules(css());
+    expect(cssRule(print, ".screen-off,\n  .horizon")).toContain("display: none;");
+    // One weight: every line of the drawing is the same stroke, kept at its width at any scale.
+    const line = cssRule(css(), ".hz-line");
+    expect(line).toContain("stroke-width: 1.25;");
+    expect(line).toContain("vector-effect: non-scaling-stroke;");
+  });
+
+  it("the why-it-matters line inks in only by script, only with motion, and prints in ink", () => {
+    const decls = declarations(css());
+    const wait = decls.filter((d) => d.selector === ".ink-wait .ink-w");
+    expect(wait.map((d) => `${d.stack[0]} ${d.prop}: ${d.value}`)).toEqual([
+      "@media (prefers-reduced-motion: no-preference) color: var(--line)",
+      "@media print color: inherit",
+    ]);
+    // No page carries the classes in its markup: only reading.ts adds them.
+    for (const file of htmlFiles(DEMO)) {
+      const html = readFileSync(file, "utf8");
+      expect(html, file).not.toMatch(/ink-wait|ink-go|ink-w|is-off/);
+    }
+    const reading = readFileSync(join(root, "src", "scripts", "reading.ts"), "utf8");
+    expect(reading).toContain('matchMedia("(prefers-reduced-motion: reduce)")');
+    expect(reading).toContain("textContent = token.text");
+    // The script comes with the scope's bundle, so an edition page still loads two scripts.
+    expect(readFileSync(join(root, "src", "components", "Scope.astro"), "utf8")).toContain('import "../scripts/reading";');
+  });
+
+  it("the opening ends on the mark and the issue, and all its beats fit in 1200 ms", () => {
+    const intro = readFileSync(join(root, "src", "scripts", "intro.ts"), "utf8");
+    const beat = (name: string) => Number(intro.match(new RegExp(`const ${name} = (\\d+);`))![1]);
+    expect(beat("SWEEP") + beat("MEET") + beat("HOLD") + beat("FADE")).toBeLessThanOrEqual(beat("BUDGET"));
+    expect(beat("BUDGET")).toBe(1200);
+    // The issue comes from the masthead as text and reaches only the canvas.
+    expect(intro).toContain('document.querySelector(".masthead .mh-no")');
+    expect(intro).toContain("ctx.fillText(issue");
+  });
+
+  it("the archive search: templates from the copy, a line when results are cut, an empty state, and the list in print", () => {
+    for (const lang of ["tr", "en"] as const) {
+      const t = COPY[lang].search.templates;
+      const fill = (template: string, n: number) => template.replace("{n}", String(n));
+      for (const n of [2, 7, 42]) {
+        expect(fill(t.sourceMany, n)).toBe(COPY[lang].sources(n));
+        expect(fill(t.countMany, n)).toBe(COPY[lang].search.count(n));
+      }
+      expect(t.sourceOne).toBe(COPY[lang].sources(1));
+      expect(t.countOne).toBe(COPY[lang].search.count(1));
+      expect(t.countNone).toBe(COPY[lang].search.count(0));
+      expect(t.more).toContain("{n}");
+    }
+    expect(fillMore("tr")).toBe("İlk 100 sonuç gösteriliyor.");
+    // No number is cut out of a phrase at build any more.
+    expect(readFileSync(join(root, "src", "components", "ArchiveView.astro"), "utf8")).not.toMatch(/\.replace\(/);
+    for (const [path, lang] of [["arsiv", "tr"], ["en/archive", "en"]] as const) {
+      const html = page(DEMO, path);
+      const region = html.match(/<section class="search"[^>]*>[\s\S]*?<\/section>/)![0];
+      const raw = region.match(/data-labels="([^"]*)"/)![1];
+      const labels = JSON.parse(raw.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&"));
+      expect(labels.more).toBe(COPY[lang].search.templates.more);
+      expect(region).toMatch(/<p class="search-more label" data-more hidden><\/p>/);
+      // The empty state: the echo meter with nothing lit, a line and a hint, hidden until needed.
+      const empty = region.match(/<div class="search-empty" data-empty hidden>([\s\S]*?)<\/div>/)![1];
+      expect(empty.match(/class="echo-on"/g)).toBeNull();
+      expect(text(empty).replace(/\.(?=\S)/, ". ")).toBe(`${COPY[lang].search.emptyTitle} ${COPY[lang].search.emptyHint}`);
+      // The input sits in a framed box led by the brand mark.
+      expect(region).toMatch(
+        /<div class="search-box"><svg class="mark" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">[\s\S]*?<\/svg>\s*<input class="search-input" id="search-q"/,
+      );
+      // The heat strip's caption and key.
+      const key = html.match(/<p class="heat-key label">([\s\S]*?)<\/p>/)![1];
+      expect(text(key).replace(/\s/g, "")).toBe(`${COPY[lang].search.heat}${COPY[lang].search.heatLess}${COPY[lang].search.heatMore}`.replace(/\s/g, ""));
+      // The scale is for the eye; the caption is what a screen reader hears.
+      expect(key).toMatch(/<span class="heat-scale" aria-hidden="true">/);
+      expect(key.match(/class="heat-day heat-[1-4]"/g)).toHaveLength(4);
+    }
+    // In print the search goes and the archive list comes back, even where the script hid it.
+    const print = printRules(css());
+    expect(cssRule(print, "[data-archive-list][hidden]")).toContain("display: block;");
+    expect(cssRule(print, ".search,\n  .heat,\n  .heat-key")).toContain("display: none;");
+    // A result's tag is the stories' category tag.
+    expect(css()).toContain("a.story-cat,\n.topic-tag,\n.result-cat {");
+  });
+
+  it("on a phone the scope is capped at 280 px and the lead card is tighter", () => {
+    const decls = declarations(css());
+    const narrow = (selector: string, prop: string) =>
+      decls.find((d) => d.selector === selector && d.prop === prop && d.stack[0] === "@media (max-width: 39.99em)")?.value;
+    expect(narrow(".scope", "max-width")).toBe("17.5rem");
+    expect(narrow(".scope", "padding")).toBe("var(--space-2)");
+    expect(narrow(".story-lead", "padding")).toBe("1rem");
+  });
+
+  it("the Künye page says what the site's own script does and the one key it keeps", () => {
+    for (const [path, lang] of [["kunye", "tr"], ["en/about", "en"]] as const) {
+      const body = text(page(DEMO, path));
+      expect(body, path).not.toMatch(/betik yok|no outside fonts or scripts/);
+      expect(body).toContain("radar:intro");
+      expect(body).toContain(lang === "tr" ? "betik olmadan da eksiksiz çalışır" : "complete without scripts");
+      expect(body).toContain(lang === "tr" ? "seni izlemez" : "does not track you");
+    }
   });
 
   it("no page has an inline script, a style element, an on* attribute or a style attribute, and every script is a local file", () => {
@@ -1492,12 +1661,12 @@ describe("built site", () => {
     const users = decls.filter((d) => /var\(--cat(-soft)?[,)]/.test(d.value)).map((d) => d.selector);
     for (const selector of users) {
       expect(selector).toMatch(
-        /^(a\.story-cat, \.topic-tag|\.story-cat|\.story-no|\.story:target::before|\.chip|\.chip\[aria-checked="true"\]|\.blip-dot|\.blip-echo|\.blip\.is-read \.blip-(dot|no)|\.readout-no)$/,
+        /^(a\.story-cat, \.topic-tag, \.result-cat|\.story-cat|\.story-no|\.story:target::before|\.chip|\.chip\[aria-checked="true"\]|\.blip-dot|\.blip-echo|\.blip\.is-read \.blip-(dot|no)|\.readout-no|\.emblem|\.em-tile|\.em-top \.em-face)$/,
       );
     }
     expect(new Set(users)).toEqual(
       new Set([
-        "a.story-cat, .topic-tag",
+        "a.story-cat, .topic-tag, .result-cat",
         ".story-cat",
         ".story-no",
         ".story:target::before",
@@ -1508,18 +1677,23 @@ describe("built site", () => {
         ".blip.is-read .blip-dot",
         ".blip.is-read .blip-no",
         ".readout-no",
+        ".emblem",
+        ".em-tile",
+        ".em-top .em-face",
       ]),
     );
+    // The emblem's mid tint is mixed from the category's own pair, so no new colour enters the table.
+    expect(value(".emblem", "--cat-mid")).toBe("color-mix(in srgb, var(--cat) 55%, var(--cat-soft))");
   });
 
-  it("only the lead card, the scope, the subscribe button and the try button have a box-shadow, and none is blurred", () => {
+  it("only the lead card, the scope, the search box, the subscribe button and the try button have a box-shadow, and none is blurred", () => {
     const shadows = declarations(sheets()).filter((d) => d.prop === "box-shadow");
     expect(shadows.length).toBeGreaterThan(3);
     for (const shadow of shadows) {
       expect(shadow.value === "none" || /^\d+px \d+px 0 var\(--ink\)$/.test(shadow.value), shadow.value).toBe(true);
       for (const part of shadow.selector.split(",").map((x) => x.trim())) {
         expect(part.replace(/:(hover|focus-visible|active)$/, "").replace(/\[aria-current="page"\]$/, "")).toMatch(
-          /^(\.story-lead \.try|\.(story-lead|scope|subscribe|try))$/,
+          /^(\.story-lead \.try|\.(story-lead|scope|search-box|subscribe|try))$/,
         );
         if (part.startsWith(".story-lead .try")) expect(shadow.value).toBe("none");
       }
@@ -1584,11 +1758,15 @@ describe("built site", () => {
       if (d.prop === "animation-timeline") expect(context).toMatch(/@supports \(animation-timeline: scroll\(\)\)/);
       if (d.prop.startsWith("transition")) expect(d.value).toMatch(/120ms/);
     }
-    // Nothing loops but the scope's one 6 s clock: the sweep, each blip's echo and the readout.
+    // Nothing loops but the scope's one 6 s clock (the sweep, each blip's echo and the readout) and
+    // the horizon's slow dish and birds, at 20 s or slower.
     expect(sheets()).not.toMatch(/alternate/);
     const loops = decls.filter((d) => /infinite/.test(d.value));
-    expect(loops.map((d) => d.selector).sort()).toEqual([".blip-echo", ".readout-line", ".scope-sweep"]);
-    for (const d of loops) expect(d.value, d.selector).toMatch(/^[a-z-]+ 6s .*infinite$/);
+    expect(loops.map((d) => d.selector).sort()).toEqual([".blip-echo", ".hz-bird", ".hz-turn", ".readout-line", ".scope-sweep"]);
+    for (const d of loops.filter((x) => !x.selector.startsWith(".hz-"))) expect(d.value, d.selector).toMatch(/^[a-z-]+ 6s .*infinite$/);
+    for (const d of decls.filter((x) => x.selector.startsWith(".hz-") && /^animation(-duration)?$/.test(x.prop))) {
+      expect(Number(d.value.match(/(\d+)s\b/)![1]), `${d.selector} ${d.value}`).toBeGreaterThanOrEqual(20);
+    }
     // The progress bar is invisible by default; only the edition view renders it.
     const bar = cssRule(css(), ".progress");
     for (const rule of ["position: fixed;", "top: 0;", "height: 3px;", "transform: scaleX(0);", "transform-origin: 0 50%;"]) {
@@ -1629,6 +1807,11 @@ describe("built site", () => {
         "@keyframes blip-ping",
         "@keyframes scope-readout",
         "@keyframes intro-hold",
+        "@keyframes ink-in",
+        "@keyframes screen-off",
+        "@keyframes emblem-lift",
+        "@keyframes dish-turn",
+        "@keyframes bird-drift",
       ]),
     );
     const fades = keyframes.filter((d) => d.prop === "opacity");

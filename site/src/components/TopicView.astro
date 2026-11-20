@@ -1,0 +1,29 @@
+---
+import Emblem from "./Emblem.astro";
+import StoryList from "./StoryList.astro";
+import { COPY } from "../lib/copy";
+import { categoryClass } from "../lib/format";
+import type { Category, Lang, PublicStory } from "../lib/schema";
+
+interface Props {
+  lang: Lang;
+  category: Category;
+  /** Newest first. */
+  stories: PublicStory[];
+}
+
+const { lang, category, stories } = Astro.props;
+const copy = COPY[lang];
+---
+
+{/* The topic's header: its emblem, its tag as the heading, and how many stories it holds. */}
+<div class="topic-head">
+  <Emblem category={category} size={96} />
+  <div class="topic-name">
+    <h1 class:list={["kunye label", categoryClass(category)]}>
+      <span class="topic-tag caps">{copy.categories[category]}</span>
+    </h1>
+    {stories.length > 0 && <p class="topic-count label">{copy.storyCount(stories.length)}</p>}
+  </div>
+</div>
+{stories.length > 0 ? <StoryList lang={lang} stories={stories} /> : <p class="empty">{copy.topicEmpty}</p>}

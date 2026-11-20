@@ -491,6 +491,16 @@ a.lang-part:focus-visible {
   }
 }
 
+/* On a phone the instrument is capped at 280px, in the middle of the column, with a tighter card,
+   so the first story's headline comes up sooner. */
+@media (max-width: 39.99em) {
+  .scope {
+    max-width: 17.5rem;
+    margin: var(--space-4) auto 0;
+    padding: var(--space-2);
+  }
+}
+
 .scope-head {
   display: flex;
   justify-content: space-between;
@@ -845,6 +855,68 @@ html:not(.intro) .intro-canvas {
   display: none;
 }
 
+/* The category emblems (Emblem.astro): a paper cut-out on its tile. The tile is the category's
+   tint inside an ink outline; above it two sheets of cut paper, the middle one in a mid tint and
+   the top one in the category's colour, each casting a hard ink shadow on what lies below. The
+   mid tint is the colour mixed into its own tint, so all eight sets come from the category table. */
+.emblem {
+  --cat-mid: color-mix(in srgb, var(--cat) 55%, var(--cat-soft));
+  flex: none;
+  overflow: visible;
+}
+
+.em-tile {
+  fill: var(--cat-soft);
+  stroke: var(--ink);
+  stroke-width: 1.25;
+}
+
+.em-shadow {
+  fill: var(--ink);
+}
+
+.em-mid .em-face {
+  fill: var(--cat-mid);
+}
+
+.em-top .em-face {
+  fill: var(--cat);
+}
+
+.em-holes {
+  fill-rule: evenodd;
+}
+
+/* A topic page opens with its emblem beside the topic's tag and its story count. */
+.topic-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  padding-block: var(--space-5) var(--space-6);
+}
+
+.topic-head .kunye {
+  padding-block: 0;
+  font-size: 1rem;
+}
+
+.topic-count {
+  margin-top: var(--space-2);
+  color: var(--muted);
+}
+
+/* On the lead's card the emblem stands on the top edge at the right, half outside the card, as a
+   cut-out laid on it; the label row keeps clear of it. */
+.story-lead .emblem {
+  position: absolute;
+  top: -1.5rem;
+  right: 0.75rem;
+}
+
+.story-lead .story-meta {
+  padding-right: 4rem;
+}
+
 /* The stories. */
 .stories {
   padding: 0;
@@ -924,6 +996,12 @@ html:not(.intro) .intro-canvas {
   box-shadow: 3px 3px 0 var(--ink);
 }
 
+@media (max-width: 39.99em) {
+  .story-lead {
+    padding: 1rem;
+  }
+}
+
 .story-meta {
   display: flex;
   flex-wrap: wrap;
@@ -964,9 +1042,10 @@ a.story-no:focus-visible {
 }
 
 /* The category tag: its colour on its tint inside a 1px outline; it links to its topic page.
-   A topic page's heading is the same tag. */
+   A topic page's heading and a search result's tag are the same tag. */
 a.story-cat,
-.topic-tag {
+.topic-tag,
+.result-cat {
   padding: 0.125rem 0.5rem;
   border: 1px solid var(--cat, var(--ink));
   background: var(--cat-soft, transparent);
@@ -1226,6 +1305,18 @@ a.story-cat:hover {
   color: var(--muted);
 }
 
+/* Under the reading time, a short accent line: the screen of the day. reading.ts switches it off
+   once (`is-off`): it thins to a hairline, then shrinks to a dot that stays. */
+.screen-off {
+  display: block;
+  width: 12rem;
+  max-width: 60%;
+  height: 6px;
+  margin-top: var(--space-4);
+  background: var(--accent);
+  transform: scaleY(0.34);
+}
+
 /* Under the closing line: the next issue and the subscribe button. */
 .closed-sub {
   display: flex;
@@ -1364,14 +1455,36 @@ a.story-cat:hover {
   }
 }
 
-/* Archive search: revealed by script; without it the region keeps its `hidden` attribute and the list below stays. */
+/* Archive search: revealed by script; without it the region keeps its `hidden` attribute and the
+   list below stays. It speaks the site's language: the input sits in a key's frame (ink outline,
+   white, hard shadow) led by the brand mark, the topic chips are the stories' category tags, and
+   a result is an archive row. */
 .search {
   padding-bottom: var(--space-5);
 }
 
 .search-field {
   display: grid;
-  gap: var(--space-1);
+  gap: var(--space-2);
+}
+
+.search-label {
+  color: var(--muted);
+}
+
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-inline: var(--space-3);
+  border: 1.5px solid var(--ink);
+  background: var(--surface);
+  box-shadow: 3px 3px 0 var(--ink);
+}
+
+.search-box:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 
 .search-input,
@@ -1383,10 +1496,20 @@ a.story-cat:hover {
   font: inherit;
 }
 
+/* The frame carries the border and the focus ring; the field itself is bare, in the display face. */
 .search-input {
-  width: 100%;
-  padding: var(--space-2) var(--space-3);
-  font-size: 1rem;
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-3) 0;
+  border: 0;
+  font-family: var(--font-display);
+  font-size: 1.375rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.search-input:focus-visible {
+  outline: none;
 }
 
 .search-select {
@@ -1401,28 +1524,29 @@ a.story-cat:hover {
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
-  margin-top: var(--space-3);
+  margin-top: var(--space-4);
 }
 
 .search-filters {
   gap: var(--space-2) var(--space-4);
+  margin-top: var(--space-3);
 }
 
-/* A topic chip: the category tag as a radio button, in its colour; the checked one is tinted and underlined. */
+/* A topic chip is the category tag as a radio button: its colour on its tint inside a 1px
+   outline, as on a story. The checked one is filled with its colour; "All" is ink. */
 .chip {
-  min-height: 2.5rem;
-  padding: 0.125rem 0.75rem;
+  min-height: 2.25rem;
+  padding: 0.125rem 0.625rem;
   border: 1px solid var(--cat, var(--ink));
-  background: transparent;
+  background: var(--cat-soft, var(--surface));
   color: var(--cat, var(--ink));
   cursor: pointer;
 }
 
 .chip[aria-checked="true"] {
-  background: var(--cat-soft, var(--chip));
+  background: var(--cat, var(--ink));
+  color: var(--surface);
   font-weight: 700;
-  text-decoration: underline;
-  text-underline-offset: 0.25em;
 }
 
 .search-echo {
@@ -1430,6 +1554,13 @@ a.story-cat:hover {
   align-items: center;
   gap: var(--space-2);
   min-height: 2.5rem;
+}
+
+.search-echo input {
+  width: 1.125rem;
+  height: 1.125rem;
+  margin: 0;
+  accent-color: var(--accent);
 }
 
 .search-clear {
@@ -1442,31 +1573,94 @@ a.story-cat:hover {
   cursor: pointer;
 }
 
+.search-clear:hover {
+  background: var(--chip);
+}
+
 .search-count {
   min-height: 1.5em;
-  margin-top: var(--space-3);
+  margin-top: var(--space-4);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--control-border);
   color: var(--muted);
 }
 
+/* A result is an archive row: its tag and date in the label voice, the title, one line of the summary. */
 .result-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--space-2);
   color: var(--muted);
+}
+
+.result-date {
+  color: var(--ink);
 }
 
 .result-title {
-  display: inline-block;
   margin-top: var(--space-1);
+}
+
+.result-title a {
   text-decoration-color: var(--accent);
 }
 
 .result-summary {
   margin-top: var(--space-1);
+  overflow: hidden;
   color: var(--muted);
   font-size: 0.9375rem;
   line-height: 1.45;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* The matched words: ink on the accent's tint over an accent rule, so they show at a glance. */
+.search-results mark {
+  border-bottom: 2px solid var(--accent);
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+
+.result-summary mark {
+  color: var(--ink);
+}
+
+.search-more {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+}
+
+/* No result: the echo meter with no arc lit, a line and a hint, in the middle of the column. */
+.search-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding-block: var(--space-6);
+  text-align: center;
+}
+
+.search-empty[hidden] {
+  display: none;
+}
+
+.search-empty .echo-arcs {
+  margin-bottom: var(--space-2);
+}
+
+.search-empty-title {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.search-empty-hint {
+  color: var(--muted);
+  font-size: 0.9375rem;
 }
 
 /* The heat strip: 26 week columns of 7 day squares, newest at the right. The box scrolls
@@ -1538,6 +1732,36 @@ a.heat-day:hover {
   outline-offset: 1px;
 }
 
+/* Under the strip, one line: what a square is, and its four strengths from fewer to more stories. */
+.heat-key {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-4);
+  margin-top: var(--space-1);
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.heat-scale {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.heat-scale .heat-day {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+.heat-scale .heat-1 {
+  margin-left: var(--space-1);
+}
+
+.heat-scale .heat-4 {
+  margin-right: var(--space-1);
+}
+
 /* The Künye and subscribe pages: plain running text. */
 .prose h2 {
   margin-bottom: var(--space-3);
@@ -1588,6 +1812,43 @@ a.heat-day:hover {
   user-select: all;
 }
 
+/* The horizon over the footer (Horizon.astro): one line at one weight, low on contrast; its
+   ground line is the footer's rule. Only the dish's feed carries the accent. */
+.horizon {
+  display: block;
+  width: 100%;
+  height: 6rem;
+  margin-bottom: var(--space-3);
+  overflow: hidden;
+}
+
+.hz-line {
+  fill: none;
+  stroke: var(--control-border);
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.hz-far {
+  stroke: var(--line);
+}
+
+.hz-fine {
+  stroke: var(--line);
+}
+
+.hz-tip {
+  fill: var(--accent);
+}
+
+/* The dish turns about its mast (x 392 in the drawing). */
+.hz-turn {
+  transform-box: view-box;
+  transform-origin: 392px 0;
+}
+
 /* Footer: the owner's signature, then the site's own links. */
 .foot {
   display: flex;
@@ -1595,8 +1856,7 @@ a.heat-day:hover {
   align-items: center;
   gap: var(--space-2);
   margin-top: var(--space-6);
-  padding-block: var(--space-4) var(--space-6);
-  border-top: 1px solid var(--line);
+  padding-bottom: var(--space-6);
   color: var(--muted);
   text-align: center;
 }
@@ -1711,7 +1971,56 @@ a.heat-day:hover {
   html.intro.intro-live body::before {
     content: none;
   }
+
+  /* The "why it matters" line inks in word by word when first seen (reading.ts wraps the words
+     and sets --i, their order; it adds ink-wait at once and ink-go when the line is seen). */
+  .ink-wait .ink-w {
+    color: var(--line);
+  }
+
+  .ink-go .ink-w {
+    color: inherit;
+    animation: ink-in 420ms ease-out both;
+    animation-delay: calc(var(--i, 0) * 38ms);
+  }
+
+  /* The end of the edition switches off like a screen, once. */
+  .is-off .screen-off {
+    animation: screen-off 650ms cubic-bezier(0.7, 0, 0.3, 1) forwards;
+  }
+
+  /* The horizon's dish turns once a minute's third, its birds glide on their own slow courses. */
+  .hz-turn {
+    animation: dish-turn 20s ease-in-out infinite;
+  }
+
+  .hz-bird {
+    animation: bird-drift 36s ease-in-out infinite;
+  }
+
+  .hz-bird-2 {
+    animation-duration: 44s;
+    animation-delay: -12s;
+  }
+
+  .hz-bird-3 {
+    animation-duration: 52s;
+    animation-delay: -30s;
+  }
+
   @supports (animation-timeline: scroll()) {
+    /* An emblem's sheets lift off their shadows as it comes into view: the top one twice as far. */
+    .em-mid .em-face,
+    .em-top .em-face {
+      animation: emblem-lift linear both;
+      animation-timeline: view();
+      animation-range: entry 0% cover 45%;
+    }
+
+    .em-top .em-face {
+      --lift: 2;
+    }
+
     .progress {
       animation: progress-fill linear both;
       animation-timeline: scroll(root);
@@ -1799,12 +2108,72 @@ a.heat-day:hover {
   }
 }
 
+/* From the page's faint line colour to the line's own ink. */
+@keyframes ink-in {
+  from {
+    color: var(--line);
+  }
+}
+
+/* A screen switching off: the line thins to a hairline, then shrinks to a dot that stays. */
+@keyframes screen-off {
+  45% {
+    transform: scale(1, 0.14);
+  }
+
+  100% {
+    transform: scale(0.03, 0.5);
+  }
+}
+
+/* A sheet sits flat on its shadow, then lifts away from it (towards the light, up and left). */
+@keyframes emblem-lift {
+  from {
+    translate: 1px 1px;
+  }
+
+  to {
+    translate: calc(-0.6px * var(--lift, 1)) calc(-0.6px * var(--lift, 1));
+  }
+}
+
+/* A full turn of the dish seen from the side: it faces away, edge on, then back. */
+@keyframes dish-turn {
+  0%,
+  100% {
+    transform: scaleX(1);
+  }
+
+  50% {
+    transform: scaleX(-1);
+  }
+}
+
+/* A bird's glide: a little across and up, and back. */
+@keyframes bird-drift {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+
+  50% {
+    translate: 26px -5px;
+  }
+}
+
 /* Print: the edition as one plain column of ink on white. Nothing relies on a background,
    which browsers drop by default; the echo meters are strokes and print as they are. */
 @media print {
   .search,
-  .heat {
+  .heat,
+  .heat-key {
     display: none;
+  }
+
+  /* A page printed in the middle of a search prints the archive, not a blank page: the list the
+     search script hid comes back. */
+  [data-archive-list][hidden] {
+    display: block;
   }
 
   .top-nav,
@@ -1839,8 +2208,24 @@ a.heat-day:hover {
   .scope-sweep,
   .blip-echo,
   .readout-line,
-  html.intro body::before {
+  html.intro body::before,
+  .ink-go .ink-w,
+  .is-off .screen-off,
+  .hz-turn,
+  .hz-bird,
+  .em-mid .em-face,
+  .em-top .em-face {
     animation: none;
+  }
+
+  /* Every word in ink, the end line drawn whole. */
+  .ink-wait .ink-w {
+    color: inherit;
+  }
+
+  .screen-off,
+  .horizon {
+    display: none;
   }
 
   html.intro body::before {

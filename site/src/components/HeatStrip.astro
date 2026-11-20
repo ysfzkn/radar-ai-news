@@ -73,4 +73,14 @@ const weeks = Array.from({ length: WEEKS }, (_, w) => {
     }
   </div>
 </div>
+{/* The strip's caption and key, one line: what a square is, then its four strengths. */}
+<p class="heat-key label">
+  <span class="heat-caption">{copy.search.heat}</span>
+  <span class="heat-scale" aria-hidden="true">
+    {copy.search.heatLess}
+    <span class="heat-day heat-1"></span><span class="heat-day heat-2"></span><span class="heat-day heat-3"></span><span
+      class="heat-day heat-4"></span>
+    {copy.search.heatMore}
+  </span>
+</p>
 <!--/heat-->

@@ -1,5 +1,6 @@
 ---
 import Echo from "./Echo.astro";
+import Emblem from "./Emblem.astro";
 import { COPY } from "../lib/copy";
 import { anchorId } from "../lib/editions";
 import { categoryClass, hostLabel, httpUrl, shortDate } from "../lib/format";
@@ -47,6 +48,7 @@ const no = String(index).padStart(2, "0");
     {showDate && <time datetime={date}>{shortDate(date, lang)}</time>}{" "}
     <Echo lang={lang} count={story.source_count} />
   </p>
+  {lead && <Emblem category={story.category} size={56} />}
   <h2 class="story-title">{text.title}</h2>
   <p class="story-summary">{text.summary}</p>
   <p class="story-why">
