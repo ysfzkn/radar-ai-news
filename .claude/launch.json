@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "admin-dev",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["--prefix", "admin", "wrangler", "dev", "--cwd", "admin", "--port", "8787", "--ip", "127.0.0.1"],
+      "port": 8787
+    },
+    {
+      "name": "site-preview",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["--prefix", "site", "astro", "preview", "--root", "site", "--port", "4321"],
+      "port": 4321
+    }
+  ]
+}
