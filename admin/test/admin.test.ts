@@ -803,23 +803,22 @@ describe("review screen", () => {
     expect(js).toContain("data-limit"); // the live counters stay
   });
 
-  it("the brand is the radar mark: an 18 px inline svg of a radar screen, hidden from assistive tech", async () => {
+  it("the brand is the echo arcs: an 18 px inline svg of three accent arcs, hidden from assistive tech", async () => {
     const body = await (await get("/admin")).text();
     const svg = body.match(/<svg [^>]*>[\s\S]*?<\/svg>/)?.[0] ?? "";
     expect(svg).toContain('class="mark"');
     expect(svg).toContain('viewBox="0 0 24 24"');
     expect(svg).toContain('width="18" height="18"');
     expect(svg).toContain('aria-hidden="true"');
-    expect(svg).toContain('<circle class="mark-ring" cx="12" cy="12" r="9.25"/>');
-    expect(svg).toContain('<line class="mark-sweep" x1="12" y1="12" x2="18.54" y2="5.46"/>');
-    expect(svg).toContain('<circle class="mark-blip" cx="7.75" cy="14.25" r="1.9"/>');
+    for (const x of [5, 11, 17]) expect(svg).toContain(`<path class="mark-arc" d="M${x} 4A13 13 0 0 1 ${x} 20"/>`);
     expect(svg.match(/<(circle|line|path|rect|polygon|polyline|ellipse)[\s/>]/g)?.length).toBe(3);
     expect(svg).not.toMatch(/(fill|stroke|style)=/);
     const css = await (await get("/admin/app.css")).text();
-    expect(css).toMatch(/\.mark-ring \{[^}]*stroke: var\(--ink\)/);
-    expect(css).toMatch(/\.mark-sweep \{[^}]*stroke: var\(--accent\)/);
-    expect(css).toMatch(/\.mark-blip \{[^}]*fill: var\(--accent\)/);
-    for (const old of [".brand::before", "mark-lit", "mark-dim", "mark-dot"]) expect(css).not.toContain(old);
+    expect(css).toMatch(
+      /\.mark-arc \{[^}]*fill: none;[^}]*stroke: var\(--accent\);[^}]*stroke-width: 2\.25;[^}]*stroke-linecap: round;/,
+    );
+    for (const old of [".brand::before", "mark-lit", "mark-dim", "mark-dot", "mark-ring", "mark-sweep", "mark-blip"])
+      expect(css + svg).not.toContain(old);
   });
   it("a page that keeps unsaved typed text marks the form dirty; a normal story page does not", async () => {
     const uid = await seed();
