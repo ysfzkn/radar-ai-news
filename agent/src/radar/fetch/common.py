@@ -1,6 +1,7 @@
 """Per-source limits shared by every fetcher."""
 
 import ipaddress
+import time
 from datetime import datetime, timedelta
 
 import httpx
@@ -12,8 +13,10 @@ MAX_ITEMS = 50
 MAX_AGE = timedelta(hours=72)
 MAX_BYTES = 5 * 1024 * 1024
 MAX_REDIRECTS = 5
+MAX_SECONDS = 20.0  # for a whole fetch, redirects included; the client's timeout is per read
 _REDIRECTS = (301, 302, 303, 307, 308)
 _LOCAL_SUFFIXES = (".localhost", ".local", ".internal")
+_clock = time.monotonic  # replaced in tests
 
 
 class FetchRefused(Exception):
@@ -68,7 +71,12 @@ def public_http_url(url: str) -> bool:
     return ip.is_global and not ip.is_multicast
 
 
-def _read_capped(response: httpx.Response) -> bytes:
+def _check_deadline(deadline: float) -> None:
+    if _clock() > deadline:
+        raise FetchRefused("response too slow")
+
+
+def _read_capped(response: httpx.Response, deadline: float) -> bytes:
     declared = response.headers.get("content-length", "")
     if declared.isdigit() and int(declared) > MAX_BYTES:
         raise FetchRefused("response too large")
@@ -77,22 +85,30 @@ def _read_capped(response: httpx.Response) -> bytes:
         body.extend(chunk)
         if len(body) > MAX_BYTES:
             raise FetchRefused("response too large")
+        _check_deadline(deadline)
     return bytes(body)
 
 
 def get(client: httpx.Client, url: str, **kwargs) -> httpx.Response:
-    """GET with a size cap and redirects followed only to public http(s) URLs."""
+    """GET with a size cap, a total deadline and redirects followed only to public
+    http(s) URLs.
+
+    The deadline is checked between chunks, so a server that stalls inside one read is
+    still bounded by the client's per-read timeout on top of MAX_SECONDS.
+    """
     kwargs["follow_redirects"] = False
+    deadline = _clock() + MAX_SECONDS
     current = url
     for _ in range(MAX_REDIRECTS + 1):
         if not public_http_url(current):
             raise FetchRefused("refused non-public or non-http(s) address")
+        _check_deadline(deadline)
         with client.stream("GET", current, **kwargs) as response:
             location = response.headers.get("location")
             if response.status_code in _REDIRECTS and location:
                 current = str(httpx.URL(current).join(location))
                 continue
-            body = _read_capped(response)
+            body = _read_capped(response, deadline)
             headers = [
                 (k, v)
                 for k, v in response.headers.multi_items()

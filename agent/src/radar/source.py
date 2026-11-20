@@ -4,7 +4,6 @@ Page content is untrusted data. This module only extracts text and links from it
 it never follows links or evaluates anything.
 """
 
-import re
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlsplit
 
@@ -12,8 +11,9 @@ import httpx
 
 from radar.fetch.common import FetchRefused, get
 from radar.models import Candidate, Cluster, SourceDoc
-from radar.text import clean_summary
+from radar.text import clean_summary, element_inner, strip_blocks
 
+MAX_HTML_CHARS = 300_000  # only this much of a page is parsed
 MAX_SOURCE_CHARS = 6000
 MIN_SOURCE_CHARS = 200
 MAX_LINKS = 50
@@ -21,17 +21,8 @@ MAX_LINK_CHARS = 200
 MAX_LINKS_CHARS = 2000  # the links joined with newlines, as the writer sees them
 
 _HTML_TYPES = ("text/html", "application/xhtml+xml")
-_NOISE = re.compile(
-    r"<(script|style|nav|header|footer|aside|form)\b[^>]*>.*?</\1\s*>",
-    re.IGNORECASE | re.DOTALL,
-)
-
-
-def _region_pattern(tag: str) -> re.Pattern[str]:
-    return re.compile(rf"<{tag}\b[^>]*>(.*?)</{tag}\s*>", re.IGNORECASE | re.DOTALL)
-
-
-_REGIONS = [_region_pattern(t) for t in ("article", "main", "body")]
+_NOISE = ("script", "style", "nav", "header", "footer", "aside", "form")
+_REGIONS = ("article", "main", "body")
 
 
 class _LinkParser(HTMLParser):
@@ -47,11 +38,11 @@ class _LinkParser(HTMLParser):
 
 
 def _region(html: str) -> str:
-    for pattern in _REGIONS:
-        match = pattern.search(html)
-        if match:
-            return _NOISE.sub(" ", match.group(1))
-    return _NOISE.sub(" ", html)
+    for tag in _REGIONS:
+        inner = element_inner(html, tag)
+        if inner is not None:
+            return strip_blocks(inner, _NOISE)
+    return strip_blocks(html, _NOISE)
 
 
 def _usable(url: str) -> bool:
@@ -102,7 +93,8 @@ def _fetch(url: str, client: httpx.Client) -> str:
 
 
 def build_source(candidate: Candidate, cluster: Cluster, client: httpx.Client) -> SourceDoc:
-    html = _fetch(candidate.url, client)
+    # Cut before any parsing: the work below must stay bounded whatever the page is.
+    html = _fetch(candidate.url, client)[:MAX_HTML_CHARS]
     article = ""
     article_links: list[str] = []
     if html:

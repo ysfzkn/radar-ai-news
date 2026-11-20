@@ -5,8 +5,8 @@ from pathlib import Path
 import httpx
 import pytest
 
-from radar.fetch import fetch_all, make_client
-from radar.fetch.common import MAX_BYTES, FetchRefused, get, public_http_url
+from radar.fetch import common, fetch_all, make_client
+from radar.fetch.common import MAX_BYTES, MAX_SECONDS, FetchRefused, get, public_http_url
 from radar.fetch.feed import fetch_feed
 from radar.fetch.hn import fetch_hn
 from radar.models import Source, Tier
@@ -410,3 +410,51 @@ def test_the_article_page_fetch_is_guarded_too():
         return httpx.Response(302, headers={"location": "http://10.0.0.1/x"})
 
     assert _fetch("https://a.test/x", routed(handler)) == ""
+
+
+class FakeClock:
+    def __init__(self):
+        self.now = 1000.0
+
+    def __call__(self) -> float:
+        return self.now
+
+
+def test_a_body_that_trickles_in_is_cut_off_at_the_total_deadline(monkeypatch):
+    clock = FakeClock()
+    monkeypatch.setattr(common, "_clock", clock)
+
+    class Trickle(httpx.SyncByteStream):
+        def __init__(self):
+            self.chunks = 0
+
+        def __iter__(self):
+            # Each chunk arrives inside the per-read timeout, but they never stop.
+            for _ in range(MAX_BYTES // 1024):
+                clock.now += 1.0
+                self.chunks += 1
+                yield b"x" * 1024
+
+    body = Trickle()
+    with pytest.raises(FetchRefused, match="^response too slow$"):
+        get(routed(lambda request: httpx.Response(200, stream=body)), "https://a.test/x")
+    assert body.chunks == int(MAX_SECONDS) + 1
+
+
+def test_the_deadline_covers_every_redirect_hop(monkeypatch):
+    clock = FakeClock()
+    monkeypatch.setattr(common, "_clock", clock)
+    seen = []
+
+    def handler(request):
+        seen.append(request.url.path)
+        clock.now += MAX_SECONDS / 2 + 0.1
+        return httpx.Response(302, headers={"location": f"/{len(seen)}"})
+
+    with pytest.raises(FetchRefused, match="^response too slow$"):
+        get(routed(handler), "https://a.test/0")
+    assert seen == ["/0", "/1"]
+
+
+def test_a_quick_response_is_unaffected_by_the_deadline():
+    assert get(routed(lambda r: httpx.Response(200, content=b"ok")), "https://a.test/x").content

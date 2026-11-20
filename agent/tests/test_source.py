@@ -1,10 +1,18 @@
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
+import pytest
 
 from radar.models import Candidate, Cluster, SourceDoc, StoredItem
-from radar.source import MAX_LINKS_CHARS, MAX_SOURCE_CHARS, build_source, is_thin
+from radar.source import (
+    MAX_HTML_CHARS,
+    MAX_LINKS_CHARS,
+    MAX_SOURCE_CHARS,
+    build_source,
+    is_thin,
+)
 
 FIXTURE = Path(__file__).parent / "fixtures" / "article.html"
 URL = "https://github.blog/a2ui-1-0"
@@ -164,3 +172,30 @@ def test_cluster_urls_are_links_but_not_article_links():
 def test_thin_source():
     assert is_thin(SourceDoc(url=URL, text="x" * 150, links=[]))
     assert not is_thin(SourceDoc(url=URL, text="x" * 250, links=[]))
+
+
+ADVERSARIAL = [
+    "<form>" * 10_000,
+    "<article>" * 7_000,
+    "<" * 60_000,
+    "<script>" * 7_500,
+    "<article><main><body>" + "<nav a=1" * 7_000,
+]
+
+
+@pytest.mark.parametrize("body", ADVERSARIAL, ids=["form", "article", "lt", "script", "attrs"])
+def test_a_page_of_unclosed_tags_is_handled_quickly(body):
+    assert len(body) >= 50_000
+    start = time.perf_counter()
+    build_source(_candidate(), _two_items(), _html_client(body))
+    assert time.perf_counter() - start < 1.0
+
+
+def test_only_the_first_300_kb_of_a_page_is_read():
+    filler = "<p>" + "word " * 70_000 + "</p>"  # 350 KB of ordinary text
+    late = '<a href="https://late.example/x">late</a>'
+    body = f"<article>{filler}{late}</article>"
+    assert len(body) > MAX_HTML_CHARS == 300_000
+    doc = build_source(_candidate(), _two_items(), _html_client(body))
+    assert "https://late.example/x" not in doc.links
+    assert doc.text.startswith("word word")
