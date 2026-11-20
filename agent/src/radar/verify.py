@@ -1,4 +1,5 @@
 import re
+from urllib.parse import urlsplit
 
 from .models import Candidate, Draft, Score, SourceDoc, Status
 
@@ -128,12 +129,91 @@ def _check_names(draft: Draft, source: str) -> list[str]:
     return issues
 
 
+# Text a hijacked source could get the writer to repeat. Radar's own texts never need a
+# link, a domain or a command (the try link is a separate, checked field), so any of
+# these sends the story to a human, even when the source says the same.
+_URL = re.compile(r"\b(?:[a-z][a-z0-9+.-]*://|www\.)\S+", re.IGNORECASE)
+_DOMAIN = re.compile(
+    r"(?<![\w.-])(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+([a-z]{2,63})(?![\w-])(/\S*)?",
+    re.IGNORECASE,
+)
+# A last label that is a common file extension makes a file name (README.md, llama.cpp),
+# not a domain, unless a path follows. Popular top-level domains (.sh, .io, .ai, .dev,
+# .app) are deliberately not here.
+_FILE_EXTENSIONS = frozenset(
+    "md mdx txt rst json jsonl yaml yml toml ini cfg conf lock env xml csv tsv html htm css "
+    "scss js mjs cjs jsx ts tsx py pyi ipynb rs go rb java kt kts swift c h cc cpp hpp cs php "
+    "lua zig dart vue svelte wasm sql proto gguf safetensors onnx pt pth bin zip gz tgz tar "
+    "pdf png jpg jpeg gif svg webp mp4 log".split()
+)
+_DOTTED_NAMES = frozenset({"asp.net", "socket.io"})
+_COMMAND = re.compile(
+    r"\$\(|\||&&"
+    r"|\b(?:curl|wget)\s+-"
+    r"|\bsudo\s+\w"
+    r"|\brm\s+-\w"
+    r"|\bchmod\s+[+0-7]"
+    r"|\b(?:bash|sh|zsh)\s+-c\b"
+    r"|\b(?:pip3?|pipx|uv|npm|pnpm|yarn|bun|brew|apt|apt-get|cargo|gem|go|conda|winget|choco)"
+    r"\s+(?:install|add|i|get)\b"
+    r"|\bnpx\s+\w"
+    r"|\b(?:iex|invoke-expression)\b",
+    re.IGNORECASE,
+)
+_SHOWN = 60  # characters of an offending token quoted in the reason
+
+
+def _domains(text: str) -> list[str]:
+    found = [m.group(0) for m in _URL.finditer(text)]
+    for m in _DOMAIN.finditer(_URL.sub(" ", text)):
+        token, tld, path = m.group(0), m.group(1).lower(), m.group(2)
+        if token.lower() in _DOTTED_NAMES or (tld in _FILE_EXTENSIONS and not path):
+            continue
+        found.append(token)
+    return found
+
+
+def _check_injection(draft: Draft) -> list[str]:
+    fields = _text_fields(draft) + [("fact_card.what", draft.fact_card.what)]
+    issues: list[str] = []
+    for where, text in fields:
+        found = [f"link or domain '{t[:_SHOWN]}'" for t in _domains(text)]
+        if "`" in text:
+            found.append("backticks")
+        found += [f"command-like text '{m.group(0)}'" for m in _COMMAND.finditer(text)]
+        for what in found:
+            issue = f"{where}: {what}"
+            if issue not in issues:
+                issues.append(issue)
+    return issues
+
+
+def _host(url: str) -> str:
+    host = (urlsplit(url).hostname or "").rstrip(".")
+    return host.removeprefix("www.")
+
+
+def _same_site(a: str, b: str) -> bool:
+    """Equal, or one is a subdomain of the other (docs.example.com and example.com)."""
+    return bool(a and b) and (a == b or a.endswith("." + b) or b.endswith("." + a))
+
+
+def _check_try_url(url: str | None, doc: SourceDoc) -> list[str]:
+    if url is None:
+        return []
+    if url not in doc.article_links:
+        return ["fact_card.try_url: not a source link"]
+    host = _host(url)
+    if not any(_same_site(host, _host(s)) for s in [doc.url, *doc.source_urls]):
+        return [f"fact_card.try_url: host '{host[:_SHOWN]}' is not a source host"]
+    return []
+
+
 def verify(draft: Draft, doc: SourceDoc) -> list[str]:
     issues = _check_lengths(draft) + _check_numbers(draft, doc.text)
     issues += _check_names(draft, doc.text)
-    url = draft.fact_card.try_url
-    if url is not None and url not in doc.article_links:
-        issues.append("fact_card.try_url: not a source link")
+    issues += _check_injection(draft)
+    issues += _check_try_url(draft.fact_card.try_url, doc)
     return issues
 
 

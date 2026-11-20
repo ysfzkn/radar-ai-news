@@ -26,11 +26,11 @@ class ScoreBatch(BaseModel):
 
 
 def _line(c: Candidate) -> str:
+    # Feed text is untrusted: a newline in it must not start a fake line for another item.
+    title = " ".join(c.title.split())
     summary = re.sub(r"\s+", " ", c.summary).strip()[:200]
     primary = "yes" if c.has_primary else "no"
-    return (
-        f"[{c.cluster_id}] {c.title} | sources: {c.source_count} | primary: {primary} | {summary}"
-    )
+    return f"[{c.cluster_id}] {title} | sources: {c.source_count} | primary: {primary} | {summary}"
 
 
 def score_user_message(candidates: list[Candidate]) -> str:

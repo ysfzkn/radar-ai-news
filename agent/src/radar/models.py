@@ -102,6 +102,7 @@ class SourceDoc(BaseModel):
     text: str
     links: list[str]  # article links plus cluster item URLs, shown to the writer
     article_links: list[str] = []  # links found in the fetched primary article only
+    source_urls: list[str] = []  # the primary URL and the cluster items' URLs
 
 
 class Story(BaseModel):

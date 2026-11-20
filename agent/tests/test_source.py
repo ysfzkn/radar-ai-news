@@ -199,3 +199,8 @@ def test_only_the_first_300_kb_of_a_page_is_read():
     doc = build_source(_candidate(), _two_items(), _html_client(body))
     assert "https://late.example/x" not in doc.links
     assert doc.text.startswith("word word")
+
+
+def test_source_urls_are_the_primary_url_and_the_cluster_items():
+    doc = build_source(_candidate(), _two_items(), _html_client(FIXTURE.read_text("utf-8")))
+    assert doc.source_urls == [URL, "https://news.example/a2ui"]

@@ -109,7 +109,13 @@ def build_source(candidate: Candidate, cluster: Cluster, client: httpx.Client) -
     links = _cap(links)
     article_links = [link for link in article_links if link in links]
     text = "\n".join(([article] if article else []) + lines)[:MAX_SOURCE_CHARS]
-    return SourceDoc(url=candidate.url, text=text, links=links, article_links=article_links)
+    return SourceDoc(
+        url=candidate.url,
+        text=text,
+        links=links,
+        article_links=article_links,
+        source_urls=list(dict.fromkeys([candidate.url] + [i.url for i in cluster.items])),
+    )
 
 
 def is_thin(doc: SourceDoc) -> bool:
