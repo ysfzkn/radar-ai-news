@@ -94,25 +94,16 @@ a:hover {
   top: var(--space-2);
 }
 
-/* The mark: a radar screen (ring, sweep, blip). Before the wordmark and at the end of an edition. */
+/* The mark: three of the echo meter's arcs, before the wordmark. */
 .mark {
   flex: none;
   fill: none;
-  stroke-width: 1.75;
+  stroke-width: 2.25;
   stroke-linecap: round;
 }
 
-.mark-ring {
-  stroke: var(--ink);
-}
-
-.mark-sweep {
+.mark-arc {
   stroke: var(--accent);
-}
-
-.mark-blip {
-  fill: var(--accent);
-  stroke: none;
 }
 
 /* Top strip: wordmark left, text links right; links wrap below at phone width. */
@@ -492,7 +483,8 @@ a.story-cat:hover {
   color: var(--accent);
 }
 
-/* Echo meter: five arcs, the first `level` lit, then the count. */
+/* Echo meter: five arcs, the first `level` lit, then the count. The same arcs, all lit and
+   twice the size, close an edition. */
 .echo {
   display: inline-flex;
   align-items: baseline;
@@ -501,8 +493,7 @@ a.story-cat:hover {
 }
 
 .echo-arcs {
-  position: relative;
-  top: 0.18em;
+  flex: none;
   fill: none;
   stroke-width: 2;
   stroke-linecap: round;
@@ -516,22 +507,27 @@ a.story-cat:hover {
   stroke: var(--control-border);
 }
 
+.echo .echo-arcs {
+  position: relative;
+  top: 0.18em;
+}
+
 /* End of page: the edition closes under a heavy rule, then the neighbouring issues. */
 .end {
   margin-top: var(--space-7);
 }
 
 .closed {
-  display: grid;
-  grid-template-columns: auto 1fr;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  column-gap: var(--space-3);
-  padding-top: var(--space-4);
+  padding-top: var(--space-5);
   border-top: 3px solid var(--ink);
+  text-align: center;
 }
 
-.closed .mark {
-  grid-row: span 2;
+.closed .echo-arcs {
+  margin-bottom: var(--space-3);
 }
 
 .closed-text {

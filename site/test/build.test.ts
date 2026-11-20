@@ -292,10 +292,9 @@ describe("built site", () => {
   });
 
   it("the mark, the echo meter and the favicon carry no colour in attributes except the favicon", () => {
-    // The mark is a radar screen: a ring, a sweep and a blip, and nothing else.
-    const ring = '<circle class="mark-ring" cx="12" cy="12" r="9.25"></circle>';
-    const sweep = '<line class="mark-sweep" x1="12" y1="12" x2="18.54" y2="5.46"></line>';
-    const blip = '<circle class="mark-blip" cx="7.75" cy="14.25" r="1.9"></circle>';
+    // The mark is three equal arcs side by side, all accent, and nothing else.
+    const markArcs = [5, 11, 17].map((x) => `<path class="mark-arc" d="M${x} 4A13 13 0 0 1 ${x} 20"></path>`).join("");
+    const meterArcs = [2, 10.5, 19, 27.5, 36].map((x) => `d="M${x} 1.5A8.5 8.5 0 0 1 ${x} 12.5"`);
     let marks = 0;
     let meters = 0;
     for (const file of [DEMO, REAL].flatMap(htmlFiles)) {
@@ -305,10 +304,11 @@ describe("built site", () => {
         expect(svg, file).not.toMatch(/#[0-9a-f]{3,8}\b|rgb\(/i);
         if (svg.startsWith('<svg class="mark" viewBox="0 0 24 24"')) {
           const inner = svg.slice(svg.indexOf(">") + 1, -"</svg>".length);
-          expect(inner, file).toBe(ring + sweep + blip);
+          expect(inner, file).toBe(markArcs);
           marks++;
         } else {
           expect(svg, file).toMatch(/^<svg class="echo-arcs" viewBox="0 0 44 14"/);
+          for (const arc of meterArcs) expect(svg, file).toContain(arc);
           meters++;
         }
       }
@@ -318,17 +318,21 @@ describe("built site", () => {
     // Before the wordmark: 20 px, hidden from screen readers.
     const strip = page(DEMO, "").match(/<a class="wordmark"[\s\S]*?<\/svg>/)![0];
     expect(strip).toMatch(/<svg class="mark" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">/);
-    // The end of an edition: 28 px.
-    const end = page(DEMO, "").match(/<div class="closed">[\s\S]*?<\/svg>/)![0];
-    expect(end).toMatch(/<svg class="mark" viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">/);
+    // The end of an edition: the echo arcs, all five lit, at twice the meter's size, above the closing line.
+    const end = page(DEMO, "").match(/<div class="closed">([\s\S]*?<\/svg>)\s*<p class="closed-text">/)![1];
+    expect(end).toMatch(/^<svg class="echo-arcs" viewBox="0 0 44 14" width="88" height="28" aria-hidden="true">/);
+    expect(end.match(/class="echo-on"/g)).toHaveLength(5);
+    expect(end).not.toContain("echo-off");
+    expect(end).not.toContain("aria-label");
     // The favicon is a standalone file with no stylesheet, so its colours are the table's hex values.
     const favicon = readFileSync(join(DEMO, "favicon.svg"), "utf8");
-    expect(favicon).toContain('<circle cx="12" cy="12" r="9.25" fill="none" stroke="#17181a" stroke-width="1.75"/>');
-    expect(favicon).toContain(
-      '<line x1="12" y1="12" x2="18.54" y2="5.46" stroke="#c2371a" stroke-width="1.75" stroke-linecap="round"/>',
-    );
-    expect(favicon).toContain('<circle cx="7.75" cy="14.25" r="1.9" fill="#c2371a"/>');
-    expect(favicon).not.toMatch(/class=|<style|<path/);
+    for (const x of [5, 11, 17]) {
+      expect(favicon).toContain(
+        `<path d="M${x} 4A13 13 0 0 1 ${x} 20" fill="none" stroke="#c2371a" stroke-width="2.25" stroke-linecap="round"/>`,
+      );
+    }
+    expect(favicon.match(/<path/g)).toHaveLength(3);
+    expect(favicon).not.toMatch(/class=|<style|<circle|<line/);
   });
 
   it("the end of an edition closes it and points to the neighbouring issues", () => {
