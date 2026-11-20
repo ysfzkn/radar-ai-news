@@ -49,12 +49,8 @@ def _remove(name: str | None) -> None:
             os.unlink(name)
 
 
-def _copy_database(db_path: str) -> bytes:
-    """A consistent copy of the database as bytes; nothing plain is written to disk.
-
-    The source is opened read-only, so packing never modifies or checkpoints it.
-    """
-    source = sqlite3.connect(f"{Path(db_path).resolve().as_uri()}?mode=ro", uri=True)
+def _backup(uri: str) -> bytes:
+    source = sqlite3.connect(uri, uri=True)
     try:
         memory = sqlite3.connect(":memory:")
         try:
@@ -64,6 +60,21 @@ def _copy_database(db_path: str) -> bytes:
             memory.close()
     finally:
         source.close()
+
+
+def _copy_database(db_path: str) -> bytes:
+    """A consistent copy of the database as bytes; nothing plain is written to disk.
+
+    The source is opened read-only, so packing normally never modifies or checkpoints it.
+    A read-only connection cannot roll back a hot journal (left by a writer killed in the
+    middle of a transaction), so if that copy fails it is taken once more through an
+    ordinary read-write connection, which rolls the journal back first.
+    """
+    uri = Path(db_path).resolve().as_uri()
+    try:
+        return _backup(f"{uri}?mode=ro")
+    except sqlite3.Error:
+        return _backup(f"{uri}?mode=rw")
 
 
 def pack(db_path: str, out_path: str, passphrase: str) -> int:

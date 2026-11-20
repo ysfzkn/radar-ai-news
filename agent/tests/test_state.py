@@ -314,6 +314,79 @@ def test_load_with_force_removes_a_stale_journal_and_orphan_side_files(tmp_path)
     assert os.listdir(orphan.parent) == ["radar.db"]
 
 
+def hot_journal_db(tmp_path):
+    """A database and the hot journal a writer killed mid-transaction leaves behind.
+
+    The writer's files are copied while its transaction is open, with pages already spilled
+    into the database file; the copies are what a killed process would have left.
+    """
+    import shutil
+
+    live = tmp_path / "live.db"
+    conn = sqlite3.connect(str(live), isolation_level=None)
+    conn.execute("PRAGMA journal_mode=DELETE")
+    conn.execute("CREATE TABLE t (x TEXT)")
+    conn.execute("INSERT INTO t VALUES ('committed')")
+    conn.execute("PRAGMA cache_size=2")  # pages spill to the file before the commit
+    conn.execute("BEGIN")
+    conn.executemany(
+        "INSERT INTO t VALUES (?)", [(f"uncommitted-{i}" + "x" * 500,) for i in range(400)]
+    )
+    target = tmp_path / "radar.db"
+    for suffix in ("", "-journal"):
+        shutil.copy(str(live) + suffix, str(target) + suffix)
+    conn.execute("ROLLBACK")
+    conn.close()
+    assert os.path.getsize(str(target) + "-journal") > 0
+    return target
+
+
+def test_pack_reads_a_database_left_with_a_hot_journal(tmp_path):
+    target = hot_journal_db(tmp_path)
+    out = tmp_path / "state.bin"
+    pack(str(target), str(out), PASSPHRASE)
+    restored = tmp_path / "restored.db"
+    unpack(str(out), str(restored), PASSPHRASE)
+    assert rows_of(restored) == ["committed"]
+
+
+def test_pack_falls_back_to_a_read_write_open_when_the_read_only_copy_fails(
+    filled, tmp_path, monkeypatch
+):
+    real = sqlite3.connect
+    opened: list[str] = []
+
+    def connect(database, *args, **kwargs):
+        opened.append(str(database))
+        if "mode=ro" in str(database):
+            raise sqlite3.OperationalError("attempt to write a readonly database")
+        return real(database, *args, **kwargs)
+
+    monkeypatch.setattr(state.sqlite3, "connect", connect)
+    out = tmp_path / "state.bin"
+    pack(str(filled), str(out), PASSPHRASE)
+    assert any("mode=ro" in name for name in opened)
+    monkeypatch.setattr(state.sqlite3, "connect", real)
+    restored = tmp_path / "restored.db"
+    unpack(str(out), str(restored), PASSPHRASE)
+    assert dump(restored) == dump(filled)
+
+
+def test_pack_still_fails_cleanly_when_both_opens_fail(filled, tmp_path, monkeypatch):
+    real = sqlite3.connect
+
+    def connect(database, *args, **kwargs):
+        if str(database) != ":memory:":
+            raise sqlite3.OperationalError(f"unable to open {database}")
+        return real(database, *args, **kwargs)
+
+    monkeypatch.setattr(state.sqlite3, "connect", connect)
+    out = tmp_path / "state.bin"
+    with pytest.raises(StateError, match="^cannot read the database$"):
+        pack(str(filled), str(out), PASSPHRASE)
+    assert not out.exists()
+
+
 def test_pack_never_leaves_a_plain_database_in_the_output_directory(filled, tmp_path, monkeypatch):
     out_dir = tmp_path / "out"
     out_dir.mkdir()
