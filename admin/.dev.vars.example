@@ -2,3 +2,5 @@
 # Real secrets are set with `wrangler secret put`, never in a file.
 INGEST_TOKEN=change-me
 DEV_NO_AUTH=1
+# Optional: an https deploy-hook URL the Worker POSTs to when the published set changes.
+# SITE_DEPLOY_HOOK=

@@ -447,6 +447,127 @@ export async function unpublishStory(
   });
 }
 
+// ---------------------------------------------------------------------------
+// Public read model
+// ---------------------------------------------------------------------------
+
+export interface PublicStory {
+  uid: string;
+  category: string;
+  publish_mode: "auto" | "human";
+  edited: boolean;
+  source_count: number;
+  source_url: string;
+  sources: { name: string; url: string }[];
+  try_url: string | null;
+  created_at: string;
+  published_at: string;
+  texts: Partial<Record<Lang, TextSet>>;
+}
+
+export interface PublicCursor {
+  published_at: string;
+  uid: string;
+}
+
+// D1 allows 100 bound parameters per statement; texts are fetched in chunks well below that.
+const TEXT_CHUNK = 90;
+
+interface PublicRow {
+  uid: string;
+  category: string;
+  publish_mode: "auto" | "human" | null;
+  edited: number;
+  source_count: number;
+  source_url: string;
+  sources: string;
+  fact_card: string;
+  created_at: string;
+  published_at: string;
+}
+
+function publicSources(raw: string): { name: string; url: string }[] {
+  const parsed: unknown = JSON.parse(raw);
+  if (!Array.isArray(parsed)) return [];
+  const out: { name: string; url: string }[] = [];
+  for (const s of parsed) {
+    if (s && typeof s.name === "string" && typeof s.url === "string" && isHttpUrl(s.url)) {
+      out.push({ name: s.name, url: s.url });
+    }
+  }
+  return out;
+}
+
+function publicTryUrl(raw: string): string | null {
+  const url: unknown = (JSON.parse(raw) as { try_url?: unknown } | null)?.try_url;
+  return typeof url === "string" && isHttpUrl(url) ? url : null;
+}
+
+// Published stories, newest published_at first and uid ascending within a tie. Two queries: one
+// SELECT for the page (one row more than `limit`, to know whether another page exists), then one
+// db.batch carrying the texts in chunks of TEXT_CHUNK uids. `next` is the position of the last
+// story returned, which the following page starts after.
+export async function listPublished(
+  db: D1Database,
+  limit: number,
+  cursor: PublicCursor | null,
+): Promise<{ stories: PublicStory[]; next: PublicCursor | null }> {
+  const keyset = cursor ? "AND (published_at < ? OR (published_at = ? AND uid > ?))" : "";
+  const binds = cursor ? [cursor.published_at, cursor.published_at, cursor.uid] : [];
+  const { results } = await db
+    .prepare(
+      `SELECT uid, category, publish_mode, edited, source_count, source_url, sources, fact_card,
+              created_at, published_at
+         FROM stories
+        WHERE status = 'published' AND published_at IS NOT NULL ${keyset}
+        ORDER BY published_at DESC, uid ASC
+        LIMIT ?`,
+    )
+    .bind(...binds, limit + 1)
+    .all<PublicRow>();
+  const rows = results.slice(0, limit);
+  const last = rows.at(-1);
+  const next = results.length > limit && last ? { published_at: last.published_at, uid: last.uid } : null;
+  if (rows.length === 0) return { stories: [], next };
+
+  const chunks: string[][] = [];
+  for (let i = 0; i < rows.length; i += TEXT_CHUNK) chunks.push(rows.slice(i, i + TEXT_CHUNK).map((r) => r.uid));
+  const batches = await db.batch<{ story_uid: string; lang: Lang } & TextSet>(
+    chunks.map((uids) =>
+      db
+        .prepare(
+          `SELECT story_uid, lang, title, summary, dev_line FROM story_texts
+            WHERE story_uid IN (${uids.map(() => "?").join(", ")})`,
+        )
+        .bind(...uids),
+    ),
+  );
+  const texts = new Map<string, Partial<Record<Lang, TextSet>>>();
+  for (const batch of batches) {
+    for (const r of batch.results) {
+      const set = texts.get(r.story_uid) ?? {};
+      set[r.lang] = { title: r.title.trim(), summary: r.summary.trim(), dev_line: r.dev_line.trim() };
+      texts.set(r.story_uid, set);
+    }
+  }
+  const stories = rows.map(
+    (r): PublicStory => ({
+      uid: r.uid,
+      category: r.category,
+      publish_mode: r.publish_mode === "human" ? "human" : "auto",
+      edited: r.edited === 1,
+      source_count: r.source_count,
+      source_url: r.source_url,
+      sources: publicSources(r.sources),
+      try_url: publicTryUrl(r.fact_card),
+      created_at: r.created_at,
+      published_at: r.published_at,
+      texts: texts.get(r.uid) ?? {},
+    }),
+  );
+  return { stories, next };
+}
+
 // Expires every review story aged 72 h or more. Idempotent: a second run finds nothing.
 export async function expireStale(db: D1Database, now: Date): Promise<number> {
   const at = now.toISOString();

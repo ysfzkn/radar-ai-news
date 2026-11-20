@@ -4,6 +4,8 @@ import { authenticate, sameOrigin, type Identity } from "./auth";
 import { COPY, failureMessage } from "./copy";
 import type { Env } from "./env";
 import { ingest } from "./ingest";
+import { notifySite, waiter } from "./notify";
+import { publicApi } from "./public";
 import type { Lang, Status } from "./schema";
 import {
   approveStory,
@@ -32,6 +34,7 @@ export const app = new Hono<AppEnv>();
 
 app.get("/healthz", (c) => c.text("ok"));
 app.route("/", ingest);
+app.route("/", publicApi);
 
 // ---------------------------------------------------------------------------
 // Admin screen: everything at /admin and under it is authenticated.
@@ -189,6 +192,8 @@ app.post("/admin/stories/:uid/edit", async (c) => {
   if (!form) return badRequest(c);
   const draft = draftOf(form);
   const result = await editStory(c.env.DB, uid, form.version, patchOf(draft), c.get("identity").email, new Date());
+  // An edit keeps the status, so a story that is published now was published before it.
+  if (result.ok && (await getStory(c.env.DB, uid))?.status === "published") notifySite(c.env, waiter(c));
   return afterResult(c, uid, result, storyPath(uid), draft);
 });
 
@@ -214,6 +219,7 @@ app.post("/admin/stories/:uid/approve", async (c) => {
     }
   }
   const result = await approveStory(c.env.DB, uid, version, actor, new Date());
+  if (result.ok) notifySite(c.env, waiter(c));
   if (result.ok || !saved) return afterResult(c, uid, result, "/admin");
   const message = `${COPY.savedNotApproved} ${failureMessage(result.error, result.detail)}`;
   return storyPage(c, uid, FAILURE_STATUS[result.error], message);
@@ -247,6 +253,7 @@ app.post("/admin/stories/:uid/unpublish", async (c) => {
     c.get("identity").email,
     new Date(),
   );
+  if (result.ok) notifySite(c.env, waiter(c));
   return afterResult(c, uid, result, storyPath(uid));
 });
 

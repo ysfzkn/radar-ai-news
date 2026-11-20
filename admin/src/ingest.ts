@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { Env } from "./env";
+import { notifySite, waiter } from "./notify";
 import { MAX_BODY_BYTES, ingestRequest } from "./schema";
 import { insertStories } from "./stories";
 
@@ -79,5 +80,10 @@ ingest.post("/api/ingest", async (c) => {
     return invalid(path.join("."));
   }
 
-  return c.json(await insertStories(c.env.DB, parsed.data.stories, new Date()));
+  const result = await insertStories(c.env.DB, parsed.data.stories, new Date());
+  const accepted = new Set(result.accepted);
+  if (parsed.data.stories.some((s) => s.status === "published" && accepted.has(s.uid))) {
+    notifySite(c.env, waiter(c));
+  }
+  return c.json(result);
 });

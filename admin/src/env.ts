@@ -5,4 +5,5 @@ export interface Env {
   ACCESS_AUD?: string;
   ADMIN_EMAILS?: string; // optional comma-separated allowlist
   DEV_NO_AUTH?: string; // "1" only in .dev.vars
+  SITE_DEPLOY_HOOK?: string; // secret; an https URL that rebuilds the static site
 }
