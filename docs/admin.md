@@ -36,7 +36,7 @@ The screen is light only: there is no dark theme and no theme switch. Lists show
 
 ## Public read endpoint
 
-`GET /api/stories` is public and needs no sign-in. It returns only `published` stories and only what a reader sees: no reasons, score, fact card, history or e-mail addresses. It is what the static site reads at build time. Parameters, response shape and paging are described in [site.md](site.md#the-public-read-contract-version-1). Responses carry `Cache-Control: public, max-age=60`.
+`GET /api/stories` is public and needs no sign-in. It returns only `published` stories and only what a reader sees: no reasons, score, fact card, history or e-mail addresses. It is what the static site reads at build time. It leaves out sources without a name and any language with an empty text, and does not return a story that has no usable language left. Parameters, response shape and paging are described in [site.md](site.md#the-public-read-contract-version-1). Responses carry `Cache-Control: public, max-age=60`.
 
 ## Ingest contract (version 1)
 
@@ -66,7 +66,7 @@ The screen is light only: there is no dark theme and no theme switch. Lists show
 }
 ```
 
-Rules: 1 to 20 stories per request; `status` is `review` or `published`; `category` is one of `protocol`, `model`, `framework`, `tooling`, `research`, `security`, `industry`, `policy`; at most 20 `reasons` of 300 characters; `who`, `numbers` and `versions` at most 30 entries of 200 characters; `what` at most 1000; 1 to 30 `sources`, `name` at most 100, `tier` 1 to 4; every URL at most 2000 characters and `http:` or `https:`; `created_at` must parse and be no more than 24 hours in the future; text fields non-empty and within the ingest limits; unknown keys are rejected.
+Rules: 1 to 20 stories per request; `status` is `review` or `published`; `category` is one of `protocol`, `model`, `framework`, `tooling`, `research`, `security`, `industry`, `policy`; at most 20 `reasons` of 300 characters; `who`, `numbers` and `versions` at most 30 entries of 200 characters; `what` at most 1000; 1 to 30 `sources`, `name` at most 100, `tier` 1 to 4; every URL at most 2000 characters and `http:` or `https:`; `created_at` must parse and be no more than 24 hours in the future; text fields non-empty after trimming and within the ingest limits; unknown keys are rejected.
 
 Responses: `200 {"accepted": [...], "duplicates": [...]}`; `400 {"error": "invalid", "path": "stories.0.texts.tr.title"}` and nothing is stored (all or nothing); `401` for a missing or wrong token; `413` over the size limit; `415` when the content type is not JSON. Sending the same `uid` again is a duplicate, not an error.
 

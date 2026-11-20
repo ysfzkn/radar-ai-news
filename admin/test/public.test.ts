@@ -199,6 +199,53 @@ describe("GET /api/stories", () => {
     expect(Object.keys(story.texts)).toEqual(["tr"]);
   });
 
+  it("keeps a source count of 0, drops nameless sources and leaves out a language with a blank text", async () => {
+    const uid = await seed("published");
+    await env.DB.batch([
+      env.DB
+        .prepare("UPDATE stories SET source_count = 0, sources = ? WHERE uid = ?")
+        .bind(
+          JSON.stringify([
+            { name: "", url: "https://empty.example/", tier: 1 },
+            { name: "  ", url: "https://blank.example/", tier: 1 },
+            { name: " Named ", url: "https://named.example/", tier: 2 },
+          ]),
+          uid,
+        ),
+      env.DB.prepare("UPDATE story_texts SET title = ' \n ' WHERE story_uid = ? AND lang = 'tr'").bind(uid),
+    ]);
+    const story = ((await (await get("/api/stories")).json()) as Json).stories[0];
+    expect(story.uid).toBe(uid);
+    expect(story.source_count).toBe(0);
+    expect(story.sources).toEqual([{ name: "Named", url: "https://named.example/" }]);
+    expect(Object.keys(story.texts)).toEqual(["en"]);
+  });
+
+  it("leaves out a story with no usable language and pages across it without a repeat or a gap", async () => {
+    const newer = await seed("published", "2026-11-20T05:00:00.000Z");
+    const blank = await seed("published", "2026-11-20T04:00:00.000Z");
+    const older = await seed("published", "2026-11-20T03:00:00.000Z");
+    await env.DB.batch([
+      env.DB.prepare("UPDATE story_texts SET title = '   ' WHERE story_uid = ? AND lang = 'tr'").bind(blank),
+      env.DB.prepare("UPDATE story_texts SET dev_line = '\t' WHERE story_uid = ? AND lang = 'en'").bind(blank),
+    ]);
+    expect(ids((await (await get("/api/stories")).json()) as Json)).toEqual([newer, older]);
+
+    for (const limit of [1, 2]) {
+      const seen: string[] = [];
+      let cursor: string | null = null;
+      for (let page = 0; page < 10; page++) {
+        const query: string = cursor === null ? "" : `&cursor=${encodeURIComponent(cursor)}`;
+        const body = (await (await get(`/api/stories?limit=${limit}${query}`)).json()) as Json;
+        seen.push(...ids(body));
+        cursor = body.next;
+        if (cursor === null) break;
+      }
+      expect(cursor, `limit=${limit}`).toBeNull();
+      expect(seen, `limit=${limit}`).toEqual([newer, older]);
+    }
+  });
+
   it("a story taken down is gone from the next response", async () => {
     const uid = await seed("published");
     expect(ids((await (await get("/api/stories")).json()) as Json)).toEqual([uid]);

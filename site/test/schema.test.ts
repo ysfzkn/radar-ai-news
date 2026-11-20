@@ -34,7 +34,8 @@ describe("parseStories", () => {
       "no language": (s) => [{ ...s, texts: {} }],
       "bad timestamp": (s) => [{ ...s, published_at: "yesterday" }],
       "unknown publish_mode": (s) => [{ ...s, publish_mode: "robot" }],
-      "zero source_count": (s) => [{ ...s, source_count: 0 }],
+      "negative source_count": (s) => [{ ...s, source_count: -1 }],
+      "fractional source_count": (s) => [{ ...s, source_count: 1.5 }],
       "duplicate uid": (s) => [s, { ...s }],
       "not an array": () => ({ stories: [] }),
     };
@@ -49,6 +50,11 @@ describe("parseStories", () => {
     const [parsed] = parseStories([story]);
     expect(parsed.texts.en).toBeUndefined();
     expect(parsed.texts.tr?.title).toBe(story.texts.tr.title);
+  });
+
+  it("accepts a source_count of 0", () => {
+    const [parsed] = parseStories([{ ...firstStory(), source_count: 0 }]);
+    expect(parsed.source_count).toBe(0);
   });
 
   it("accepts empty sources and a null try_url", () => {

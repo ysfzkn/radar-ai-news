@@ -113,6 +113,22 @@ describe("ingest", () => {
   });
 
   it.each([
+    ["tr", "title"],
+    ["tr", "summary"],
+    ["tr", "dev_line"],
+    ["en", "title"],
+    ["en", "summary"],
+    ["en", "dev_line"],
+  ])("rejects a whitespace-only %s.%s", async (lang, field) => {
+    const body = clone();
+    body.stories[0].texts[lang][field] = " \n\t ";
+    const res = await post(body);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "invalid", path: `stories.0.texts.${lang}.${field}` });
+    expect(await count("stories")).toBe(0);
+  });
+
+  it.each([
     ["javascript:alert(1)", "source_url"],
     ["javascript:alert(1)", "fact_card.try_url"],
     ["data:text/html,x", "sources.0.url"],

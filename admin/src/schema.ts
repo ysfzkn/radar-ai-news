@@ -53,10 +53,18 @@ const createdAt = z.string().transform((value, ctx) => {
   return new Date(ms).toISOString();
 });
 
+// Non-empty after trimming: the public read model trims texts, and a blank one cannot be shown.
+const textField = (max: number) =>
+  z
+    .string()
+    .min(1)
+    .max(max)
+    .refine((value) => value.trim() !== "", { message: "must not be blank" });
+
 const text = z.strictObject({
-  title: z.string().min(1).max(INGEST_LIMITS.title),
-  summary: z.string().min(1).max(INGEST_LIMITS.summary),
-  dev_line: z.string().min(1).max(INGEST_LIMITS.dev_line),
+  title: textField(INGEST_LIMITS.title),
+  summary: textField(INGEST_LIMITS.summary),
+  dev_line: textField(INGEST_LIMITS.dev_line),
 });
 
 const story = z.strictObject({

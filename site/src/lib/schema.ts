@@ -66,7 +66,7 @@ const story = z.strictObject({
   category: z.enum(CATEGORIES),
   publish_mode: z.enum(["auto", "human"]),
   edited: z.boolean(),
-  source_count: z.number().int().positive(),
+  source_count: z.number().int().nonnegative(),
   source_url: httpUrl,
   sources: z.array(z.strictObject({ name: nonEmpty, url: httpUrl })),
   try_url: httpUrl.nullable(),

@@ -51,8 +51,9 @@ Response, `200`:
 ```
 
 - `publish_mode` is `auto` when the agent published the story and `human` when a person approved it. `edited` is true when a person changed the text.
-- `texts` holds `tr`, `en` or both. Text is trimmed.
-- `sources` lists only entries with a name and an `http:` or `https:` link. `try_url` is `null` unless it is an `http:` or `https:` link.
+- `texts` holds `tr`, `en` or both. Text is trimmed. A language whose title, summary or developer line is empty after trimming is left out, and a story with no usable language is not returned at all, so a page may hold fewer than `limit` stories.
+- `source_count` is a whole number and may be `0`.
+- `sources` lists only entries with a non-empty name (trimmed) and an `http:` or `https:` link; sources without a name are left out. `try_url` is `null` unless it is an `http:` or `https:` link.
 - Stories come newest `published_at` first, then by `uid`. `next` is an opaque cursor for the following page, or `null` after the last page. Pass it back unchanged as `cursor`.
 - A `limit` outside 1 to 200 (or not a whole number) and a malformed `cursor` give `400` with `{"error": "invalid"}`.
 - Responses carry `Cache-Control: public, max-age=60`.

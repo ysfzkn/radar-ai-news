@@ -503,9 +503,9 @@ function publicSources(raw: string): { name: string; url: string }[] {
   if (!Array.isArray(parsed)) return [];
   const out: { name: string; url: string }[] = [];
   for (const s of parsed) {
-    if (isRecord(s) && typeof s.name === "string" && typeof s.url === "string" && isHttpUrl(s.url)) {
-      out.push({ name: s.name, url: s.url });
-    }
+    if (!isRecord(s) || typeof s.name !== "string" || typeof s.url !== "string" || !isHttpUrl(s.url)) continue;
+    const name = s.name.trim();
+    if (name !== "") out.push({ name, url: s.url });
   }
   return out;
 }
@@ -518,8 +518,10 @@ function publicTryUrl(raw: string): string | null {
 
 // Published stories, newest published_at first and uid ascending within a tie. Two queries: one
 // SELECT for the page (one row more than `limit`, to know whether another page exists), then one
-// db.batch carrying the texts in chunks of TEXT_CHUNK uids. `next` is the position of the last
-// story returned, which the following page starts after.
+// db.batch carrying the texts in chunks of TEXT_CHUNK uids. `next` is the position of the last of
+// the first `limit` rows, which the following page starts after. A language with a blank text is
+// left out, and a story left with no language is not returned; `next` still comes from the rows
+// read, so such a story is stepped over, never repeated, and a page may hold fewer than `limit`.
 export async function listPublished(
   db: D1Database,
   limit: number,
@@ -558,13 +560,18 @@ export async function listPublished(
   const texts = new Map<string, Partial<Record<Lang, TextSet>>>();
   for (const batch of batches) {
     for (const r of batch.results) {
+      const text = { title: r.title.trim(), summary: r.summary.trim(), dev_line: r.dev_line.trim() };
+      if (text.title === "" || text.summary === "" || text.dev_line === "") continue;
       const set = texts.get(r.story_uid) ?? {};
-      set[r.lang] = { title: r.title.trim(), summary: r.summary.trim(), dev_line: r.dev_line.trim() };
+      set[r.lang] = text;
       texts.set(r.story_uid, set);
     }
   }
-  const stories = rows.map(
-    (r): PublicStory => ({
+  const stories: PublicStory[] = [];
+  for (const r of rows) {
+    const set = texts.get(r.uid);
+    if (!set) continue;
+    stories.push({
       uid: r.uid,
       category: r.category,
       publish_mode: r.publish_mode === "human" ? "human" : "auto",
@@ -575,9 +582,9 @@ export async function listPublished(
       try_url: publicTryUrl(r.fact_card),
       created_at: r.created_at,
       published_at: r.published_at,
-      texts: texts.get(r.uid) ?? {},
-    }),
-  );
+      texts: set,
+    });
+  }
   return { stories, next };
 }
 
