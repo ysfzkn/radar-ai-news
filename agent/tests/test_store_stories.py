@@ -184,11 +184,76 @@ def test_story_sources_orders_by_tier_and_drops_duplicate_urls(store, cluster_id
     )
     for stored in store.items_since(now - timedelta(hours=1)):
         store.set_cluster(stored.id, cluster_id)
+    # news.test is not the site of either source that carried it: each shows its own site.
     assert store.story_sources(cluster_id) == [
         {"name": "GitHub Blog", "url": "https://github.blog/post", "tier": 1},
-        {"name": "Hacker News", "url": "https://news.test/thread", "tier": 2},
+        {"name": "Hacker News", "url": "https://news.ycombinator.com/", "tier": 2},
+        {"name": "Webrazzi AI", "url": "https://webrazzi.com/", "tier": 4},
     ]
     assert store.story_sources(999) == []
+
+
+def _cluster_of(store, cluster_id, now, *items):
+    from radar.models import RawItem
+
+    store.insert_items(
+        [
+            RawItem(source_id=sid, url=url, title="t", published_at=now + timedelta(minutes=i))
+            for i, (sid, url) in enumerate(items)
+        ]
+    )
+    for stored in store.items_since(now - timedelta(hours=1)):
+        store.set_cluster(stored.id, cluster_id)
+    return store.story_sources(cluster_id)
+
+
+def test_a_hacker_news_item_never_links_to_the_submitted_page(store, cluster_id, now):
+    sources = _cluster_of(
+        store,
+        cluster_id,
+        now,
+        ("github-blog", "https://github.blog/a2ui"),
+        ("hn", "https://evil.example/fake-release"),
+        ("hn", "https://sub.evil.example/other"),
+    )
+    assert all("evil.example" not in s["url"] for s in sources)
+    assert sources == [
+        {"name": "GitHub Blog", "url": "https://github.blog/a2ui", "tier": 1},
+        {"name": "Hacker News", "url": "https://news.ycombinator.com/", "tier": 2},
+    ]
+
+
+def test_a_hacker_news_discussion_link_is_kept(store, cluster_id, now):
+    sources = _cluster_of(store, cluster_id, now, ("hn", "https://news.ycombinator.com/item?id=1"))
+    assert [s["url"] for s in sources] == ["https://news.ycombinator.com/item?id=1"]
+
+
+def test_a_feed_item_on_its_own_site_or_a_subdomain_is_kept(store, cluster_id, now):
+    sources = _cluster_of(
+        store,
+        cluster_id,
+        now,
+        ("github-blog", "https://github.blog/post"),
+        ("github-blog", "https://www.github.blog/other"),
+        ("webrazzi-ai", "https://ai.webrazzi.com/haber"),
+    )
+    assert [s["url"] for s in sources] == [
+        "https://github.blog/post",
+        "https://www.github.blog/other",
+        "https://ai.webrazzi.com/haber",
+    ]
+
+
+def test_a_feed_item_on_another_site_shows_the_feeds_own_site(store, cluster_id, now):
+    sources = _cluster_of(
+        store,
+        cluster_id,
+        now,
+        ("webrazzi-ai", "https://evil.example/webrazzi.com"),
+        ("github-blog", "https://notgithub.blog/x"),
+        ("github-blog", "https://blog/x"),
+    )
+    assert [s["url"] for s in sources] == ["https://github.blog/", "https://webrazzi.com/"]
 
 
 def test_attempts_are_recorded_oldest_first(store, cluster_id, run_id, now):

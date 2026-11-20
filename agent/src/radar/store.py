@@ -3,7 +3,9 @@ import sqlite3
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
+from urllib.parse import urlsplit
 
+from radar.fetch.hn import SITE as HN_SITE
 from radar.models import (
     Cluster,
     Draft,
@@ -40,6 +42,29 @@ def _stored(row: sqlite3.Row) -> StoredItem:
         points=row["points"],
         cluster_id=row["cluster_id"],
     )
+
+
+def _host(url: str) -> str:
+    try:
+        host = urlsplit(url).hostname or ""
+    except ValueError:
+        return ""
+    return host.rstrip(".").lower().removeprefix("www.")
+
+
+def _shown_url(item_url: str, kind: str, source_url: str) -> str:
+    """The item's URL when it is on its source's site, else that source's own site."""
+    if kind == "hn":
+        sites = [HN_SITE, source_url]
+    else:
+        parts = urlsplit(source_url)
+        sites = [f"{parts.scheme}://{parts.netloc}/"]
+    host = _host(item_url)
+    for site in sites:
+        site_host = _host(site)
+        if host and site_host and (host == site_host or host.endswith("." + site_host)):
+            return item_url
+    return sites[0]
 
 
 class SqliteStore:
@@ -326,8 +351,17 @@ class SqliteStore:
             )
 
     def story_sources(self, cluster_id: int) -> list[dict]:
+        """The story's public source links, one per distinct URL, by tier then time.
+
+        An item's own URL is shown only when it is on the site of the configured source
+        that carried it (the same host as the source's feed URL or a subdomain of it). An
+        aggregator's item points wherever its submitter chose, so any other item shows that
+        source's own site instead (Hacker News: news.ycombinator.com). Every item still
+        counts toward the story's source count, which is stored with the story.
+        """
         rows = self._conn.execute(
-            "SELECT s.name AS name, s.tier AS tier, i.url AS url FROM items i "
+            "SELECT s.name AS name, s.tier AS tier, s.kind AS kind, s.url AS source_url, "
+            "i.url AS url FROM items i "
             "JOIN sources s ON s.id = i.source_id WHERE i.cluster_id = ? "
             "ORDER BY s.tier, i.published_at, i.id",
             (cluster_id,),
@@ -335,10 +369,11 @@ class SqliteStore:
         seen: set[str] = set()
         result = []
         for r in rows:
-            if r["url"] in seen:
+            url = _shown_url(r["url"], r["kind"], r["source_url"])
+            if url in seen:
                 continue
-            seen.add(r["url"])
-            result.append({"name": r["name"], "url": r["url"], "tier": r["tier"]})
+            seen.add(url)
+            result.append({"name": r["name"], "url": url, "tier": r["tier"]})
         return result
 
     def record_attempt(

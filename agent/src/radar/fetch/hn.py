@@ -7,6 +7,8 @@ import httpx
 from radar.fetch.common import get, limit_items, safe_canonical
 from radar.models import RawItem, Source
 
+SITE = "https://news.ycombinator.com/"  # the site the Algolia search API indexes
+
 
 def fetch_hn(source: Source, client: httpx.Client, now: datetime) -> list[RawItem]:
     response = get(client, source.url)
@@ -15,9 +17,7 @@ def fetch_hn(source: Source, client: httpx.Client, now: datetime) -> list[RawIte
     for hit in response.json().get("hits", []):
         title = (hit.get("title") or "").strip()
         object_id = hit.get("objectID")
-        url = hit.get("url") or (
-            f"https://news.ycombinator.com/item?id={object_id}" if object_id else None
-        )
+        url = hit.get("url") or (f"{SITE}item?id={object_id}" if object_id else None)
         created = hit.get("created_at_i")
         canonical = safe_canonical(url) if url else None
         if not title or not canonical or created is None:
