@@ -38,6 +38,10 @@ describe("reasonView", () => {
     });
   });
 
+  it.each(["verify:", "risk:", "risk:   "])("treats %j, a known prefix with nothing after it, as a plain note", (reason) => {
+    expect(reasonView(reason)).toEqual({ kind: "other", label: "Not", text: reason, raw: true });
+  });
+
   it.each(["", "verify:", "risk:", "x".repeat(300), "verify: <script>alert(1)</script>", "risk: <b>"])(
     "never throws on %j",
     (reason) => {

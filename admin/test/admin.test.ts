@@ -600,6 +600,24 @@ describe("save and approve", () => {
     expect(actionsOf(s)).toEqual(["ingested"]);
   });
 
+  it("a stale save-and-approve on a story approved meanwhile shows the plain conflict and the stored text", async () => {
+    const uid = await seed();
+    const stale = { ...(await storedFields(uid)), tr_title: "Bayat başlık", checked: "on" };
+    // Approved in another tab first.
+    expect((await post(`/admin/stories/${uid}/approve`, { version: "1", checked: "on" })).status).toBe(303);
+    const res = await post(`/admin/stories/${uid}/approve`, stale);
+    expect(res.status).toBe(409);
+    const body = await res.text();
+    expect(body).toContain(COPY.failures.conflict);
+    expect(body).not.toContain(COPY.conflictKept);
+    expect(body).not.toContain("Bayat başlık");
+    expect(body).toMatch(/<textarea id="tr_title"[^>]*>A2UI 1\.0 aday sürümü yayında<\/textarea>/);
+    expect(body).not.toContain("data-dirty");
+    const s = (await getStory(env.DB, uid))!;
+    expect(s).toMatchObject({ status: "published", version: 2, edited: false });
+    expect(s.texts.tr.title).toBe("A2UI 1.0 aday sürümü yayında");
+  });
+
   it("approve with a changed title on a published story answers 409 and saves nothing", async () => {
     const uid = await seed({ status: "published" });
     const before = (await getStory(env.DB, uid))!;
@@ -800,5 +818,23 @@ describe("review screen", () => {
     expect(svg).not.toMatch(/(fill|stroke|style)=/);
     const css = await (await get("/admin/app.css")).text();
     expect(css).not.toContain(".brand::before");
+  });
+  it("a page that keeps unsaved typed text marks the form dirty; a normal story page does not", async () => {
+    const uid = await seed();
+    const normal = await (await get(`/admin/stories/${uid}`)).text();
+    expect(normal).toMatch(/<form [^>]*id="story-form"/);
+    expect(normal).not.toContain("data-dirty");
+
+    const conflict = await (await post(`/admin/stories/${uid}/edit`, editFields(7, { tr_title: "Benim başlığım" }))).text();
+    expect(conflict).toMatch(/<form [^>]*id="story-form"[^>]*data-dirty="1"/);
+    expect(conflict).toContain(`<p class="unsaved" id="unsaved" role="status" hidden>`);
+
+    const published = await seed({ status: "published" });
+    const tooLong = await post(`/admin/stories/${published}/edit`, editFields(1, { tr_summary: "ö".repeat(321) }));
+    expect(tooLong.status).toBe(400);
+    expect(await tooLong.text()).toMatch(/<form [^>]*id="story-form"[^>]*data-dirty="1"/);
+
+    const js = await (await get("/admin/app.js")).text();
+    expect(js).toContain('hasAttribute("data-dirty")');
   });
 });

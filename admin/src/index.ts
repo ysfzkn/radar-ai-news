@@ -115,7 +115,7 @@ async function storyPage(
 ): Promise<Response> {
   const story = await getStory(c.env.DB, uid);
   if (!story) return page(c, { title: COPY.notFoundTitle, active: null, body: notFoundView() }, 404);
-  const body = storyView(story, new Date(), draft);
+  const body = storyView(story, new Date(), draft, draft !== undefined && differs(story, draft));
   const title = story.texts.tr?.title ?? COPY.notFoundTitle;
   return page(c, { title, active: story.status, body, ...(message ? { message } : {}) }, status);
 }
@@ -185,19 +185,29 @@ const FAILURE_STATUS: Record<Failure, ContentfulStatusCode> = {
   invalid: 400,
 };
 
-// A version conflict on a form with edit fields: the page shows what was typed, with the story's
-// current version, so the next save is a deliberate overwrite. A story that no longer takes edits
-// (rejected or expired meanwhile) is shown as it is now.
-async function conflictPage(c: Ctx, uid: string, draft: Draft): Promise<Response> {
+// A version conflict on a form with edit fields: while the story is still in one of `keepFor`, the
+// page shows what was typed, with the story's current version, so the next save is a deliberate
+// overwrite. Otherwise (rejected or expired meanwhile; for approve, also published meanwhile, so a
+// stale form cannot become an edit of a live story) the story is shown as it is now.
+async function conflictPage(c: Ctx, uid: string, draft: Draft, keepFor: readonly Status[]): Promise<Response> {
   const story = await getStory(c.env.DB, uid);
-  const editable = story?.status === "review" || story?.status === "published";
-  if (!editable) return storyPage(c, uid, FAILURE_STATUS.conflict, failureMessage("conflict"));
+  if (!story || !keepFor.includes(story.status))
+    return storyPage(c, uid, FAILURE_STATUS.conflict, failureMessage("conflict"));
   return storyPage(c, uid, FAILURE_STATUS.conflict, COPY.conflictKept, draft);
 }
 
-function afterResult(c: Ctx, uid: string, result: Result, success: string, draft?: Draft): Promise<Response> | Response {
+const EDITABLE: readonly Status[] = ["review", "published"];
+
+function afterResult(
+  c: Ctx,
+  uid: string,
+  result: Result,
+  success: string,
+  draft?: Draft,
+  keepFor: readonly Status[] = EDITABLE,
+): Promise<Response> | Response {
   if (result.ok) return c.redirect(success, 303);
-  if (draft && result.error === "conflict") return conflictPage(c, uid, draft);
+  if (draft && result.error === "conflict") return conflictPage(c, uid, draft, keepFor);
   const keep = draft && (result.error === "too_long" || result.error === "invalid") ? draft : undefined;
   return storyPage(c, uid, FAILURE_STATUS[result.error], failureMessage(result.error, result.detail), keep);
 }
@@ -231,14 +241,14 @@ app.post("/admin/stories/:uid/approve", async (c) => {
     // Only a story in review is saved here; any other status goes straight to approveStory, which refuses it.
     if (story?.status === "review" && differs(story, draft)) {
       const edited = await editStory(c.env.DB, uid, version, patchOf(draft), actor, new Date());
-      if (!edited.ok) return afterResult(c, uid, edited, "/admin", draft);
+      if (!edited.ok) return afterResult(c, uid, edited, "/admin", draft, ["review"]);
       version += 1;
       saved = true;
     }
   }
   const result = await approveStory(c.env.DB, uid, version, actor, new Date());
   if (result.ok) notifySite(c.env, waiter(c));
-  if (result.ok || !saved) return afterResult(c, uid, result, "/admin", draft);
+  if (result.ok || !saved) return afterResult(c, uid, result, "/admin", draft, ["review"]);
   const message = `${COPY.savedNotApproved} ${failureMessage(result.error, result.detail)}`;
   return storyPage(c, uid, FAILURE_STATUS[result.error], message);
 });

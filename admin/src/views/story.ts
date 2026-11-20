@@ -130,7 +130,7 @@ ${save("secondary")}
 </div>`;
 }
 
-function editForm(s: StoryFull, d: Draft): View {
+function editForm(s: StoryFull, d: Draft, dirty: boolean): View {
   const options = CATEGORIES.map(
     (c) => html`<option value="${c}"${c === d.category ? html` selected` : ""}>${categoryLabel(c)}</option>`,
   );
@@ -142,7 +142,7 @@ ${FIELDS.map((f) => textField(lang, f, d.texts[lang][f]))}
   );
   return html`<section class="edit" aria-labelledby="edit-h">
 <h2 id="edit-h">${COPY.editHeading}</h2>
-<form method="post" action="${storyPath(s.uid)}/edit" id="${FORM_ID}" class="stack">
+<form method="post" action="${storyPath(s.uid)}/edit" id="${FORM_ID}" class="stack"${dirty ? html` data-dirty="1"` : ""}>
 ${versionField(s)}
 <div class="panel stack">
 <div class="field">
@@ -225,7 +225,8 @@ ${e.note ? html`<p class="note">${e.note}</p>` : ""}
 
 // One column below 64rem (head, reasons, fact card, sources, form, decision card, history);
 // from 64rem the side column (reasons to history) sits sticky on the right of the form.
-export function storyView(s: StoryFull, now: Date, draft: Draft = draftFrom(s)): View {
+// `dirty`: the draft holds typed text that is not saved (app.js then starts in the unsaved state).
+export function storyView(s: StoryFull, now: Date, draft: Draft = draftFrom(s), dirty = false): View {
   const editable = s.status === "review" || s.status === "published";
   return html`<p class="back"><a href="/admin?status=${s.status}">${COPY.back}</a></p>
 <article class="story">
@@ -240,7 +241,7 @@ ${sources(s)}
 ${history(s)}
 </div>
 <div class="story-main">
-${editable ? editForm(s, draft) : readOnlyTexts(s)}
+${editable ? editForm(s, draft, dirty) : readOnlyTexts(s)}
 ${s.status === "review" ? rejectCard(s) : s.status === "published" ? takeDownCard(s) : ""}
 </div>
 </article>`;

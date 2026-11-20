@@ -28,10 +28,12 @@ const isRiskFlag = (value: string): value is (typeof RISK_FLAGS)[number] =>
   (RISK_FLAGS as readonly string[]).includes(value);
 
 // The agent writes reasons as free strings; the shapes it is known to use become Turkish,
-// anything else is shown as written. Never throws.
+// anything else (a known prefix with nothing after it too) is shown as written. Never throws.
 export function reasonView(reason: string): ReasonView {
+  const other: ReasonView = { kind: "other", label: COPY.reasonKinds.other, text: reason, raw: true };
   if (RISK.test(reason)) {
     const flag = reason.replace(RISK, "").trim();
+    if (flag === "") return other;
     const label = COPY.reasonKinds.risk;
     return isRiskFlag(flag)
       ? { kind: "risk", label, text: COPY.riskFlags[flag], raw: false }
@@ -39,6 +41,7 @@ export function reasonView(reason: string): ReasonView {
   }
   if (VERIFY.test(reason)) {
     const rest = reason.replace(VERIFY, "").trim();
+    if (rest === "") return other;
     const label = COPY.reasonKinds.verify;
     const long = TOO_LONG.exec(rest);
     const longLabel = long ? knownLabel(long[1]!, long[2]!) : undefined;
@@ -50,7 +53,7 @@ export function reasonView(reason: string): ReasonView {
     const text = path && pathLabel ? `${pathLabel}: ${rest.slice(path[0].length)}` : rest;
     return { kind: "verify", label, text, raw: true };
   }
-  return { kind: "other", label: COPY.reasonKinds.other, text: reason, raw: true };
+  return other;
 }
 
 const KIND_CLASS: Record<ReasonView["kind"], string> = { risk: "chip risk", verify: "chip verify", other: "chip" };

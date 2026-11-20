@@ -308,6 +308,8 @@ document.addEventListener("DOMContentLoaded", function () {
     return JSON.stringify(values);
   };
   var initial = snapshot();
+  // Set by the server when the page re-renders typed text that was not saved.
+  var kept = form.hasAttribute("data-dirty");
   var dirty = false;
   var onLeave = function (event) {
     event.preventDefault();
@@ -321,9 +323,10 @@ document.addEventListener("DOMContentLoaded", function () {
     if (dirty) window.addEventListener("beforeunload", onLeave);
     else window.removeEventListener("beforeunload", onLeave);
   };
-  var check = function () { setDirty(snapshot() !== initial); };
+  var check = function () { setDirty(kept || snapshot() !== initial); };
+  if (kept) setDirty(true);
   form.addEventListener("input", check);
   form.addEventListener("change", check);
-  form.addEventListener("submit", function () { setDirty(false); });
+  form.addEventListener("submit", function () { kept = false; setDirty(false); });
 });
 `;
