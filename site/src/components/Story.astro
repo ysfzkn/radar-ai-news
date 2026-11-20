@@ -49,7 +49,10 @@ const no = String(index).padStart(2, "0");
   </p>
   <h2 class="story-title">{text.title}</h2>
   <p class="story-summary">{text.summary}</p>
-  <p class="story-why"><span class="why-label label caps">{copy.whyItMatters}</span> {text.dev_line}</p>
+  <p class="story-why">
+    <span class="why-label label caps">{copy.whyItMatters}</span><span class="visually-hidden">{copy.labelColon}</span>{" "}
+    {text.dev_line}
+  </p>
   {
     shown.length > 0 && (
       <p class="story-sources label">

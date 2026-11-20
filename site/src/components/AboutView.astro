@@ -29,7 +29,7 @@ const about = COPY[Astro.props.lang].about;
         )}
         {section.after?.map((paragraph) => <p>{paragraph}</p>)}
         {section.links && (
-          <p class="prose-links">
+          <p>
             {section.links.map((link, i) => (
               <>
                 {i > 0 && " · "}

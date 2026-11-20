@@ -228,7 +228,11 @@ describe("built site", () => {
         expect(article).not.toContain("story-dev");
         const why = article.match(/<p class="story-why">([\s\S]*?)<\/p>/);
         expect(why).not.toBeNull();
-        expect(why![1]).toMatch(new RegExp(`^<span class="why-label label caps">${COPY[lang].whyItMatters}</span> \\S`));
+        expect(why![1]).toMatch(
+          new RegExp(`^<span class="why-label label caps">${COPY[lang].whyItMatters}</span><span class="visually-hidden">:</span> \\S`),
+        );
+        // A screen reader hears "Neden önemli: …", the pill shows no colon.
+        expect(text(why![1])).toMatch(new RegExp(`^${COPY[lang].whyItMatters}: \\S`));
         expect(article).toMatch(new RegExp(`<a href="https://[^"]+" ${EXTERNAL}>`));
         expect(article).toMatch(/role="img" aria-label="[^"]*"/);
         const label = article.match(/role="img" aria-label="([^"]*)"/)![1];
@@ -919,6 +923,15 @@ describe("built site", () => {
         expect(first, `${path} ${href}`).toContain(`href="${href}" ${EXTERNAL}`);
       }
     }
+    expect(text(page(DEMO, "kunye"))).toContain(
+      "Radar, Yusuf Özkan'ın kişisel projesi; onu o yürütüyor ve sitenin kaynak kodu herkese açık.",
+    );
+    expect(text(page(DEMO, "en/about"))).toContain(
+      "Radar is a personal project by Yusuf Özkan, who runs it; the site's source code is open.",
+    );
+    // Most stories publish themselves, so the page does not say he publishes every issue.
+    expect(text(page(DEMO, "kunye"))).not.toContain("Her sayıyı o yayımlıyor");
+    expect(text(page(DEMO, "en/about"))).not.toContain("He publishes every issue");
     // The rest of the method stays below it.
     expect(text(page(DEMO, "kunye"))).toContain("Yankı ölçer");
     expect(text(page(DEMO, "en/about"))).toContain("The echo meter");
@@ -998,6 +1011,15 @@ describe("built site", () => {
       expect(text(main)).not.toMatch(/\b20\d\d\b/);
     }
     expect(page(DEMO, "abone")).toMatch(/<link rel="alternate" hreflang="en" href="https:\/\/[^"]+\/en\/subscribe\/">/);
+    // Turkish: "akış" for the feed and "RSS okuyucusu" for the reader, never "besleme".
+    const tr = text(page(DEMO, "abone").match(/<main[\s\S]*?<\/main>/)![0]);
+    expect(tr).not.toMatch(/besleme|akış okuyucu/i);
+    expect(tr).toContain(
+      "Radar'a abone olmak bugün RSS akışını takip etmek demek: her gün yeni sayı, kullandığın RSS okuyucusunda kendiliğinden belirir.",
+    );
+    expect(tr).toContain("Akış adresi");
+    expect(tr).toContain("Bir RSS okuyucusu aç; çoğu ücretsizdir ve telefonda da çalışır.");
+    expect(JSON.stringify(COPY.tr)).not.toMatch(/besleme/i);
     // The strip's button marks the subscribe page as the current page there.
     expect(page(DEMO, "abone")).toContain('<a class="subscribe label" href="/abone/" aria-current="page">');
   });
@@ -1041,13 +1063,13 @@ describe("built site", () => {
     }
     const xml = readFileSync(join(REAL, "rss.xml"), "utf8");
     expect(items(xml).every((item) => item.includes("\n\nNeden önemli: "))).toBe(true);
-    // The pill: ink on page colour, the label face at 0.6875rem, fully rounded; inline in the line.
+    // The pill: ink on page colour, the label face at 0.75rem, fully rounded; inline in the line.
     const sheet = css();
     const pill = cssRule(sheet, ".why-label");
     for (const rule of [
       "background: var(--ink);",
       "color: var(--bg);",
-      "font-size: 0.6875rem;",
+      "font-size: 0.75rem;",
       "letter-spacing: 0.04em;",
       "padding: 0.125rem 0.5rem;",
       "border-radius: 999px;",
@@ -1056,7 +1078,11 @@ describe("built site", () => {
     }
     expect(pill).not.toMatch(/display:/);
     const line = cssRule(sheet, ".story-why");
-    expect(line).toContain("margin-top: 0.75rem;");
+    expect(line).toContain("margin-top: var(--space-3);");
+    const hidden = cssRule(sheet, ".visually-hidden");
+    for (const rule of ["position: absolute;", "width: 1px;", "height: 1px;", "overflow: hidden;", "clip-path: inset(50%);"]) {
+      expect(hidden).toContain(rule);
+    }
     expect(line).toContain("font-size: 1rem;");
     expect(line).not.toMatch(/border|background/);
   });
@@ -1086,8 +1112,11 @@ describe("built site", () => {
     expect(seen).toBeGreaterThan(20);
     // Topic pages: the list rows and the heading tag carry it too.
     for (const category of CATEGORIES) {
-      const html = page(DEMO, `konu/${category}`);
-      expect(html).toMatch(new RegExp(`<h1 class="kunye label cat-${category}">\\s*<span class="topic-tag caps">`));
+      for (const path of [`konu/${category}`, `en/topic/${category}`]) {
+        expect(page(DEMO, path), path).toMatch(
+          new RegExp(`<h1 class="kunye label cat-${category}">\\s*<span class="topic-tag caps">`),
+        );
+      }
     }
     expect(page(DEMO, "konu/security")).toMatch(/<li class="cat-security">/);
     const decls = declarations(sheets());
@@ -1113,18 +1142,34 @@ describe("built site", () => {
     for (const shadow of shadows) {
       expect(shadow.value === "none" || /^\d+px \d+px 0 var\(--ink\)$/.test(shadow.value), shadow.value).toBe(true);
       for (const part of shadow.selector.split(",").map((x) => x.trim())) {
-        expect(part.replace(/:(hover|focus-visible|active)$/, "")).toMatch(/^\.(story-lead|subscribe|try)$/);
+        expect(part.replace(/:(hover|focus-visible|active)$/, "").replace(/\[aria-current="page"\]$/, "")).toMatch(
+          /^\.(story-lead|subscribe|try)$/,
+        );
       }
     }
+    // The lead card: a 3px shadow at phone width, 4px from 48rem.
     const lead = cssRule(css(), ".story-lead");
     for (const rule of [
       "padding: 1.25rem;",
       "border: 1.5px solid var(--ink);",
       "background: var(--surface);",
-      "box-shadow: 4px 4px 0 var(--ink);",
+      "box-shadow: 3px 3px 0 var(--ink);",
     ]) {
       expect(lead).toContain(rule);
     }
+    expect(
+      shadows.find((d) => d.selector === ".story-lead" && d.stack[0] === "@media (min-width: 48rem)")?.value,
+    ).toBe("4px 4px 0 var(--ink)");
+    // On the subscribe page the strip's button is the current page: flat, on the chip, and still.
+    const current = declarations(css()).filter((d) => d.selector.includes('.subscribe[aria-current="page"]'));
+    const flat = current.find((d) => d.prop === "box-shadow")!;
+    expect(flat.value).toBe("none");
+    for (const state of ["", ":hover", ":focus-visible", ":active"]) {
+      expect(flat.selector.split(", ")).toContain(`.subscribe[aria-current="page"]${state}`);
+    }
+    expect(current.find((d) => d.prop === "background" && d.selector === flat.selector)?.value).toBe("var(--chip)");
+    expect(current.find((d) => d.prop === "transform" && d.selector === flat.selector)?.value).toBe("none");
+    expect(flat.stack.join(" ")).not.toContain("@media");
     expect(sheets()).not.toMatch(/gradient\(|backdrop-filter|filter:\s*drop-shadow|text-shadow/);
   });
 
@@ -1149,6 +1194,22 @@ describe("built site", () => {
     expect(decls.some((d) => d.prop === "animation-timeline" && d.value === "view()")).toBe(true);
     for (const path of ["", "en", "2026-11-18"]) expect(page(DEMO, path)).toContain('<div class="progress" aria-hidden="true"></div>');
     for (const path of ["arsiv", "kunye", "abone", "hafta/2026-W47", "konu/model"]) expect(page(DEMO, path)).not.toContain('class="progress"');
+    // Print cancels every animation with the very same selector (so at least equal specificity),
+    // and shows stories and lit arcs at full opacity in place, whatever a timeline left behind.
+    const animated = decls
+      .filter((d) => d.prop === "animation" && d.stack[0] === "@media (prefers-reduced-motion: no-preference)")
+      .flatMap((d) => d.selector.split(", "));
+    expect(animated.length).toBeGreaterThan(4);
+    const print = decls.filter((d) => d.stack[0] === "@media print");
+    for (const selector of animated) {
+      const reset = print.find((d) => d.prop === "animation" && d.value === "none" && d.selector.split(", ").includes(selector));
+      expect(reset, `print does not cancel ${selector}`).toBeDefined();
+    }
+    for (const selector of [".story:not(.story-lead)", ".echo .echo-on", ".index-list .echo-on"]) {
+      const rules = print.filter((d) => d.selector.split(", ").includes(selector));
+      expect(rules.find((d) => d.prop === "opacity")?.value, selector).toBe("1");
+      expect(rules.find((d) => d.prop === "transform")?.value, selector).toBe("none");
+    }
     // Faded or offset states live only in keyframes, never as an element's default.
     for (const d of decls.filter((x) => x.prop === "opacity")) expect(d.stack.join(" ")).toMatch(/@keyframes|@media print/);
   });

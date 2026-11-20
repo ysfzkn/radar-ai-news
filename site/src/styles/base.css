@@ -77,6 +77,18 @@ a:hover {
   text-transform: uppercase;
 }
 
+/* Read by assistive technology, not shown. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .skip {
   position: absolute;
   left: var(--gutter);
@@ -268,7 +280,7 @@ a.lang-part:focus-visible {
 }
 
 /* The masthead of an edition: one h1 set as three rows between a heavy rule and a hairline.
-   Its text runs "Sayı 4 · 20 Kasım 2026 Cuma · 5 haber · ~2 dk"; `order` moves the year
+   Its text runs "Sayı 4 · 20 Kasım 2026 Cuma · 5 haber · 22 kaynak · ~2 dk"; `order` moves the year
    down beside the count, so a screen reader still hears everything in reading order. */
 .masthead {
   --mh-size: clamp(2rem, 7vw, 3.25rem);
@@ -529,7 +541,7 @@ a.lang-part:focus-visible {
   padding: 1.25rem;
   border: 1.5px solid var(--ink);
   background: var(--surface);
-  box-shadow: 4px 4px 0 var(--ink);
+  box-shadow: 3px 3px 0 var(--ink);
 }
 
 .story-meta {
@@ -609,6 +621,10 @@ a.story-cat:hover {
     letter-spacing: -0.02em;
   }
 
+  .story-lead {
+    box-shadow: 4px 4px 0 var(--ink);
+  }
+
   /* The lead's number stays outside its card, level with the card's first row. */
   .story-lead .story-no {
     top: 1.25rem;
@@ -617,8 +633,8 @@ a.story-cat:hover {
 }
 
 /* From 50rem the gutter is at least 4.375rem even beside a 20px scrollbar, so the bar moves out
-   to its far left: 0.5rem left of the hanging number, at least 0.5rem from the window edge, and
-   0.5rem from the rail on a railed page. */
+   to its far left: its left edge 0.5rem left of the hanging number's 3rem box (the digits sit at
+   the box's right), at least 0.5rem from the window edge, and 0.5rem from the rail on a railed page. */
 @media (min-width: 50rem) {
   .story:target::before {
     left: -3.5rem;
@@ -658,7 +674,7 @@ a.story-cat:hover {
 
 /* Why it matters: one line under the summary, led by an ink pill; no box. */
 .story-why {
-  margin-top: 0.75rem;
+  margin-top: var(--space-3);
   margin-bottom: var(--space-4);
   font-size: 1rem;
   text-wrap: pretty;
@@ -670,7 +686,7 @@ a.story-cat:hover {
   border-radius: 999px;
   background: var(--ink);
   color: var(--bg);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   letter-spacing: 0.04em;
   white-space: nowrap;
   vertical-align: 0.0625rem;
@@ -732,6 +748,16 @@ a.story-cat:hover {
 .try:active {
   transform: translate(2px, 2px);
   box-shadow: 1px 1px 0 var(--ink);
+}
+
+/* On the subscribe page the strip's button is where the reader already is: flat and still. */
+.subscribe[aria-current="page"],
+.subscribe[aria-current="page"]:hover,
+.subscribe[aria-current="page"]:focus-visible,
+.subscribe[aria-current="page"]:active {
+  background: var(--chip);
+  box-shadow: none;
+  transform: none;
 }
 
 .story-try-mark {
@@ -1148,9 +1174,21 @@ a.story-cat:hover {
     box-shadow: none;
   }
 
-  .story,
-  .echo-on {
+  /* The same selectors as the motion rules, so the reset always wins; whatever state a scroll
+     timeline left behind, stories and arcs print in place at full strength. */
+  .echo .echo-on,
+  .index-list .echo-on,
+  .story:target::before,
+  .progress,
+  .story:not(.story-lead) {
     animation: none;
+  }
+
+  .story:not(.story-lead),
+  .echo .echo-on,
+  .index-list .echo-on {
+    opacity: 1;
+    transform: none;
   }
 
   body {

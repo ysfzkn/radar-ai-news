@@ -13,6 +13,8 @@ export interface Copy {
   echoLabel(level: number, n: number): string;
   /** The label of a story's last line; the feed adds a colon after it. */
   whyItMatters: string;
+  /** Read, not shown, after the pill of that label, so a screen reader pauses before the line. */
+  labelColon: string;
   sourceLabel: string;
   tryIt: string;
   /** The heading of an edition's index of stories. */
@@ -108,6 +110,7 @@ export const COPY: Record<Lang, Copy> = {
     sources: (n) => `${n} kaynak`,
     echoLabel: (level, n) => `5 üzerinden ${level}: ${n} bağımsız kaynak`,
     whyItMatters: "Neden önemli",
+    labelColon: ":",
     sourceLabel: "Kaynak:",
     tryIt: "Bugün dene",
     inThisIssue: "Bu sayıda",
@@ -175,7 +178,7 @@ export const COPY: Record<Lang, Copy> = {
         {
           heading: "Radar'ı kim çıkarıyor?",
           paragraphs: [
-            "Radar, Yusuf Özkan'ın kişisel projesi. Her sayıyı o yayımlıyor; sitenin kaynak kodu herkese açık.",
+            "Radar, Yusuf Özkan'ın kişisel projesi; onu o yürütüyor ve sitenin kaynak kodu herkese açık.",
           ],
           links: [
             { text: "ozkanyusuf.com", href: SITE },
@@ -253,18 +256,18 @@ export const COPY: Record<Lang, Copy> = {
     subscribe: {
       description: "Radar'ı RSS ile ücretsiz takip et: hesap yok, e-posta yok.",
       intro: [
-        "Radar'a abone olmak bugün RSS beslemesini takip etmek demek: her gün yeni sayı, kullandığın akış okuyucusunda kendiliğinden belirir.",
+        "Radar'a abone olmak bugün RSS akışını takip etmek demek: her gün yeni sayı, kullandığın RSS okuyucusunda kendiliğinden belirir.",
         "Ücretsiz. Hesap yok, e-posta adresi yok; hiçbir şey kaydedilmez.",
       ],
-      feedHeading: "Besleme adresi",
+      feedHeading: "Akış adresi",
       stepsHeading: "Üç adımda",
       steps: [
-        "Bir akış okuyucusu aç; çoğu ücretsizdir ve telefonda da çalışır.",
+        "Bir RSS okuyucusu aç; çoğu ücretsizdir ve telefonda da çalışır.",
         "Yeni bir abonelik ekle ve yukarıdaki adresi yapıştır.",
         "Kaydet. Her yeni sayı okuyucuna kendiliğinden gelir.",
       ],
-      otherFeed: "İngilizce sayıların ayrı bir beslemesi var:",
-      otherFeedLink: "İngilizce besleme",
+      otherFeed: "İngilizce sayıların ayrı bir akışı var:",
+      otherFeedLink: "İngilizce akış",
       noNewsletter: "E-posta bülteni yok; Radar'ı şimdilik yalnızca RSS ile takip edebilirsin.",
     },
   },
@@ -279,6 +282,7 @@ export const COPY: Record<Lang, Copy> = {
     echoLabel: (level, n) =>
       `${level} of 5: ${n} independent ${n === 1 ? "source" : "sources"}`,
     whyItMatters: "Why it matters",
+    labelColon: ":",
     sourceLabel: "Source:",
     tryIt: "Try it today",
     inThisIssue: "In this issue",
@@ -346,7 +350,7 @@ export const COPY: Record<Lang, Copy> = {
         {
           heading: "Who makes Radar?",
           paragraphs: [
-            "Radar is a personal project by Yusuf Özkan. He publishes every issue, and the site's source code is open.",
+            "Radar is a personal project by Yusuf Özkan, who runs it; the site's source code is open.",
           ],
           links: [
             { text: "ozkanyusuf.com", href: SITE },
