@@ -5,13 +5,15 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { COPY } from "../src/lib/copy";
 import { CATEGORIES } from "../src/lib/schema";
 
-// These tests read the files of finished builds. beforeAll runs three builds one
-// after another (never concurrently): the demo fixture, a hostile file, an empty file.
+// These tests read the files of finished builds. beforeAll runs four builds one after
+// another (never concurrently): the demo fixture, a hostile file, an empty file, and the
+// demo fixture's stories read as real data (so feeds and pages are built without the demo marks).
 const root = resolve(import.meta.dirname, "..");
 const astro = join(root, "node_modules", "astro", "bin", "astro.mjs");
 const DEMO = join(root, "dist");
 const HOSTILE = join(root, "dist-hostile");
 const EMPTY = join(root, "dist-empty");
+const REAL = join(root, "dist-real");
 // The configured site, as astro.config.mjs reads it; the builds inherit this environment.
 const SITE = process.env.SITE_URL || "https://radar.ozkanyusuf.com";
 const DEMO_DATES =["2026-11-17", "2026-11-18", "2026-11-19", "2026-11-20"];
@@ -34,7 +36,8 @@ beforeAll(() => {
   build(DEMO);
   build(HOSTILE, "test/fixtures/hostile.json");
   build(EMPTY, "test/fixtures/empty.json");
-}, 300_000);
+  build(REAL, "fixtures/stories.json");
+}, 400_000);
 
 const page = (dir: string, path: string) => readFileSync(join(dir, path, "index.html"), "utf8");
 
@@ -177,10 +180,39 @@ describe("built site", () => {
       const html = text(readFileSync(file, "utf8"));
       expect(html, file).toMatch(new RegExp(`${COPY.tr.demo}|${COPY.en.demo}`));
     }
-    for (const file of [...htmlFiles(HOSTILE), ...htmlFiles(EMPTY)]) {
+    for (const file of [HOSTILE, EMPTY, REAL].flatMap(htmlFiles)) {
       const html = text(readFileSync(file, "utf8"));
       expect(html, file).not.toContain(COPY.tr.demo);
       expect(html, file).not.toContain(COPY.en.demo);
+    }
+  });
+
+  it("every demo page is marked noindex and no page built from a real file is", () => {
+    const noindex = '<meta name="robots" content="noindex">';
+    const demoPages = htmlFiles(DEMO);
+    expect(demoPages.length).toBeGreaterThanOrEqual(10);
+    for (const file of demoPages) expect(readFileSync(file, "utf8"), file).toContain(noindex);
+    for (const file of [HOSTILE, EMPTY, REAL].flatMap(htmlFiles)) {
+      expect(readFileSync(file, "utf8"), file).not.toMatch(/<meta name="robots"/);
+    }
+  });
+
+  it("the demo build's feeds have zero items and say they are demo data", () => {
+    for (const [file, lang] of [["rss.xml", "tr"], ["en/rss.xml", "en"]] as const) {
+      const xml = readFileSync(join(DEMO, file), "utf8");
+      expect(wellFormed(xml), file).toBe(true);
+      expect(items(xml), file).toHaveLength(0);
+      const channelTitle = `${COPY[lang].demoShort} · ${COPY[lang].feedTitle}`.replace(/'/g, "&apos;");
+      expect(xml, file).toContain(`<title>${channelTitle}</title>`);
+      expect(xml, file).toContain(`<description>${COPY[lang].demo}</description>`);
+    }
+    for (const dir of [REAL, HOSTILE]) {
+      for (const [file, lang] of [["rss.xml", "tr"], ["en/rss.xml", "en"]] as const) {
+        const xml = readFileSync(join(dir, file), "utf8");
+        expect(items(xml).length, `${dir} ${file}`).toBeGreaterThan(0);
+        expect(xml, `${dir} ${file}`).not.toContain(COPY[lang].demoShort);
+        expect(xml, `${dir} ${file}`).not.toContain(COPY[lang].demo);
+      }
     }
   });
 
@@ -274,7 +306,7 @@ describe("built site", () => {
 
   it("both feeds are well-formed XML with one item per story and absolute links that match a real anchor", () => {
     for (const [file, lang] of [["rss.xml", "tr"], ["en/rss.xml", "en"]] as const) {
-      const xml = readFileSync(join(DEMO, file), "utf8");
+      const xml = readFileSync(join(REAL, file), "utf8");
       expect(wellFormed(xml), file).toBe(true);
       expect(xml).toContain(`<title>${COPY[lang].feedTitle.replace(/'/g, "&apos;")}</title>`);
       const list = items(xml);
@@ -284,7 +316,7 @@ describe("built site", () => {
         expect(link.startsWith(`${SITE}/`), link).toBe(true);
         const { pathname, hash } = new URL(link);
         expect(pathname.startsWith(lang === "tr" ? "/2026-" : "/en/2026-"), link).toBe(true);
-        const target = readFileSync(join(DEMO, pathname, "index.html"), "utf8");
+        const target = readFileSync(join(REAL, pathname, "index.html"), "utf8");
         expect(target, link).toContain(`id="${hash.slice(1)}"`);
         expect(item).toMatch(/<guid isPermaLink="false">[0-9a-f]{32}<\/guid>/);
         expect(item.match(/<guid/g)).toHaveLength(1);
@@ -327,8 +359,8 @@ describe("built site", () => {
       for (const title of titles) expect(content, file).not.toContain(title);
       expect(content, file).not.toContain("s-4b06d152");
     }
-    // The same title is on the demo build, so the search would have found it.
-    expect(readFileSync(join(DEMO, "rss.xml"), "utf8")).toContain(titles[0]);
+    // The same title is in the feed of a build that has the story, so the search would have found it.
+    expect(readFileSync(join(REAL, "rss.xml"), "utf8")).toContain(titles[0]);
   });
 
   it("the method page exists in both languages and names the 72-hour rule", () => {

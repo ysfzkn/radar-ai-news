@@ -96,7 +96,7 @@ npm ci
 npm run dev                  # serves http://localhost:4321
 ```
 
-Without `RADAR_API_URL` and without a fetched data file, the site uses invented demo stories from `site/fixtures/stories.json` and shows a "demo data" banner on every page. To build static files into `site/dist/`: `npm run build`. To look at them: `npx astro preview`.
+Without `RADAR_API_URL` and without a fetched data file, the site uses invented demo stories from `site/fixtures/stories.json` and shows a "demo data" banner on every page. A demo build also marks every page `noindex` for search engines, and its two RSS feeds carry no items: the feed title starts with "Demo data" ("Örnek veri" in Turkish) and the feed description is the banner's sentence, so invented stories never reach a feed reader. To build static files into `site/dist/`: `npm run build`. To look at them: `npx astro preview`.
 
 ### Against a local admin service
 

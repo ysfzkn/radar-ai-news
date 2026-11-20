@@ -14,3 +14,4 @@ site/.data/
 .astro/
 dist-hostile/
 dist-empty/
+dist-real/

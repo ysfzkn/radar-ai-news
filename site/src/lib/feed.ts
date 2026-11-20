@@ -11,18 +11,23 @@ const FEED_LIMIT = 50;
 const XML_ILLEGAL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F￾￿]/g;
 const clean = (value: string) => value.replace(XML_ILLEGAL, "");
 
-/** The RSS response for one language: its newest 50 stories, links absolute on `site`. */
+/**
+ * The RSS response for one language: its newest 50 stories, links absolute on `site`.
+ * A demo build gets a feed that says so and carries no items, so invented stories never
+ * reach a feed reader.
+ */
 export function feed(lang: Lang, site: URL | undefined): Promise<Response> {
   if (!site) throw new Error("the feed needs `site` in astro.config.mjs");
   const copy = COPY[lang];
-  const newest = forLang(loadData().stories, lang)
+  const { stories, demo } = loadData();
+  const newest = (demo ? [] : forLang(stories, lang))
     .sort((a, b) =>
       a.published_at === b.published_at ? (a.uid < b.uid ? -1 : 1) : a.published_at < b.published_at ? 1 : -1,
     )
     .slice(0, FEED_LIMIT);
   return rss({
-    title: copy.feedTitle,
-    description: copy.feedDescription,
+    title: demo ? `${copy.demoShort} · ${copy.feedTitle}` : copy.feedTitle,
+    description: demo ? copy.demo : copy.feedDescription,
     site: new URL(routes[lang].home, site).href,
     items: newest.map((story) => {
       const text = story.texts[lang]!;

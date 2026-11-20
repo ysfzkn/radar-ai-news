@@ -32,6 +32,7 @@ const { demo } = loadData();
     <meta name="color-scheme" content="light" />
     <title>{title}</title>
     <meta name="description" content={description} />
+    {demo && <meta name="robots" content="noindex" />}
     <link rel="canonical" href={absolute(path)} />
     {
       alternate && (

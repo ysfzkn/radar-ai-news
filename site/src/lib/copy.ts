@@ -19,6 +19,8 @@ export interface Copy {
   next: string;
   noEdition: string;
   demo: string;
+  /** The demo line's short form, put before the feed title in a demo build. */
+  demoShort: string;
   otherLang: string;
   skip: string;
   rss: string;
@@ -88,6 +90,7 @@ export const COPY: Record<Lang, Copy> = {
     next: "Sonraki sayı",
     noEdition: "Henüz baskı yok.",
     demo: "Örnek veri: bu haberler gerçek değil.",
+    demoShort: "Örnek veri",
     otherLang: "English",
     skip: "İçeriğe geç",
     rss: "RSS",
@@ -223,6 +226,7 @@ export const COPY: Record<Lang, Copy> = {
     next: "Next issue",
     noEdition: "No edition yet.",
     demo: "Demo data: these stories are not real.",
+    demoShort: "Demo data",
     otherLang: "Türkçe",
     skip: "Skip to content",
     rss: "RSS",
