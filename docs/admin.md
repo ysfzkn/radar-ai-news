@@ -20,6 +20,8 @@ It does not store: the fetched source articles, the agent's prompts or model out
 | Unpublish | `published` | `rejected` | A note is required. |
 | Expire | `review` aged 72 hours or more | `expired` | Hourly, and whenever the queue is opened. |
 
+The 72 hours run from the moment the agent wrote the story, not from its arrival here, so a story that was pushed late arrives with less time left for review.
+
 `rejected` and `expired` are final. Publish limits: title 90, summary 320, developer line 200 characters. The agent may send longer text (up to 300, 1000 and 600); a story over the publish limits must be shortened by hand before it can be approved.
 
 Save and approve is two guarded steps: first the edit is saved (and the story marked as edited), then the story is approved. If the second step is refused, for example because a text is over the publish limit, the edit stays saved and the story stays in review; the screen says so, and you can shorten the text and try again. If the form has not changed anything, nothing is saved and the stored text is approved. Approve never saves anything on a story that is not in review. Human edits are not re-checked by the fact check: the verifier ran on the agent's text only.

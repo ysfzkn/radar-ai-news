@@ -49,7 +49,7 @@ A story is `published` only if it has no verification issue, no risk flag and a 
 - any risk flag from the scorer (`risk: ...`);
 - no primary source among the cluster's items (`no primary source`).
 
-Nothing leaves the local database in this version, so `published` means "passed the automatic checks", not "online".
+Finished stories are sent to the admin service by `radar push` (or `radar daily`). A `published` story is then served by the public endpoint the site is built from; a `review` story waits until a person approves it, and the daily job sends a notice when one is waiting. See [admin.md](admin.md), [site.md](site.md) and [automation.md](automation.md). Nothing has been deployed yet and the scheduled job has never run, so for now `published` means "passed the automatic checks", not "online".
 
 ## How stories are labelled
 

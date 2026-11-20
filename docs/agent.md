@@ -90,4 +90,4 @@ Secrets are never accepted as command-line flags and never printed.
 
 ## Running without publishing
 
-Stories are rows in the local database (`dev-notes/local.db`, or `--db`/`RADAR_DB_PATH`). `published` and `review` are only status values; no website, feed or message is produced by this version. Delete the database file to start over.
+Stories are rows in the local database (`dev-notes/local.db`, or `--db`/`RADAR_DB_PATH`). They stay there until `radar push` (or `radar daily`) sends them to the admin service: `published` ones are then served by its public endpoint, from which the site is built, and `review` ones wait for a person on the review screen; the daily job sends a notice when one is waiting ([admin.md](admin.md), [site.md](site.md), [automation.md](automation.md)). Nothing has been deployed yet and the scheduled job has never run. Delete the database file to start over.
