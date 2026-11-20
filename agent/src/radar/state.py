@@ -54,7 +54,7 @@ def _copy_database(db_path: str) -> bytes:
 
     The source is opened read-only, so packing never modifies or checkpoints it.
     """
-    source = sqlite3.connect(f"file:{Path(db_path).as_posix()}?mode=ro", uri=True)
+    source = sqlite3.connect(f"{Path(db_path).resolve().as_uri()}?mode=ro", uri=True)
     try:
         memory = sqlite3.connect(":memory:")
         try:

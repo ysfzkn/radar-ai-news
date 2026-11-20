@@ -342,3 +342,15 @@ def test_pack_includes_uncheckpointed_wal_rows_and_does_not_touch_the_source(tmp
     unpack(str(out), str(restored), PASSPHRASE)
     live.close()
     assert rows_of(restored) == ["a", "b", "c"]
+
+
+def test_a_database_path_with_special_characters_is_packed_in_full(tmp_path):
+    source = tmp_path / "we#ird%20 x.db"
+    make_wal_db(source, ["a", "b"])
+    before = source.read_bytes()
+    out = tmp_path / "state.bin"
+    pack(str(source), str(out), PASSPHRASE)
+    assert source.read_bytes() == before
+    restored = tmp_path / "restored.db"
+    unpack(str(out), str(restored), PASSPHRASE)
+    assert rows_of(restored) == ["a", "b"]
