@@ -74,7 +74,7 @@ A source response is read up to 5 MB; a larger one is refused (by its declared l
 
 ## Environment variables
 
-`.env.example` lists them. The agent reads only the process environment; it does not load a `.env` file.
+`.env.example` lists them. The `radar` command also reads `agent/.env` when that file exists: copy `.env.example` to `agent/.env` and fill it in. A variable that is already set to a non-empty value in the environment (a shell export, a CI secret) always wins over the file. Blank lines, `#` comments and empty values are skipped; a leading `export ` and one pair of matching quotes around a value are removed. Only `agent/.env` is read, from wherever you start `radar`; a `.env` in the repository root or the current folder is not.
 
 | Variable | Used by | Meaning |
 | --- | --- | --- |

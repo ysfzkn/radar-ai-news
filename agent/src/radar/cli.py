@@ -478,5 +478,16 @@ def main(argv: list[str] | None = None) -> int:
     return args.run(args)
 
 
+def entry() -> int:
+    """The `radar` command: loads `agent/.env`, then runs `main`.
+
+    Kept apart from `main` so tests that call `main` never see a real `.env`.
+    """
+    from radar.envfile import ENV_FILE, load_env_file
+
+    load_env_file(ENV_FILE, os.environ)
+    return main()
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(entry())

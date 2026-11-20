@@ -20,7 +20,7 @@ dev = [
 ]
 
 [project.scripts]
-radar = "radar.cli:main"
+radar = "radar.cli:entry"
 
 [build-system]
 requires = ["hatchling"]

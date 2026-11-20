@@ -32,7 +32,7 @@ It prints one line per source, `<id>: ok <n> items` or `<id>: FAIL <reason>`, an
 
 ## Run the agent
 
-1. Create an Anthropic API key in the Anthropic Console and put it in your environment. Radar reads only the process environment; it does not load a `.env` file (`.env.example` just lists the variable names). Never commit the key:
+1. Create an Anthropic API key in the Anthropic Console and put it in `agent/.env` (copy `.env.example` there and fill in `ANTHROPIC_API_KEY`). The `radar` command reads that file on start; a variable already set in your environment wins over it. The file is git-ignored; never commit the key. Exporting the key in your shell works too:
 
    ```bash
    export ANTHROPIC_API_KEY=...   # your own key
