@@ -7,6 +7,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from email.message import EmailMessage
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -15,6 +16,7 @@ from radar.budget import ISTANBUL
 LIMIT = 1500
 ERROR_CHARS = 300
 MAX_PATHS = 5
+PATH_CHARS = 100
 MONTHS = ("Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara")
 TELEGRAM = "https://api.telegram.org/bot{token}/sendMessage"
 FIELD_PATH = re.compile(r"[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*")
@@ -72,21 +74,39 @@ def _date(now: datetime | None) -> str:
     return f"{local.day} {MONTHS[local.month - 1]}"
 
 
-def _paths(s: Summary) -> list[str]:
-    """Field names only (`texts.tr.title`); anything else the service sent is dropped."""
+def field_paths(values: object) -> list[str]:
+    """Field names only (`texts.tr.title`), each once, at most MAX_PATHS + 1 of them
+    (one more than is shown, so a message can say there were more); anything else the
+    admin service sent is dropped."""
     found: list[str] = []
-    for path in (s.push or {}).get("refused_paths") or []:
-        if isinstance(path, str) and len(path) <= 100 and FIELD_PATH.fullmatch(path):
+    for path in values if isinstance(values, list) else []:
+        if isinstance(path, str) and len(path) <= PATH_CHARS and FIELD_PATH.fullmatch(path):
             if path not in found:
                 found.append(path)
+        if len(found) > MAX_PATHS:
+            break
     return found
+
+
+def origin(url: str | None) -> str | None:
+    """Scheme, host and port of an http(s) URL; user-info, path, query and fragment go."""
+    try:
+        parts = urlsplit(url or "")
+        host, port = parts.hostname, parts.port
+    except ValueError:
+        return None
+    if parts.scheme not in ("http", "https") or not host:
+        return None
+    host = f"[{host}]" if ":" in host else host
+    return f"{parts.scheme}://{host}" + (f":{port}" if port is not None else "")
 
 
 def render(s: Summary, *, now: datetime | None = None) -> str:
     """Turkish plain text, only the lines that apply; never story text, never a secret."""
     lines = [f"Radar · {_date(now)}"]
     if s.review > 0:
-        where = f": {s.admin_url.rstrip('/')}/admin" if s.admin_url else ""
+        admin = origin(s.admin_url)
+        where = f": {admin}/admin" if admin else ""
         lines.append(f"{s.review} haber onayını bekliyor{where}")
     if s.published > 0:
         lines.append(f"{s.published} haber otomatik yayımlandı")
@@ -98,7 +118,7 @@ def render(s: Summary, *, now: datetime | None = None) -> str:
         lines.append(f"{total} kaynaktan {_possessive(failed)} okunamadı.")
     rejected = _rejected(s)
     if rejected:
-        paths = _paths(s)
+        paths = field_paths((s.push or {}).get("refused_paths"))
         shown = ", ".join(paths[:MAX_PATHS]) + (", …" if len(paths) > MAX_PATHS else "")
         where = f" ({shown})" if paths else ""
         lines.append(f"{len(rejected)} haberi yönetim servisi kabul etmedi{where}.")

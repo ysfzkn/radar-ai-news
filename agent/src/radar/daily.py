@@ -15,7 +15,9 @@ from radar import cli
 from radar.notify import (
     NotifyError,
     Summary,
+    field_paths,
     needs_notice,
+    origin,
     render,
     send_email,
     send_telegram,
@@ -86,12 +88,7 @@ def _push_step(store: SqliteStore, url: str, token: str, http) -> dict:
     with http("admin") as client:
         stats = push_stories(store, client, url, token, datetime.now(UTC))
     parked = {s.uid: s.refused_path for s in store.refused_stories()}
-    paths: list[str] = []
-    for uid in stats["rejected"]:
-        path = parked.get(uid)
-        if path and path not in paths:
-            paths.append(path)
-    stats["refused_paths"] = paths
+    stats["refused_paths"] = field_paths([parked.get(uid) for uid in stats["rejected"]])
     return stats
 
 
@@ -110,6 +107,8 @@ def _notify(summary: Summary, env: Mapping[str, str], http, now: datetime) -> No
         channels.append(("telegram", telegram))
     if env.get("RADAR_SMTP_HOST"):
         channels.append(("email", lambda: send_email(text, subject(summary, now=now), env)))
+    if not channels:
+        print("notice needed but no channel is configured", file=sys.stderr)
     for name, send in channels:
         try:
             send()
@@ -133,7 +132,8 @@ def run_daily(
     """Collect, run and push; print one JSON summary line; notify when something needs it.
 
     `http(kind)` returns a new client for "sources", "admin" or "telegram"; `llm_factory`
-    builds the model client from the meter. Returns 1 when a step failed, else 0.
+    builds the model client from the meter. Returns 1 when a step failed or no source
+    could be read, else 0.
     """
     failure: tuple[str, str] | None = None
 
@@ -148,7 +148,7 @@ def run_daily(
     review = published = 0
     url = (env.get("RADAR_ADMIN_URL") or "").strip()
     token = env.get("RADAR_INGEST_TOKEN") or ""
-    admin_url = url.rstrip("/") if url and allowed_url(url) else None
+    admin_url = origin(url) if url and allowed_url(url) else None
     store: SqliteStore | None = None
     try:
         try:
@@ -161,25 +161,29 @@ def run_daily(
             record: dict = {}
             error_name: str | None = None
             try:
-                with http("sources") as client:
-                    try:
-                        collected, candidates = cli._collect_in_run(store, sources, client, now)
-                        record = dict(collected)
-                    except Exception as exc:
-                        fail("collect", exc)
-                        error_name = type(exc).__name__
-                    else:
+                try:
+                    with http("sources") as client:
                         try:
-                            run_stats = _run_step(
-                                store, candidates, client, now, run_id, max_stories, llm_factory
-                            )
-                            record |= run_stats
+                            collected, candidates = cli._collect_in_run(store, sources, client, now)
+                            record = dict(collected)
                         except Exception as exc:
-                            fail("run", exc)
+                            fail("collect", exc)
                             error_name = type(exc).__name__
-            except Exception as exc:  # the client could not be made or closed
-                fail("collect" if not record else "run", exc)
-                error_name = error_name or type(exc).__name__
+                        else:
+                            try:
+                                run_stats = _run_step(
+                                    store, candidates, client, now, run_id, max_stories, llm_factory
+                                )
+                                record |= run_stats
+                            except Exception as exc:
+                                fail("run", exc)
+                                error_name = type(exc).__name__
+                except Exception as exc:  # the client could not be made or closed
+                    fail("collect" if not record else "run", exc)
+                    error_name = error_name or type(exc).__name__
+            except BaseException as exc:  # an interruption: record it, as `radar run` does
+                store.finish_run(run_id, datetime.now(UTC), {**record, "error": type(exc).__name__})
+                raise
             store.finish_run(
                 run_id,
                 datetime.now(UTC),
@@ -219,4 +223,7 @@ def run_daily(
     print(json.dumps(asdict(summary)), file=out)
     if needs_notice(summary):
         _notify(summary, env, http, now)
-    return 1 if failure else 0
+    # As in `radar collect` and `radar run`: a day on which no source could be read failed,
+    # though the chain went on so that stories of earlier runs were still pushed.
+    unread = bool(collected) and collected.get("sources_ok", 0) == 0
+    return 1 if failure or unread else 0

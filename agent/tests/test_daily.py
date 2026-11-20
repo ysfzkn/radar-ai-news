@@ -70,6 +70,7 @@ class World:
         self.telegram = telegram or (lambda r: httpx.Response(200, json={"ok": True}))
         self.requests: list[httpx.Request] = []
         self.kinds: list[str] = []
+        self.sources_down = False
 
     @staticmethod
     def accept(request):
@@ -78,6 +79,8 @@ class World:
 
     def handler(self, request: httpx.Request) -> httpx.Response:
         self.requests.append(request)
+        if self.sources_down and request.url.host.endswith(".test"):
+            return httpx.Response(500)
         if request.url.host == "admin.example.com":
             return self.admin(request)
         if request.url.host == "api.telegram.org":
@@ -326,3 +329,116 @@ def test_daily_does_not_import_anthropic():
 def test_the_default_clients_never_follow_redirects(kind):
     with cli._daily_client(kind) as client:
         assert client.follow_redirects is False and client.timeout.read == 30
+
+
+def test_every_source_failing_exits_1_but_still_pushes_and_notifies(tmp_path, now):
+    uid = earlier_story(tmp_path, now)
+    world = World(now)
+    world.sources_down = True
+    code, summary = daily(tmp_path, now, world)
+    assert code == 1 and summary["failed_step"] is None
+    assert summary["collected"]["sources_ok"] == 0 and summary["collected"]["sources_failed"] == 2
+    assert summary["run"] is not None and summary["run"]["written"] == 0
+    sent = json.loads(world.to("admin.example.com")[0].content)["stories"]
+    assert [s["uid"] for s in sent] == [uid] and summary["push"]["pushed"] == 1
+    (notice,) = world.notices()
+    assert "2 kaynaktan 2'si okunamadı." in notice
+
+
+def test_no_sources_configured_exits_1(tmp_path, now):
+    empty = tmp_path / "empty.yaml"
+    empty.write_text("sources: []\n", encoding="utf-8")
+    world = World(now)
+    code, summary = daily(tmp_path, now, world, sources=str(empty))
+    assert code == 1 and summary["failed_step"] is None
+    assert summary["collected"]["sources_ok"] == 0 and summary["push"]["pushed"] == 0
+
+
+def test_the_summary_line_keeps_only_field_paths_of_refusals(tmp_path, now):
+    odd = "stories.0." + "not a field path " * 9  # spaces, over 150 characters
+
+    def refuse_first(request):
+        uids = [s["uid"] for s in json.loads(request.content)["stories"]]
+        if len(uids) == 2:
+            return httpx.Response(400, json={"error": "invalid", "path": odd})
+        return World.accept(request)
+
+    world = World(now, admin=refuse_first)
+    out = io.StringIO()
+    code = run_daily(
+        db_path=tmp_path / "r.db",
+        sources_path=write_sources(tmp_path),
+        max_stories=2,
+        env=ENV,
+        now=now,
+        http=world.http,
+        llm_factory=lambda meter: llm(),
+        out=out,
+    )
+    assert code == 0
+    summary = json.loads(out.getvalue())
+    assert len(summary["push"]["rejected"]) == 1 and summary["push"]["refused_paths"] == []
+    assert "not a field path" not in out.getvalue()
+
+
+def test_the_admin_address_is_shown_as_its_origin_only(tmp_path, now):
+    env = {**ENV, "RADAR_ADMIN_URL": "https://user:pass@admin.example.com/x?y=1#z"}
+    world = World(now)
+    out = io.StringIO()
+    code = run_daily(
+        db_path=tmp_path / "r.db",
+        sources_path=write_sources(tmp_path),
+        max_stories=2,
+        env=env,
+        now=now,
+        http=world.http,
+        llm_factory=lambda meter: llm(),
+        out=out,
+    )
+    assert code == 0
+    line = out.getvalue()
+    assert json.loads(line)["admin_url"] == "https://admin.example.com"
+    (notice,) = world.notices()
+    assert "2 haber onayını bekliyor: https://admin.example.com/admin" in notice
+    for text in (line, notice):
+        assert "user" not in text and "pass" not in text and "y=1" not in text
+
+
+def test_an_interruption_finishes_the_run_record_and_propagates(tmp_path, now):
+    world = World(now)
+
+    def interrupted(meter):
+        raise KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        run_daily(
+            db_path=tmp_path / "r.db",
+            sources_path=write_sources(tmp_path),
+            max_stories=2,
+            env=ENV,
+            now=now,
+            http=world.http,
+            llm_factory=interrupted,
+            out=io.StringIO(),
+        )
+    store = SqliteStore(str(tmp_path / "r.db"))
+    try:
+        run = store.last_run()
+    finally:
+        store.close()
+    assert run["finished_at"] is not None and run["stats"]["error"] == "KeyboardInterrupt"
+    assert run["stats"]["sources_ok"] == 2
+
+
+@pytest.mark.parametrize(
+    "channels",
+    [{}, {"TELEGRAM_BOT_TOKEN": "123456:test-bot-token"}, {"TELEGRAM_CHAT_ID": "42"}],
+    ids=["none", "token-only", "chat-only"],
+)
+def test_a_needed_notice_without_a_channel_says_so_on_stderr(tmp_path, now, capsys, channels):
+    env = {"RADAR_ADMIN_URL": ADMIN, "RADAR_INGEST_TOKEN": "test-ingest-token", **channels}
+    world = World(now)
+    code, summary = daily(tmp_path, now, world, env=env)
+    assert code == 0 and summary["review"] == 2
+    assert world.to("api.telegram.org") == []
+    assert capsys.readouterr().err.splitlines() == ["notice needed but no channel is configured"]
