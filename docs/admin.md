@@ -19,7 +19,7 @@ It does not store: the fetched source articles, the agent's prompts or model out
 | Reject | `review` | `rejected` | |
 | Unpublish | `published` | `rejected` | A note is required. |
 | Restore ("Geri al: kuyruğa döndür") | `rejected` | `review` | Undoes a rejection or a take-down. Needs the story's current version. Refused once the story's 72 hours have passed; the story then stays rejected and the page says why. Recorded in the history as "Kuyruğa döndürüldü" with who did it. |
-| Expire | `review` aged 72 hours or more | `expired` | Hourly, and whenever the queue is opened. |
+| Expire | `review` aged 72 hours or more | `expired` | Hourly, and whenever the queue is opened. Each story is expired in its own transaction (decision and history row together); a story whose history row cannot be written is skipped and logged, and the others still expire. |
 
 The 72 hours run from the moment the agent wrote the story, not from its arrival here, so a story that was pushed late arrives with less time left for review.
 
@@ -61,7 +61,7 @@ The screen is light only: there is no dark theme and no theme switch. It works w
 
 ## Public read endpoint
 
-`GET /api/stories` is public and needs no sign-in. It returns only `published` stories and only what a reader sees: no reasons, score, fact card, history or e-mail addresses. It is what the static site reads at build time. It leaves out sources without a name and any language with an empty text, and does not return a story that has no usable language left. Parameters, response shape and paging are described in [site.md](site.md#the-public-read-contract-version-1). Responses carry `Cache-Control: public, max-age=60`. Migration `0003_public_feed_index.sql` adds an index on `(status, published_at DESC, uid)`, the endpoint's filter, order and page cursor, so a call reads only the rows of its page instead of every published story; a test checks with `EXPLAIN QUERY PLAN` that the query uses it and needs no sort.
+`GET /api/stories` is public and needs no sign-in. It returns only `published` stories and only what a reader sees: no reasons, score, fact card, history or e-mail addresses. It is what the static site reads at build time. It leaves out sources without a name and any language with an empty text, and does not return a story that has no usable language left. Parameters, response shape and paging are described in [site.md](site.md#the-public-read-contract-version-1). Responses carry `Cache-Control: public, max-age=60`. Migration `0003_public_feed_index.sql` adds an index on `(status, published_at DESC, uid)`, the endpoint's filter and order. The page cursor's `published_at` is also bound as `published_at <= ?`, so the planner seeks into the index at the cursor instead of reading every newer row; a call, with or without a cursor, reads about the rows of its page. Tests check with `EXPLAIN QUERY PLAN` that the query searches the index with a range and needs no sort, and that paging through stories with equal `published_at` returns each once. Not limited by this: anyone can call the endpoint, and the Worker has no rate limit or edge cache of its own.
 
 ## Ingest contract (version 1)
 
@@ -148,7 +148,7 @@ To see an approved story on the site, build the site against this server; see [s
 
 Checks: `npm run typecheck` and `npm test` in `admin/`.
 
-After pulling a change that adds a file under `admin/migrations/` (for example `0002_restored_event.sql`, which lets the history record a restore), run `npm run db:migrate:local` again; it applies only the new files and keeps your data. Migrate first, then start the new code. Every decision and its history row are written in one transaction: if the database cannot record the history row, the decision is not made either. So until 0002 is applied, "Geri al" changes nothing: the story stays rejected, no history row is written, and the screen shows an error page ("Sunucuda bir hata oldu; istek tamamlanmadı.") instead of the story.
+After pulling a change that adds a file under `admin/migrations/` (for example `0002_restored_event.sql`, which lets the history record a restore), run `npm run db:migrate:local` again; it applies only the new files and keeps your data. Migrate first, then start the new code. Every decision and its history row are written in one transaction. What runs after a stored approval or rejection (finding the next story, the deploy hook) cannot undo it: if that step fails, the reviewer is sent to the queue with the usual notice, not to the error page. If the database cannot record the history row, the decision is not made either. So until 0002 is applied, "Geri al" changes nothing: the story stays rejected, no history row is written, and the screen shows an error page ("Sunucuda bir hata oldu; istek tamamlanmadı.") instead of the story.
 
 ## Deploy
 

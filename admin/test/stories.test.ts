@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import sample from "../fixtures/ingest-sample.json";
 import type { IngestStory } from "../src/schema";
 import {
@@ -322,5 +322,27 @@ describe("expireStale", () => {
     }
     expect((await getStory(db, fresh))!.status).toBe("review");
     expect(await events(pub)).toHaveLength(1);
+  });
+
+  it("one story whose history row cannot be written is skipped and logged; the others still expire, each with its event", async () => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const a = await seed({ ageMs: 80 * HOUR });
+    const bad = await seed({ ageMs: 90 * HOUR });
+    const c = await seed({ ageMs: 100 * HOUR });
+    // Version 2's slot is already taken, so this story's expiry event cannot be written.
+    await db
+      .prepare("INSERT INTO story_events (story_uid, version, action, actor, at) VALUES (?, 2, 'edited', 'x', ?)")
+      .bind(bad, NOW.toISOString())
+      .run();
+    expect(await expireStale(db, NOW)).toBe(2);
+    for (const uid of [a, c]) {
+      expect(await getStory(db, uid)).toMatchObject({ status: "expired", version: 2 });
+      expect((await events(uid)).at(-1)).toMatchObject({ action: "expired", version: 2 });
+    }
+    // Atomic for the bad one too: no state change without its event.
+    expect(await getStory(db, bad)).toMatchObject({ status: "review", version: 1 });
+    expect(err).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(err.mock.calls)).not.toContain(bad);
+    err.mockRestore();
   });
 });

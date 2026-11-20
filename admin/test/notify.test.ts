@@ -138,4 +138,38 @@ describe("deploy hook", () => {
     expect(res.status).toBe(303);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  // A database whose lookups for the queue (the step after a decision) fail; writes still work.
+  const queueDown = (): Json => ({
+    ...hooked,
+    DB: new Proxy(env.DB, {
+      get(target, prop) {
+        const value = (target as any)[prop];
+        if (prop === "prepare") {
+          return (sql: string) => {
+            if (sql.includes("status = 'review'")) throw new Error("queue lookup failed");
+            return value.call(target, sql);
+          };
+        }
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    }),
+  });
+
+  it("keeps a saved decision when the step after it fails: plain redirect to the queue, not the error page", async () => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const approve = await seed("review");
+    const res = await admin(`/admin/stories/${approve}/approve`, { ...editFields(), checked: "on" }, queueDown());
+    expect(res.status).toBe(303);
+    expect(res.headers.get("Location")).toBe("/admin?done=approved");
+    const reject = await seed("review");
+    const res2 = await admin(`/admin/stories/${reject}/reject`, { version: "1", note: "" }, queueDown());
+    expect(res2.status).toBe(303);
+    expect(res2.headers.get("Location")).toBe("/admin?done=rejected");
+    const status = async (uid: string) =>
+      (await env.DB.prepare("SELECT status FROM stories WHERE uid = ?").bind(uid).first<{ status: string }>())?.status;
+    expect(await status(approve)).toBe("published");
+    expect(await status(reject)).toBe("rejected");
+    err.mockRestore();
+  });
 });

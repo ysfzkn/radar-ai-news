@@ -294,18 +294,49 @@ describe("GET /api/stories", () => {
 describe("the public feed's index", () => {
   // The planner's answer for the exact statement listPublished runs, with and without a cursor.
   const plan = async (cursor: boolean): Promise<string[]> => {
-    const binds = cursor ? ["2026-11-20T05:00:00.000Z", "2026-11-20T05:00:00.000Z", "a".repeat(32), 51] : [51];
+    const binds = cursor ? ["2026-11-20T05:00:00.000Z", "2026-11-20T05:00:00.000Z", "2026-11-20T05:00:00.000Z", "a".repeat(32), 51] : [51];
     const { results } = await env.DB.prepare(`EXPLAIN QUERY PLAN ${publishedPageSql(cursor)}`)
       .bind(...binds)
       .all<{ detail: string }>();
     return results.map((r) => r.detail);
   };
 
-  it("reads published rows through idx_stories_status_published in feed order, with no sort step", async () => {
+  it("uses idx_stories_status_published with a range on published_at and no sort, with and without a cursor", async () => {
     for (const cursor of [false, true]) {
-      const details = await plan(cursor);
-      expect(details.join(" | ")).toMatch(/USING INDEX idx_stories_status_published/);
-      expect(details.join(" | ")).not.toMatch(/TEMP B-TREE/);
+      const details = (await plan(cursor)).join(" | ");
+      expect(details).toMatch(/SEARCH stories USING INDEX idx_stories_status_published/);
+      expect(details).not.toMatch(/SCAN/);
+      expect(details).not.toMatch(/TEMP B-TREE/);
+    }
+    // The cursor's published_at bounds the index range; it is not only a filter on scanned rows.
+    expect((await plan(true)).join(" | ")).toMatch(/published_at<\?/);
+  });
+
+  it("returns every story exactly once, in order, when several share a published_at", async () => {
+    let count = 0;
+    for (const [at, n] of [["2026-11-20T05:00:00.000Z", 5], ["2026-11-20T06:00:00.000Z", 2], ["2026-11-20T04:00:00.000Z", 3]] as const) {
+      for (let i = 0; i < n; i++) {
+        await seed("published", at, `${at.slice(11, 13)}${i}`.padEnd(32, "d"));
+        count++;
+      }
+    }
+    const expected = (
+      await env.DB.prepare("SELECT uid FROM stories WHERE status = 'published' ORDER BY published_at DESC, uid ASC").all<{
+        uid: string;
+      }>()
+    ).results.map((r) => r.uid);
+    expect(expected).toHaveLength(count);
+    for (const limit of [1, 2, 3, 4]) {
+      const seen: string[] = [];
+      let cursor: string | null = null;
+      for (let guard = 0; guard < 20; guard++) {
+        const query: string = cursor === null ? "" : `&cursor=${encodeURIComponent(cursor)}`;
+        const body = (await (await get(`/api/stories?limit=${limit}${query}`)).json()) as Json;
+        seen.push(...ids(body));
+        cursor = body.next;
+        if (cursor === null) break;
+      }
+      expect(seen, `limit=${limit}`).toEqual(expected);
     }
   });
 });

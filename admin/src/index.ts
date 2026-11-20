@@ -280,11 +280,27 @@ const badRequest = (c: Ctx) => c.text(COPY.badRequest, 400);
 // After an approval or a rejection: the next story waiting in the queue (in queue order, after the
 // one just decided), or the queue itself, which then shows its all-done state. Built from a uid
 // read from the database and fixed paths only.
+// The decision is already stored when this runs, so a failure here (the lookup, the expiry) must not turn into the error page: it falls back to the queue with the usual notice.
+// Only the error's name is logged, never story text.
 async function afterDecision(c: Ctx, uid: string, kind: "approved" | "rejected"): Promise<string> {
-  const decided = await getStory(c.env.DB, uid);
-  const next = decided ? await nextInQueue(c.env.DB, { created_at: decided.created_at, uid }, new Date()) : null;
-  if (!next) return withDone("/admin", kind);
-  return withDone(storyPath(next), kind === "approved" ? "next_approved" : "next_rejected");
+  try {
+    const decided = await getStory(c.env.DB, uid);
+    const next = decided ? await nextInQueue(c.env.DB, { created_at: decided.created_at, uid }, new Date()) : null;
+    if (!next) return withDone("/admin", kind);
+    return withDone(storyPath(next), kind === "approved" ? "next_approved" : "next_rejected");
+  } catch (e) {
+    console.error("after a decision: the next story could not be found", e instanceof Error ? e.name : "error");
+    return withDone("/admin", kind);
+  }
+}
+
+// The deploy hook after a stored decision; it never throws.
+function tellSite(c: Ctx): void {
+  try {
+    notifySite(c.env, waiter(c));
+  } catch (e) {
+    console.error("deploy hook not called", e instanceof Error ? e.name : "error");
+  }
 }
 
 app.post("/admin/stories/:uid/edit", async (c) => {
@@ -294,7 +310,7 @@ app.post("/admin/stories/:uid/edit", async (c) => {
   const draft = draftOf(form);
   const result = await editStory(c.env.DB, uid, form.version, patchOf(draft), c.get("identity").email, new Date());
   // An edit keeps the status, so a story that is published now was published before it.
-  if (result.ok && (await getStory(c.env.DB, uid))?.status === "published") notifySite(c.env, waiter(c));
+  if (result.ok && (await getStory(c.env.DB, uid))?.status === "published") tellSite(c);
   return afterResult(c, uid, result, withDone(storyPath(uid), "saved"), draft);
 });
 
@@ -329,7 +345,7 @@ app.post("/admin/stories/:uid/approve", async (c) => {
   }
   const result = await approveStory(c.env.DB, uid, version, actor, new Date());
   if (result.ok) {
-    notifySite(c.env, waiter(c));
+    tellSite(c);
     return c.redirect(await afterDecision(c, uid, "approved"), 303);
   }
   if (!saved) return afterResult(c, uid, result, "/admin", draft, ["review"]);
@@ -366,7 +382,7 @@ app.post("/admin/stories/:uid/unpublish", async (c) => {
     c.get("identity").email,
     new Date(),
   );
-  if (result.ok) notifySite(c.env, waiter(c));
+  if (result.ok) tellSite(c);
   // From today's edition the answer goes back there; `from` is compared with the one known name.
   const back = form.text("from") === "edition" ? listHref("edition") : storyPath(uid);
   return afterResult(c, uid, result, withDone(back, "unpublished"));

@@ -777,15 +777,17 @@ function publicTryUrl(raw: string): string | null {
 // the first `limit` rows, which the following page starts after. A language with a blank text is
 // left out, and a story left with no language is not returned; `next` still comes from the rows
 // read, so such a story is stepped over, never repeated, and a page may hold fewer than `limit`.
-// The page query: binds are the cursor's published_at twice and uid (with a cursor), then the
-// limit. Migration 0003's index (status, published_at DESC, uid) matches its WHERE, its keyset and
-// its ORDER BY, so a page reads only its own rows, in order, with no sort.
+// The page query: binds are the cursor's published_at three times and uid (with a cursor), then the
+// limit. Migration 0003's index (status, published_at DESC, uid) matches its WHERE and its ORDER BY.
+// The keyset's OR cannot be one range on the index by itself, so the cursor's published_at is also
+// given as the plain bound `published_at <= ?`: the planner seeks to it and reads from there, in
+// order, with no sort, so a page reads about its own rows even when the cursor is deep.
 export const publishedPageSql = (withCursor: boolean): string =>
   `SELECT uid, category, publish_mode, edited, source_count, source_url, sources, fact_card,
               created_at, published_at
          FROM stories
         WHERE status = 'published' AND published_at IS NOT NULL
-              ${withCursor ? "AND (published_at < ? OR (published_at = ? AND uid > ?))" : ""}
+              ${withCursor ? "AND published_at <= ? AND (published_at < ? OR (published_at = ? AND uid > ?))" : ""}
         ORDER BY published_at DESC, uid ASC
         LIMIT ?`;
 
@@ -794,7 +796,7 @@ export async function listPublished(
   limit: number,
   cursor: PublicCursor | null,
 ): Promise<{ stories: PublicStory[]; next: PublicCursor | null }> {
-  const binds = cursor ? [cursor.published_at, cursor.published_at, cursor.uid] : [];
+  const binds = cursor ? [cursor.published_at, cursor.published_at, cursor.published_at, cursor.uid] : [];
   const { results } = await db
     .prepare(publishedPageSql(cursor !== null))
     .bind(...binds, limit + 1)
@@ -856,9 +858,17 @@ export async function expireStale(db: D1Database, now: Date): Promise<number> {
     .bind(cutoff)
     .all<{ uid: string; version: number }>();
   if (results.length === 0) return 0;
-  const transitions = results.map((r) => expireTransition(r.uid, r.version, at));
-  const statements = transitions.flatMap((t) => transitionStatements(db, t));
-  const out = await db.batch(statements);
-  const size = statements.length / transitions.length;
-  return transitions.filter((t, i) => (out[i * size + updateIndex(t)]?.meta.changes ?? 0) > 0).length;
+  // One batch per story: a story whose history row cannot be written fails alone (logged without
+  // any story text) and the others still expire. Each batch keeps the event and the update atomic.
+  let expired = 0;
+  for (const r of results) {
+    const t = expireTransition(r.uid, r.version, at);
+    try {
+      const out = await db.batch(transitionStatements(db, t));
+      if ((out[updateIndex(t)]?.meta.changes ?? 0) > 0) expired += 1;
+    } catch (e) {
+      console.error("expiry skipped one story", e instanceof Error ? e.name : "error");
+    }
+  }
+  return expired;
 }
