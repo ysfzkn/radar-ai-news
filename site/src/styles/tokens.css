@@ -66,8 +66,8 @@
 
   /* Category colours: each used only for its tag (text, border, tint), its story's number and
      the target bar. Contrast, colour on --bg / on its tint: protocol 5.9 / 5.5, model 7.4 / 6.5,
-     framework 6.7 / 6.0, tooling 6.3 / 5.8, research 6.1 / 5.6, security 7.5 / 6.6 (a wine red, apart from the brand red),
-     industry 8.9 / 8.0, policy 6.9 / 6.1. */
+     framework 6.7 / 6.0, tooling 6.3 / 5.8, research 6.1 / 5.6, security 7.5 / 6.6,
+     industry 8.9 / 8.0, policy 6.9 / 6.1. Security is a wine red, apart from the brand red. */
   --cat-protocol: #0f6b63;
   --cat-protocol-soft: #dff3f0;
   --cat-model: #4338ca;

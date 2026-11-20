@@ -207,7 +207,7 @@ main > section { margin-top: var(--space-6); }
 .pv-why { font-size: 1rem; }
 .pv-why-label {
   margin-right: 0.125rem; padding: 0.125rem 0.5rem; border-radius: 999px;
-  background: var(--ink); color: var(--bg); font-size: 0.75rem; font-weight: 600;
+  background: var(--ink); color: var(--bg); font-size: 0.75rem;
   letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap;
 }
 
