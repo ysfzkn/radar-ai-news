@@ -8,7 +8,7 @@ The agent can run by itself every morning on GitHub Actions. This page describes
 
 The workflow is `.github/workflows/daily.yml`. It starts at 04:15 UTC (07:15 in Istanbul), which leaves time to review before 08:00, and it can also be started by hand from the Actions tab. GitHub's scheduler can start a run several minutes late, sometimes much later at busy hours, so do not count on the exact minute.
 
-It does nothing unless the repository variable `RADAR_ENABLED` is `true`. Two runs never overlap: a second one waits for the first (it is queued, not cancelled). A run is stopped after 20 minutes.
+It does nothing unless the repository variable `RADAR_ENABLED` is `true`. Two runs never overlap: a second one waits for the first (it is queued, not cancelled). A run is stopped after 20 minutes, and the `radar daily` step alone after 15, so that a step that hangs still leaves time to save the state.
 
 The steps, in order:
 

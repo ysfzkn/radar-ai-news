@@ -106,6 +106,13 @@ def test_steps_run_restore_then_daily_then_save():
     assert "always()" not in str(steps()[run].get("if", ""))
 
 
+def test_the_run_step_times_out_before_the_job_so_state_is_still_saved():
+    run = steps()[step_index("daily")]
+    assert run["timeout-minutes"] == 15
+    assert run["timeout-minutes"] < job()["timeout-minutes"]
+    assert "timeout-minutes" not in steps()[step_index("save")]
+
+
 def test_state_key_only_in_the_two_state_steps():
     holders = [s["id"] for s in steps() if "RADAR_STATE_KEY" in s.get("env", {})]
     assert holders == ["restore", "save"]

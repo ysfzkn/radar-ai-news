@@ -70,6 +70,8 @@ jobs:
 
       - name: Run radar daily
         id: daily
+        # Shorter than the job's limit: a timeout here is a step failure, so the state is still saved.
+        timeout-minutes: 15
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           RADAR_INGEST_TOKEN: ${{ secrets.RADAR_INGEST_TOKEN }}
