@@ -61,6 +61,30 @@ ${reasonList(s.reasons)}
 </section>`;
 }
 
+// How the story will look on the reader site, from the form's values: an approximation of the
+// site's story block (length and wrapping, not a pixel copy). app.js keeps each part in step with
+// its field (ids `pv_` + the field's id). The tag shows the Turkish category label in both.
+function preview(d: Draft): View {
+  const block = (lang: Lang) => {
+    const t = d.texts[lang];
+    const en = lang === "en";
+    return html`<div class="pv-story"${en ? html` lang="en"` : ""}>
+<p class="pv-lang"${en ? html` lang="tr"` : ""}>${COPY.langs[lang]}</p>
+<p class="pv-meta"><span class="pv-tag" id="pv_${lang}_category"${en ? html` lang="tr"` : ""}>${categoryLabel(d.category)}</span></p>
+<p class="pv-title" id="pv_${lang}_title">${t.title}</p>
+<p class="pv-summary" id="pv_${lang}_summary">${t.summary}</p>
+<div class="pv-dev">
+<p class="pv-dev-label">${COPY.previewDev[lang]}</p>
+<p id="pv_${lang}_dev_line">${t.dev_line}</p>
+</div>
+</div>`;
+  };
+  return html`<section class="panel preview" aria-labelledby="preview-h">
+<h2 id="preview-h">${COPY.previewHeading}</h2>
+${LANGS.map(block)}
+</section>`;
+}
+
 function factCard(s: StoryFull): View {
   const f = s.fact_card;
   return html`<section class="panel" aria-labelledby="fact-h">
@@ -111,7 +135,7 @@ const sourceLink = (s: StoryFull): View | string =>
 // The buttons point at the one form; each picks its route with formaction.
 function actionBar(s: StoryFull): View {
   const save = (cls: string) =>
-    html`<button type="submit" class="${cls}" form="${FORM_ID}" formaction="${storyPath(s.uid)}/edit">${COPY.save}</button>`;
+    html`<button type="submit" class="${cls}" id="save-button" form="${FORM_ID}" formaction="${storyPath(s.uid)}/edit">${COPY.save}</button>`;
   if (s.status !== "review")
     return html`<div class="action-bar">
 ${unsavedNotice}
@@ -236,6 +260,7 @@ ${statusChips(s, now)}
 </div>
 <div class="story-side">
 ${reasons(s)}
+${editable ? preview(draft) : ""}
 ${factCard(s)}
 ${sources(s)}
 ${history(s)}

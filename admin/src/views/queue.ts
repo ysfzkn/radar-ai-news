@@ -2,7 +2,7 @@ import { html } from "hono/html";
 import { COPY } from "../copy";
 import type { Status } from "../schema";
 import type { StorySummary } from "../stories";
-import { categoryLabel, durationLeft, formatDate, hostOf, storyPath, timeLeft, type View } from "./layout";
+import { RADAR_MARK, categoryLabel, durationLeft, formatDate, hostOf, storyPath, timeLeft, type View } from "./layout";
 import { reasonList } from "./reasons";
 
 const chip = (text: string, tone?: "accent" | "warn" | "ok"): View =>
@@ -63,6 +63,6 @@ export function queueView(
       : "";
   return html`<h1 class="visually-hidden">${COPY.tabs[status]}</h1>
 ${line}
-${stories.length === 0 ? html`<p class="empty">${empty}</p>` : html`<ul class="cards">${stories.map((s) => card(s, now))}</ul>`}
+${stories.length === 0 ? html`<div class="empty">${status === "review" ? RADAR_MARK : ""}<p>${empty}</p></div>` : html`<ul class="cards">${stories.map((s) => card(s, now))}</ul>`}
 ${pager(status, page)}`;
 }

@@ -52,7 +52,7 @@ export const storyPath = (uid: string): string => `/admin/stories/${encodeURICom
 // The product's mark, the echo arcs: three equal arcs of radius 13 from (x, 4) to (x, 20), bulging
 // right. Built from constants only; its colour comes from the stylesheet.
 const ECHO_XS = [5, 11, 17] as const;
-const RADAR_MARK = html`<svg class="mark" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">${ECHO_XS.map(
+export const RADAR_MARK = html`<svg class="mark" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">${ECHO_XS.map(
   (x) => html`<path class="mark-arc" d="M${x} 4A13 13 0 0 1 ${x} 20"/>`,
 )}</svg>`;
 
@@ -62,7 +62,16 @@ export interface Shell {
   counts: Record<Status, number>;
   active: Status | null;
   message?: string | undefined;
+  // A confirmation of what just happened; an error message wins over it.
+  done?: string | undefined;
   body: View;
+}
+
+// The status notice: an error (alert) or, failing that, a confirmation (status).
+function notice(p: Shell): View | string {
+  if (p.message) return html`<p class="notice" role="alert">${p.message}</p>`;
+  if (p.done) return html`<p class="notice done" role="status">${p.done}</p>`;
+  return "";
 }
 
 export function layout(p: Shell): View {
@@ -76,7 +85,7 @@ export function layout(p: Shell): View {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
-<title>${p.title} · ${COPY.appName}</title>
+<title>${p.counts.review > 0 ? `(${p.counts.review}) ` : ""}${p.title} · ${COPY.appName}</title>
 <link rel="stylesheet" href="/admin/app.css">
 <script src="/admin/app.js" defer></script>
 </head>
@@ -89,7 +98,7 @@ export function layout(p: Shell): View {
 </header>
 <nav class="wrap" aria-label="${COPY.queueHeading}"><ul class="tabs">${tabs}</ul></nav>
 <main class="wrap">
-${p.message ? html`<p class="notice" role="alert">${p.message}</p>` : ""}
+${notice(p)}
 ${p.body}
 </main>
 </body>

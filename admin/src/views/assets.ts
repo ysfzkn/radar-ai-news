@@ -111,10 +111,13 @@ p { margin: 0; }
   padding: var(--space-3) var(--space-4); margin-bottom: var(--space-5); font-weight: 500;
   background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--ink); border-radius: var(--radius);
 }
+/* The confirmation after an action: ok text on its soft tint (5.6:1). */
+.notice.done { background: var(--ok-soft); color: var(--ok); border-color: var(--ok-soft); border-left-color: var(--ok); }
 .empty {
   padding: var(--space-6) var(--space-4); text-align: center; color: var(--muted);
   border: 1px dashed var(--control-border); border-radius: 0.75rem;
 }
+.empty .mark { display: block; width: 28px; height: 28px; margin: 0 auto var(--space-3); }
 
 /* Queue */
 .cards { display: grid; gap: var(--space-3); list-style: none; margin: 0; padding: 0; }
@@ -184,6 +187,23 @@ main > section { margin-top: var(--space-6); }
 .history li { padding: var(--space-2) 0; border-top: 1px solid var(--line); }
 .history li:last-child { padding-bottom: 0; }
 .history .note { margin-top: var(--space-1); padding-left: var(--space-3); border-left: 2px solid var(--line); overflow-wrap: anywhere; }
+
+/* Preview: an approximation of the site's story block, in the admin's font. */
+.pv-story { overflow-wrap: anywhere; }
+.pv-story + .pv-story { margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--line); }
+.pv-lang { margin-bottom: var(--space-2); color: var(--muted); font-size: var(--text-sm); }
+.pv-meta { margin-bottom: var(--space-2); }
+.pv-tag {
+  display: inline-block; padding: 0.125rem var(--space-2); border: 1px solid var(--ink);
+  font-size: 0.8125rem; letter-spacing: 0.04em; line-height: 1.5; text-transform: uppercase;
+}
+.pv-title { margin-bottom: var(--space-2); font-size: 1.125rem; font-weight: 700; line-height: 1.3; }
+.pv-summary { margin-bottom: var(--space-3); font-size: var(--text-sm); }
+.pv-dev {
+  padding: var(--space-3); font-size: var(--text-sm);
+  background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--accent);
+}
+.pv-dev-label { margin-bottom: var(--space-1); color: var(--accent); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
 
 /* Forms */
 .stack > * + * { margin-top: var(--space-4); }
@@ -264,7 +284,7 @@ button:hover { border-color: var(--ink); }
       display: flex; flex-direction: column; gap: var(--space-4);
       max-height: calc(100vh - 5.5rem); overflow-y: auto; padding: 2px; margin: -2px;
     }
-    .story-side { scrollbar-width: thin; }
+    .story-side { scrollbar-width: thin; scrollbar-color: var(--control-border) transparent; }
     .action-bar { margin: var(--space-4) 0 var(--space-2); border: 1px solid var(--line); border-radius: 0.75rem; bottom: var(--space-2); }
   }
 }
@@ -274,8 +294,8 @@ button:hover { border-color: var(--ink); }
 }
 `;
 
-// Live counters and the unsaved-changes notice. The page works without it; the server
-// enforces every limit.
+// Live counters, the unsaved-changes notice, the live preview and the save key. The page works
+// without it; the server enforces every limit.
 export const JS = `"use strict";
 document.addEventListener("DOMContentLoaded", function () {
   var fields = document.querySelectorAll("textarea[data-limit]");
@@ -325,5 +345,36 @@ document.addEventListener("DOMContentLoaded", function () {
   form.addEventListener("input", check);
   form.addEventListener("change", check);
   form.addEventListener("submit", function () { kept = false; setDirty(false); });
+
+  // The preview follows the form, as text only: each part has the id "pv_" + its field's id.
+  Array.prototype.forEach.call(form.querySelectorAll("textarea"), function (field) {
+    var part = document.getElementById("pv_" + field.id);
+    if (!part) return;
+    field.addEventListener("input", function () { part.textContent = field.value; });
+  });
+  var category = document.getElementById("category");
+  if (category) {
+    category.addEventListener("change", function () {
+      var option = category.options[category.selectedIndex];
+      var label = option ? option.text : "";
+      ["pv_tr_category", "pv_en_category"].forEach(function (id) {
+        var tag = document.getElementById(id);
+        if (tag) tag.textContent = label;
+      });
+    });
+  }
+
+  // Ctrl+S / Cmd+S saves through the Kaydet button, so its formaction applies.
+  var save = document.getElementById("save-button");
+  if (save) {
+    document.addEventListener("keydown", function (event) {
+      var isSave = (event.ctrlKey || event.metaKey) && typeof event.key === "string" && event.key.toLowerCase() === "s";
+      if (!isSave) return;
+      event.preventDefault();
+      if (event.repeat) return;
+      if (typeof form.requestSubmit === "function") form.requestSubmit(save);
+      else save.click();
+    });
+  }
 });
 `;

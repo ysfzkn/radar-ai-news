@@ -68,9 +68,28 @@ app.use("*", async (c, next) => {
 app.get("/admin/app.css", (c) => c.body(CSS, 200, { "Content-Type": "text/css; charset=utf-8" }));
 app.get("/admin/app.js", (c) => c.body(JS, 200, { "Content-Type": "text/javascript; charset=utf-8" }));
 
+// The confirmations a redirect may ask for with ?done=; any other value says nothing.
+const DONE = ["saved", "approved", "rejected", "unpublished"] as const;
+type Done = (typeof DONE)[number];
+
+function doneMessage(c: Ctx): string | undefined {
+  const asked = c.req.query("done");
+  const known = DONE.find((d) => d === asked);
+  return known ? COPY.done[known] : undefined;
+}
+
+const withDone = (path: string, done: Done): string => `${path}?done=${done}`;
+
 async function page(
   c: Ctx,
-  p: { title: string; active: Status | null; body: View; message?: string; counts?: Record<Status, number> },
+  p: {
+    title: string;
+    active: Status | null;
+    body: View;
+    message?: string;
+    done?: string | undefined;
+    counts?: Record<Status, number>;
+  },
   status: ContentfulStatusCode = 200,
 ): Promise<Response> {
   const shell = layout({ ...p, email: c.get("identity").email, counts: p.counts ?? (await counts(c.env.DB)) });
@@ -102,7 +121,7 @@ app.get("/admin", async (c) => {
     if (first) summary = { count: all.review, soonestExpiry: first.expires_at };
   }
   const body = queueView(status, rows.slice(0, PAGE_SIZE), now, { current, hasMore: rows.length > PAGE_SIZE }, summary);
-  return page(c, { title: COPY.tabs[status], active: status, body, counts: all });
+  return page(c, { title: COPY.tabs[status], active: status, body, counts: all, done: doneMessage(c) });
 });
 
 // The story page from a fresh read, optionally with a message and the user's own form values.
@@ -112,15 +131,18 @@ async function storyPage(
   status: ContentfulStatusCode = 200,
   message?: string,
   draft?: Draft,
+  done?: string,
 ): Promise<Response> {
   const story = await getStory(c.env.DB, uid);
   if (!story) return page(c, { title: COPY.notFoundTitle, active: null, body: notFoundView() }, 404);
   const body = storyView(story, new Date(), draft, draft !== undefined && differs(story, draft));
   const title = story.texts.tr?.title ?? COPY.notFoundTitle;
-  return page(c, { title, active: story.status, body, ...(message ? { message } : {}) }, status);
+  return page(c, { title, active: story.status, body, done, ...(message ? { message } : {}) }, status);
 }
 
-app.get("/admin/stories/:uid", (c) => storyPage(c, c.req.param("uid")));
+app.get("/admin/stories/:uid", (c) =>
+  storyPage(c, c.req.param("uid"), 200, undefined, undefined, doneMessage(c)),
+);
 
 interface Form {
   version: number;
@@ -222,7 +244,7 @@ app.post("/admin/stories/:uid/edit", async (c) => {
   const result = await editStory(c.env.DB, uid, form.version, patchOf(draft), c.get("identity").email, new Date());
   // An edit keeps the status, so a story that is published now was published before it.
   if (result.ok && (await getStory(c.env.DB, uid))?.status === "published") notifySite(c.env, waiter(c));
-  return afterResult(c, uid, result, storyPath(uid), draft);
+  return afterResult(c, uid, result, withDone(storyPath(uid), "saved"), draft);
 });
 
 // "Kaydet ve onayla": saves the form's text when it differs from the stored story, then approves.
@@ -249,14 +271,14 @@ app.post("/admin/stories/:uid/approve", async (c) => {
     // Only a story in review is saved here; any other status goes straight to approveStory, which refuses it.
     if (story?.status === "review" && differs(story, draft)) {
       const edited = await editStory(c.env.DB, uid, version, patchOf(draft), actor, new Date());
-      if (!edited.ok) return afterResult(c, uid, edited, "/admin", draft, ["review"]);
+      if (!edited.ok) return afterResult(c, uid, edited, withDone("/admin", "approved"), draft, ["review"]);
       version += 1;
       saved = true;
     }
   }
   const result = await approveStory(c.env.DB, uid, version, actor, new Date());
   if (result.ok) notifySite(c.env, waiter(c));
-  if (result.ok || !saved) return afterResult(c, uid, result, "/admin", draft, ["review"]);
+  if (result.ok || !saved) return afterResult(c, uid, result, withDone("/admin", "approved"), draft, ["review"]);
   const message = `${COPY.savedNotApproved} ${failureMessage(result.error, result.detail)}`;
   return storyPage(c, uid, FAILURE_STATUS[result.error], message);
 });
@@ -274,7 +296,7 @@ app.post("/admin/stories/:uid/reject", async (c) => {
     c.get("identity").email,
     new Date(),
   );
-  return afterResult(c, uid, result, "/admin");
+  return afterResult(c, uid, result, withDone("/admin", "rejected"));
 });
 
 app.post("/admin/stories/:uid/unpublish", async (c) => {
@@ -290,7 +312,7 @@ app.post("/admin/stories/:uid/unpublish", async (c) => {
     new Date(),
   );
   if (result.ok) notifySite(c.env, waiter(c));
-  return afterResult(c, uid, result, storyPath(uid));
+  return afterResult(c, uid, result, withDone(storyPath(uid), "unpublished"));
 });
 
 // Any other path under /admin: the not-found page, reached only after the middleware signed the user in.

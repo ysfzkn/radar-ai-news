@@ -5,6 +5,8 @@ import { COPY } from "../src/copy";
 import { app } from "../src/index";
 import type { IngestStory } from "../src/schema";
 import { getStory, insertStories, rejectStory } from "../src/stories";
+import { layout } from "../src/views/layout";
+import { html } from "hono/html";
 
 const HOUR = 3600_000;
 const ORIGIN = "http://localhost";
@@ -223,11 +225,11 @@ describe("admin screen", () => {
     expect((await getStory(env.DB, uid))!.status).toBe("review");
   });
 
-  it("approve with the checkbox publishes and redirects 303 to /admin", async () => {
+  it("approve with the checkbox publishes and redirects 303 to /admin?done=approved", async () => {
     const uid = await seed();
     const res = await post(`/admin/stories/${uid}/approve`, { version: "1", checked: "on" });
     expect(res.status).toBe(303);
-    expect(res.headers.get("Location")).toBe("/admin");
+    expect(res.headers.get("Location")).toBe("/admin?done=approved");
     const s = (await getStory(env.DB, uid))!;
     expect(s).toMatchObject({ status: "published", publish_mode: "human" });
     expect(s.events.at(-1)).toMatchObject({ action: "approved", actor: "dev@localhost" });
@@ -301,7 +303,7 @@ describe("admin screen", () => {
     const uid = await seed();
     const res = await post(`/admin/stories/${uid}/edit`, editFields(1, { try_url: "https://try.example/x" }));
     expect(res.status).toBe(303);
-    expect(res.headers.get("Location")).toBe(`/admin/stories/${uid}`);
+    expect(res.headers.get("Location")).toBe(`/admin/stories/${uid}?done=saved`);
     const s = (await getStory(env.DB, uid))!;
     expect(s.version).toBe(2);
     expect(s.category).toBe("model");
@@ -327,11 +329,11 @@ describe("admin screen", () => {
     expect((await getStory(env.DB, uid))!.version).toBe(1);
   });
 
-  it("reject with an empty note rejects and redirects to /admin", async () => {
+  it("reject with an empty note rejects and redirects to /admin?done=rejected", async () => {
     const uid = await seed();
     const res = await post(`/admin/stories/${uid}/reject`, { version: "1", note: "" });
     expect(res.status).toBe(303);
-    expect(res.headers.get("Location")).toBe("/admin");
+    expect(res.headers.get("Location")).toBe("/admin?done=rejected");
     const s = (await getStory(env.DB, uid))!;
     expect(s.status).toBe("rejected");
     expect(s.events.at(-1)).toMatchObject({ action: "rejected", note: null });
@@ -345,7 +347,7 @@ describe("admin screen", () => {
     expect((await getStory(env.DB, uid))!.status).toBe("published");
     const ok = await post(`/admin/stories/${uid}/unpublish`, { version: "1", note: "Yanlış rakam" });
     expect(ok.status).toBe(303);
-    expect(ok.headers.get("Location")).toBe(`/admin/stories/${uid}`);
+    expect(ok.headers.get("Location")).toBe(`/admin/stories/${uid}?done=unpublished`);
     expect((await getStory(env.DB, uid))!.status).toBe("rejected");
   });
 
@@ -534,7 +536,7 @@ describe("save and approve", () => {
     const fields = { ...(await storedFields(uid)), tr_title: "Elle düzeltilmiş başlık", checked: "on" };
     const res = await post(`/admin/stories/${uid}/approve`, fields);
     expect(res.status).toBe(303);
-    expect(res.headers.get("Location")).toBe("/admin");
+    expect(res.headers.get("Location")).toBe("/admin?done=approved");
     const s = (await getStory(env.DB, uid))!;
     expect(s).toMatchObject({ status: "published", publish_mode: "human", edited: true, version: 3 });
     expect(s.texts.tr.title).toBe("Elle düzeltilmiş başlık");
@@ -874,5 +876,200 @@ describe("review screen", () => {
 
     const js = await (await get("/admin/app.js")).text();
     expect(js).toContain('hasAttribute("data-dirty")');
+  });
+});
+
+// The confirmation notice of a page, or undefined.
+const doneNotice = (body: string): string | undefined => body.match(/<p class="notice done"[^>]*>[^<]*<\/p>/)?.[0];
+
+describe("feedback and foresight", () => {
+  it("a successful save redirects with done=saved and the story page then says Kaydedildi.", async () => {
+    const uid = await seed();
+    const res = await post(`/admin/stories/${uid}/edit`, editFields(1));
+    expect(res.status).toBe(303);
+    expect(res.headers.get("Location")).toBe(`/admin/stories/${uid}?done=saved`);
+    const body = await (await get(res.headers.get("Location")!)).text();
+    expect(doneNotice(body)).toBe('<p class="notice done" role="status">Kaydedildi.</p>');
+    expect(COPY.done.saved).toBe("Kaydedildi.");
+    // The plain story page says nothing.
+    expect(await (await get(`/admin/stories/${uid}`)).text()).not.toContain('class="notice');
+  });
+
+  it("approve, reject and take-down redirect with their hints and the next page shows the message", async () => {
+    const approved = await seed();
+    const a = await post(`/admin/stories/${approved}/approve`, { version: "1", checked: "on" });
+    expect(a.status).toBe(303);
+    expect(a.headers.get("Location")).toBe("/admin?done=approved");
+    expect(doneNotice(await (await get("/admin?done=approved")).text())).toContain(">Haber yayınlandı.<");
+
+    const edited = await seed();
+    const e = await post(`/admin/stories/${edited}/approve`, {
+      ...(await storedFields(edited)),
+      tr_title: "Elle düzeltilmiş başlık",
+      checked: "on",
+    });
+    expect(e.status).toBe(303);
+    expect(e.headers.get("Location")).toBe("/admin?done=approved");
+
+    const rejected = await seed();
+    const r = await post(`/admin/stories/${rejected}/reject`, { version: "1", note: "" });
+    expect(r.status).toBe(303);
+    expect(r.headers.get("Location")).toBe("/admin?done=rejected");
+    expect(doneNotice(await (await get("/admin?done=rejected")).text())).toContain(">Haber reddedildi.<");
+
+    const published = await seed({ status: "published" });
+    const u = await post(`/admin/stories/${published}/unpublish`, { version: "1", note: "Yanlış rakam" });
+    expect(u.status).toBe(303);
+    expect(u.headers.get("Location")).toBe(`/admin/stories/${published}?done=unpublished`);
+    const page = await (await get(u.headers.get("Location")!)).text();
+    expect(doneNotice(page)).toBe('<p class="notice done" role="status">Haber yayından kaldırıldı.</p>');
+  });
+
+  it("an unknown or hostile done value shows nothing and is not reflected", async () => {
+    const uid = await seed();
+    const values = ["%3Cscript%3E", "x", "approved%22", "x&done=approved", "constructor", "toString", ""];
+    for (const base of ["/admin", `/admin/stories/${uid}`]) {
+      for (const v of values) {
+        const body = await (await get(`${base}?done=${v}`)).text();
+        expect(body).not.toContain('class="notice');
+        for (const message of Object.values(COPY.done)) expect(body).not.toContain(message);
+        expect(body).not.toMatch(/<script>/);
+        expect(body).not.toContain('approved"');
+        expect(body).not.toContain("constructor");
+      }
+    }
+  });
+
+  it("a failure message wins over a done hint", async () => {
+    const uid = await seed();
+    const res = await post(`/admin/stories/${uid}/edit?done=saved`, editFields(7));
+    expect(res.status).toBe(409);
+    const body = await res.text();
+    expect(body).toContain(`<p class="notice" role="alert">${COPY.conflictKept}</p>`);
+    expect(body).not.toContain(COPY.done.saved);
+    const shell = String(
+      await layout({
+        title: "t",
+        email: "a@b",
+        counts: { review: 0, published: 0, rejected: 0, expired: 0 },
+        active: null,
+        message: "Hata",
+        done: COPY.done.saved,
+        body: html``,
+      }),
+    );
+    expect(shell).toContain('<p class="notice" role="alert">Hata</p>');
+    expect(shell).not.toContain(COPY.done.saved);
+  });
+
+  it("the story page shows a preview built from the stored text, English parts marked lang=en", async () => {
+    for (const status of ["review", "published"] as const) {
+      const uid = await seed({ status });
+      const body = await (await get(`/admin/stories/${uid}`)).text();
+      const s = (await getStory(env.DB, uid))!;
+      expect(body).toContain(`<h2 id="preview-h">${COPY.previewHeading}</h2>`);
+      expect(COPY.previewHeading).toBe("Sitede görünüm");
+      const preview = body.slice(body.indexOf('id="preview-h"'), body.indexOf('id="fact-h"'));
+      for (const lang of ["tr", "en"] as const) {
+        expect(preview).toContain(
+          `<span class="pv-tag" id="pv_${lang}_category"${lang === "en" ? ' lang="tr"' : ""}>Protokol</span>`,
+        );
+        for (const f of ["title", "summary", "dev_line"] as const)
+          expect(preview).toContain(`id="pv_${lang}_${f}">${s.texts[lang][f]}</`);
+      }
+      expect(preview).toContain('<div class="pv-story" lang="en">');
+      expect(preview).toContain(`>${COPY.previewDev.tr}</p>`);
+      expect(preview).toContain(`>${COPY.previewDev.en}</p>`);
+      expect(COPY.previewDev).toEqual({ tr: "Geliştiriciler için", en: "For developers" });
+      expect(preview.indexOf('id="pv_tr_title"')).toBeLessThan(preview.indexOf('id="pv_en_title"'));
+      // Directly under the reasons, above the fact card.
+      expect(body.indexOf('id="reasons-h"')).toBeLessThan(body.indexOf('id="preview-h"'));
+      const between = body.slice(body.indexOf('id="reasons-h"'), body.indexOf('id="preview-h"'));
+      expect(between.match(/<section /g)?.length).toBe(1);
+    }
+  });
+
+  it("after a kept-text re-render the preview shows the typed text, escaped", async () => {
+    const uid = await seed();
+    const hostile = "<img src=x onerror=alert(1)>";
+    const res = await post(
+      `/admin/stories/${uid}/edit`,
+      editFields(7, { tr_title: hostile, en_summary: '"><b>x</b>', category: "security" }),
+    );
+    expect(res.status).toBe(409);
+    const body = await res.text();
+    expect(body).toContain('id="pv_tr_title">&lt;img src=x onerror=alert(1)&gt;</p>');
+    expect(body).toContain('id="pv_en_summary">&quot;&gt;&lt;b&gt;x&lt;/b&gt;</p>');
+    expect(body).toContain('id="pv_tr_category">Güvenlik</span>');
+    expect(body).not.toContain("<img");
+    expect(body).not.toContain("<b>x");
+  });
+
+  it("read-only stories have no preview", async () => {
+    const rejected = await seed();
+    await rejectStory(env.DB, rejected, 1, null, "owner@example.com", new Date());
+    const body = await (await get(`/admin/stories/${rejected}`)).text();
+    expect(body).not.toContain(COPY.previewHeading);
+    expect(body).not.toContain('id="pv_');
+  });
+
+  it("the script updates the preview with textContent only and never uses innerHTML", async () => {
+    const js = await (await get("/admin/app.js")).text();
+    expect(js).toContain('"pv_"');
+    expect(js).toContain(".textContent = ");
+    expect(js).toContain('getElementById("category")');
+    expect(js).toContain('addEventListener("change"');
+    for (const bad of ["innerHTML", "outerHTML", "insertAdjacentHTML", "document.write", "eval("])
+      expect(js).not.toContain(bad);
+  });
+
+  it("the script submits through the save button on Ctrl+S and Cmd+S and only when the form exists", async () => {
+    const js = await (await get("/admin/app.js")).text();
+    for (const s of [
+      'addEventListener("keydown"',
+      "ctrlKey",
+      "metaKey",
+      'toLowerCase() === "s"',
+      "preventDefault()",
+      ".repeat",
+      "requestSubmit(save)",
+      "save.click()",
+    ])
+      expect(js).toContain(s);
+    expect(js.indexOf("if (!form) return;")).toBeGreaterThan(-1);
+    expect(js.indexOf('addEventListener("keydown"')).toBeGreaterThan(js.indexOf("if (!form) return;"));
+    expect(js.indexOf('addEventListener("keydown"')).toBeGreaterThan(js.indexOf("if (save)"));
+    const uid = await seed();
+    const body = await (await get(`/admin/stories/${uid}`)).text();
+    expect(body).toMatch(/<button [^>]*id="save-button"[^>]*formaction="[^"]*\/edit"[^>]*>Kaydet<\/button>/);
+    expect(body.match(/id="save-button"/g)?.length).toBe(1);
+  });
+
+  it("the page title starts with the waiting count and has no prefix at zero", async () => {
+    expect(await (await get("/admin")).text()).toContain("<title>Bekleyen · Radar · Onay</title>");
+    const uid = await seed();
+    await seed();
+    await seed({ status: "published" });
+    expect(await (await get("/admin?status=published")).text()).toContain("<title>(2) Yayında · Radar · Onay</title>");
+    expect(await (await get(`/admin/stories/${uid}`)).text()).toContain(
+      "<title>(2) A2UI 1.0 aday sürümü yayında · Radar · Onay</title>",
+    );
+    expect(await (await get("/admin/nothing")).text()).toContain("<title>(2) Bulunamadı · Radar · Onay</title>");
+  });
+
+  it("the empty review queue shows the brand mark", async () => {
+    const body = await (await get("/admin")).text();
+    expect(body).toMatch(/<div class="empty"><svg class="mark"[^>]*>[\s\S]*?<\/svg><p>Bekleyen haber yok\.<\/p><\/div>/);
+    const other = await (await get("/admin?status=rejected")).text();
+    expect(other).toContain('<div class="empty"><p>Bu listede haber yok.</p></div>');
+  });
+
+  it("the side column has a thin scrollbar in the control colour, and the done notice uses the ok colours", async () => {
+    const css = await (await get("/admin/app.css")).text();
+    expect(css).toMatch(/\.story-side \{[^}]*scrollbar-width: thin;[^}]*scrollbar-color: var\(--control-border\) transparent;/);
+    expect(css).toMatch(/\.notice\.done \{[^}]*background: var\(--ok-soft\);[^}]*color: var\(--ok\);/);
+    expect(css).toMatch(/\.pv-dev \{[^}]*border-left: 3px solid var\(--accent\)/);
+    expect(css).toMatch(/\.pv-title \{[^}]*font-size: 1\.125rem;[^}]*font-weight: 700;/);
+    expect(css).not.toContain("box-shadow");
   });
 });

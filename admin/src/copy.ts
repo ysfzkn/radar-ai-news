@@ -110,6 +110,16 @@ export const COPY = {
     regulation: "düzenleme",
   } satisfies Record<(typeof RISK_FLAGS)[number], string>,
   tooLongReason: (field: string, n: string, max: string) => `${field} çok uzun (${n} / ${max})`,
+
+  // Said after a successful action, from the redirect's `done` hint.
+  done: {
+    saved: "Kaydedildi.",
+    approved: "Haber yayınlandı.",
+    rejected: "Haber reddedildi.",
+    unpublished: "Haber yayından kaldırıldı.",
+  },
+  previewHeading: "Sitede görünüm",
+  previewDev: { tr: "Geliştiriciler için", en: "For developers" } satisfies Record<Lang, string>,
 };
 
 // "tr.summary" -> "Türkçe özet". Unknown details fall back to the raw path.
