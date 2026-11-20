@@ -1,0 +1,72 @@
+---
+import Echo from "./Echo.astro";
+import { COPY } from "../lib/copy";
+import { anchorId } from "../lib/editions";
+import { hostLabel, httpUrl, shortDate } from "../lib/format";
+import type { Lang, PublicStory, Source } from "../lib/schema";
+
+interface Props {
+  lang: Lang;
+  story: PublicStory;
+  /** 1-based position in the edition. */
+  index: number;
+  /** The edition's "YYYY-MM-DD". */
+  date: string;
+}
+
+const SOURCE_LIMIT = 4;
+
+const { lang, story, index, date } = Astro.props;
+const copy = COPY[lang];
+const text = story.texts[lang]!;
+
+// The main source first, by its name if the list has it, else by its host.
+const listed: Source[] = story.sources.filter((source) => httpUrl(source.url) !== null);
+const mainUrl = httpUrl(story.source_url);
+const main = listed.find((source) => source.url === story.source_url);
+const sources: Source[] = mainUrl
+  ? [main ?? { name: hostLabel(mainUrl), url: mainUrl }, ...listed.filter((s) => s !== main)]
+  : listed;
+const shown = sources.slice(0, SOURCE_LIMIT);
+const more = sources.length - shown.length;
+
+const tryUrl = httpUrl(story.try_url);
+---
+
+<article id={anchorId(story.uid)} class="story">
+  <p class="story-meta label">
+    <span class="story-no">{String(index).padStart(2, "0")}</span>{" "}
+    <span class="story-cat caps">{copy.categories[story.category]}</span>{" "}
+    <time datetime={date}>{shortDate(date, lang)}</time>{" "}
+    <Echo lang={lang} count={story.source_count} />
+  </p>
+  <h2 class="story-title">{text.title}</h2>
+  <p class="story-summary">{text.summary}</p>
+  <p class="story-dev"><strong>{copy.forDevelopers}</strong> {text.dev_line}</p>
+  {
+    shown.length > 0 && (
+      <p class="story-sources label">
+        {copy.sourceLabel}{" "}
+        {shown.map((source, i) => (
+          <>
+            {i > 0 && " · "}
+            <a href={source.url} rel="noopener">
+              {source.name}
+            </a>
+          </>
+        ))}
+        {more > 0 && ` · +${more}`}
+      </p>
+    )
+  }
+  {
+    tryUrl && (
+      <p class="story-try label">
+        <a href={tryUrl} rel="noopener">
+          <span class="story-try-mark" aria-hidden="true">▸</span> {copy.tryIt} · {hostLabel(tryUrl)}
+        </a>
+      </p>
+    )
+  }
+  <p class="story-honest label">{copy.label[story.publish_mode]}</p>
+</article>

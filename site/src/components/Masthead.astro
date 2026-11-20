@@ -1,0 +1,48 @@
+---
+import { COPY } from "../lib/copy";
+import { routes } from "../lib/routes";
+import type { Lang } from "../lib/schema";
+
+interface Props {
+  lang: Lang;
+  /** This page's address, to mark the current link. */
+  path: string;
+  /** The same page in the other language, or null to point at its home. */
+  alternate: string | null;
+}
+
+const { lang, path, alternate } = Astro.props;
+const copy = COPY[lang];
+const other: Lang = lang === "tr" ? "en" : "tr";
+const links = [
+  { href: routes[lang].home, text: copy.nav.today },
+  { href: routes[lang].archive, text: copy.nav.archive },
+  { href: routes[lang].weekIndex, text: copy.nav.week },
+  { href: routes[lang].method, text: copy.nav.method },
+];
+---
+
+<header class="top">
+  <a class="wordmark" href={routes[lang].home}>
+    <svg class="wordmark-mark" viewBox="0 0 5 14" width="5" height="14" stroke-width="2" aria-hidden="true">
+      <path d="M1.25 1A8.485 8.485 0 0 1 1.25 13" />
+    </svg>
+    {copy.siteName}
+  </a>
+  <nav>
+    <ul class="nav label">
+      {
+        links.map((link) => (
+          <li>
+            <a href={link.href} aria-current={link.href === path ? "page" : undefined}>
+              {link.text}
+            </a>
+          </li>
+        ))
+      }
+      <li>
+        <a href={alternate ?? routes[other].home} hreflang={other} lang={other}>{copy.otherLang}</a>
+      </li>
+    </ul>
+  </nav>
+</header>

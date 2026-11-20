@@ -1,0 +1,68 @@
+---
+import "../styles/tokens.css";
+import "../styles/base.css";
+import Masthead from "../components/Masthead.astro";
+import { COPY } from "../lib/copy";
+import { loadData } from "../lib/data";
+import { routes } from "../lib/routes";
+import type { Lang } from "../lib/schema";
+
+interface Props {
+  lang: Lang;
+  title: string;
+  description: string;
+  /** This page's address, for example "/" or "/en/2026-11-20/". */
+  path: string;
+  /** The same page in the other language, or null when it has none. */
+  alternate: string | null;
+}
+
+const { lang, title, description, path, alternate } = Astro.props;
+const copy = COPY[lang];
+const other: Lang = lang === "tr" ? "en" : "tr";
+const absolute = (address: string) => new URL(address, Astro.site).href;
+const { demo } = loadData();
+---
+
+<!doctype html>
+<html lang={lang}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={absolute(path)} />
+    {
+      alternate && (
+        <>
+          <link rel="alternate" hreflang={lang} href={absolute(path)} />
+          <link rel="alternate" hreflang={other} href={absolute(alternate)} />
+        </>
+      )
+    }
+    <link rel="alternate" type="application/rss+xml" title={copy.feedTitle} href={absolute(routes[lang].rss)} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={copy.siteName} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={absolute(path)} />
+    <meta property="og:locale" content={lang === "tr" ? "tr_TR" : "en_GB"} />
+  </head>
+  <body>
+    <a class="skip" href="#main">{copy.skip}</a>
+    <div class="page">
+      <Masthead lang={lang} path={path} alternate={alternate} />
+      {demo && <p class="demo label">{copy.demo}</p>}
+      <main id="main">
+        <slot />
+      </main>
+      <footer class="foot label">
+        <a href={routes[lang].rss}>{copy.rss}</a>{" "}
+        <a href={routes[lang].method}>{copy.nav.method}</a>{" "}
+        <a href="https://github.com/ysfzkn/radar-ai-news">{copy.sourceCode}</a>
+      </footer>
+    </div>
+  </body>
+</html>

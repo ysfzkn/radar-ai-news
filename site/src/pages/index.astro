@@ -1,17 +1,33 @@
 ---
+import Base from "../layouts/Base.astro";
+import EditionView from "../components/EditionView.astro";
+import { COPY } from "../lib/copy";
 import { loadData } from "../lib/data";
+import { buildEditions, forLang } from "../lib/editions";
+import { editionTitle } from "../lib/format";
+import { routes } from "../lib/routes";
 
-const { stories } = loadData();
+const lang = "tr";
+const editions = buildEditions(forLang(loadData().stories, lang));
+const latest = editions[0];
+const copy = COPY[lang];
 ---
 
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <title>Radar</title>
-  </head>
-  <body>
-    <ul>
-      {stories.map((story) => <li>{(story.texts.en ?? story.texts.tr)?.title}</li>)}
-    </ul>
-  </body>
-</html>
+<Base
+  lang={lang}
+  title={latest ? editionTitle(latest.number, latest.date, lang) : copy.siteName}
+  description={copy.tagline}
+  path={routes[lang].home}
+  alternate={routes.en.home}
+>
+  {
+    latest ? (
+      <EditionView lang={lang} edition={latest} previous={editions[1] ?? null} next={null} isLatest />
+    ) : (
+      <>
+        <h1 class="kunye label">{copy.noEdition}</h1>
+        <p class="empty">{copy.tagline}</p>
+      </>
+    )
+  }
+</Base>

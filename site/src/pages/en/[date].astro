@@ -1,0 +1,47 @@
+---
+import Base from "../../layouts/Base.astro";
+import EditionView from "../../components/EditionView.astro";
+import { COPY } from "../../lib/copy";
+import { loadData } from "../../lib/data";
+import { buildEditions, forLang, type Edition } from "../../lib/editions";
+import { editionTitle } from "../../lib/format";
+import { routes } from "../../lib/routes";
+
+export function getStaticPaths() {
+  const stories = loadData().stories;
+  const editions = buildEditions(forLang(stories, "en"));
+  const otherDates = new Set(buildEditions(forLang(stories, "tr")).map((e) => e.date));
+  // Newest first: the older neighbour is at i + 1, the newer one at i - 1.
+  return editions.map((edition, i) => ({
+    params: { date: edition.date },
+    props: {
+      edition,
+      previous: editions[i + 1] ?? null,
+      next: editions[i - 1] ?? null,
+      isLatest: i === 0,
+      hasOther: otherDates.has(edition.date),
+    },
+  }));
+}
+
+interface Props {
+  edition: Edition;
+  previous: Edition | null;
+  next: Edition | null;
+  isLatest: boolean;
+  hasOther: boolean;
+}
+
+const lang = "en";
+const { edition, previous, next, isLatest, hasOther } = Astro.props;
+---
+
+<Base
+  lang={lang}
+  title={editionTitle(edition.number, edition.date, lang)}
+  description={COPY[lang].tagline}
+  path={routes[lang].edition(edition.date)}
+  alternate={hasOther ? routes.tr.edition(edition.date) : null}
+>
+  <EditionView lang={lang} edition={edition} previous={previous} next={next} isLatest={isLatest} />
+</Base>

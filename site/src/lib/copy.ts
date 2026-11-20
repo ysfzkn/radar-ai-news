@@ -21,6 +21,8 @@ export interface Copy {
   demo: string;
   otherLang: string;
   skip: string;
+  rss: string;
+  sourceCode: string;
   categories: Record<Category, string>;
   /** Index 0 is January. */
   months: readonly string[];
@@ -61,6 +63,8 @@ export const COPY: Record<Lang, Copy> = {
     demo: "Örnek veri: bu haberler gerçek değil.",
     otherLang: "English",
     skip: "İçeriğe geç",
+    rss: "RSS",
+    sourceCode: "Kaynak kodu",
     categories: {
       protocol: "Protokol",
       model: "Model",
@@ -120,6 +124,8 @@ export const COPY: Record<Lang, Copy> = {
     demo: "Demo data: these stories are not real.",
     otherLang: "Türkçe",
     skip: "Skip to content",
+    rss: "RSS",
+    sourceCode: "Source code",
     categories: {
       protocol: "Protocol",
       model: "Model",

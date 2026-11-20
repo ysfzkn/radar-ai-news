@@ -1,0 +1,66 @@
+---
+import Story from "./Story.astro";
+import { COPY } from "../lib/copy";
+import { readingMinutes, type Edition } from "../lib/editions";
+import { longDate, shortDate } from "../lib/format";
+import { routes } from "../lib/routes";
+import type { Lang } from "../lib/schema";
+
+interface Props {
+  lang: Lang;
+  edition: Edition;
+  /** The older neighbour, or null for the first edition. */
+  previous: Edition | null;
+  /** The newer neighbour, or null for the newest edition. */
+  next: Edition | null;
+  isLatest: boolean;
+}
+
+const { lang, edition, previous, next, isLatest } = Astro.props;
+const copy = COPY[lang];
+const newer = isLatest ? null : next;
+---
+
+<h1 class="kunye label">
+  <span class="kunye-no">{copy.issue(edition.number)}</span>{" · "}
+  <time datetime={edition.date}>{longDate(edition.date, lang)}</time>{" · "}
+  <span class="nowrap">
+    {copy.storyCount(edition.stories.length)}{" · "}{copy.minutes(readingMinutes(edition.stories, lang))}
+  </span>
+</h1>
+
+<ol class="stories">
+  {
+    edition.stories.map((story, i) => (
+      <li>
+        <Story lang={lang} story={story} index={i + 1} date={edition.date} />
+      </li>
+    ))
+  }
+</ol>
+
+<div class="end">
+  <p class="closed">{copy.closed}</p>
+  {
+    (previous || newer) && (
+      <p class="pager">
+        {previous && (
+          <a class="pager-prev" href={routes[lang].edition(previous.date)} rel="prev">
+            <span class="pager-dir label caps">← {copy.previous}</span>
+            <span class="pager-issue">
+              {copy.issue(previous.number)} · {shortDate(previous.date, lang)}
+            </span>
+          </a>
+        )}
+        {newer && (
+          <a class="pager-next" href={routes[lang].edition(newer.date)} rel="next">
+            <span class="pager-dir label caps">{copy.next} →</span>
+            <span class="pager-issue">
+              {copy.issue(newer.number)} · {shortDate(newer.date, lang)}
+            </span>
+          </a>
+        )}
+      </p>
+    )
+  }
+</div>

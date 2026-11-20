@@ -22,6 +22,13 @@ export function longDate(date: string, lang: Lang): string {
     : `${weekday}, ${day} ${monthName} ${year}`;
 }
 
+/** "Sayı 4 · 20 Kasım 2026 · Radar": an edition page's <title>. */
+export function editionTitle(number: number, date: string, lang: Lang): string {
+  const { year, month, day } = parts(date);
+  const copy = COPY[lang];
+  return `${copy.issue(number)} · ${day} ${copy.months[month]} ${year} · ${copy.siteName}`;
+}
+
 export function shortDate(date: string, lang: Lang): string {
   const { month, day } = parts(date);
   return `${day} ${COPY[lang].monthsShort[month]}`;

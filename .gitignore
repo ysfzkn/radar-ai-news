@@ -12,3 +12,5 @@ dist/
 .dev.vars
 site/.data/
 .astro/
+dist-hostile/
+dist-empty/
