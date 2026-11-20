@@ -5,6 +5,7 @@ import type { IngestStory } from "../src/schema";
 import {
   approveStory,
   countStories,
+  expireStale,
   getStory,
   insertStories,
   istanbulDay,
@@ -66,6 +67,12 @@ describe("restore", () => {
     expect(await restoreStory(db, review, 1, "o", NOW)).toEqual({ ok: false, error: "wrong_status" });
     const published = await seed({ status: "published" });
     expect(await restoreStory(db, published, 1, "o", NOW)).toEqual({ ok: false, error: "wrong_status" });
+    // A review story whose 72-hour window ran out: expired, and not restorable.
+    const lapsed = await seed({ ageMs: 73 * HOUR });
+    expect(await expireStale(db, NOW)).toBe(1);
+    expect((await getStory(db, lapsed))!).toMatchObject({ status: "expired", version: 2 });
+    expect(await restoreStory(db, lapsed, 2, "o", NOW)).toEqual({ ok: false, error: "wrong_status" });
+    expect((await getStory(db, lapsed))!).toMatchObject({ status: "expired", version: 2 });
     const rejected = await seed();
     await rejectStory(db, rejected, 1, null, "o", NOW);
     expect(await restoreStory(db, rejected, 1, "o", NOW)).toEqual({ ok: false, error: "conflict" });

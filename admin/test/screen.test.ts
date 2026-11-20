@@ -79,6 +79,12 @@ describe("the next story after a decision", () => {
     await seed();
     const res = await post(`/admin/stories/${a}/approve`, { version: "9", checked: "on" });
     expect(res.status).toBe(409);
+    expect(res.headers.get("Location")).toBeNull();
+    const body = await res.text();
+    expect(body).toContain(`<p class="notice" role="alert">${COPY.failures.conflict}</p>`);
+    expect(body).toContain(`<form method="post" action="/admin/stories/${a}/edit" id="story-form"`);
+    expect(body).toContain('<button type="submit" class="primary" id="approve-button"');
+    expect((await getStory(env.DB, a))!).toMatchObject({ status: "review", version: 1 });
   });
 });
 
@@ -379,7 +385,7 @@ describe("keys, phone layout and field help", () => {
     expect(phone).toMatch(/\.bar-buttons\.decide \{[^}]*grid-template-columns: auto auto minmax\(0, 1fr\);/);
   });
 
-  it("keys move the selection and the focus, open the sheet, and never submit anything", async () => {
+  it("keys move the selection and the focus and open the sheet; no key presses a decision button or submits a form", async () => {
     const js = await (await get("/admin/app.js")).text();
     const page = keyPage(js);
     page.key({ key: "j" });
@@ -398,6 +404,10 @@ describe("keys, phone layout and field help", () => {
     page.key({ key: "j", target: { tagName: "DIV", isContentEditable: true } });
     for (const mod of ["ctrlKey", "metaKey", "altKey", "shiftKey"]) page.key({ key: "j", [mod]: true });
     expect(page.selected()).toBe(1);
+    // A key that belongs to an input method's composition (keyCode 229) is left alone too.
+    page.key({ key: "j", keyCode: 229 });
+    page.key({ key: "Process", keyCode: 229 });
+    expect(page.selected()).toBe(1);
     page.key({ key: "a" });
     page.key({ key: "r" });
     expect(page.focused.slice(-2)).toEqual(["approve-button", "reject_note"]);
@@ -413,8 +423,16 @@ describe("keys, phone layout and field help", () => {
     page.key({ key: "?", shiftKey: true });
     expect(page.sheetOpen()).toBe(false);
     expect(page.hintShown()).toBe(true);
-    expect(page.submits).toBe(0);
     expect(page.prevented).toBe(page.handled);
+    // Every printable key, Enter and Space, on the page and on the focused approve button: the
+    // decision buttons are only ever focused, never clicked, and no form is submitted.
+    const keys = [..."abcdefghijklmnopqrstuvwxyz0123456789?/", "Enter", " "];
+    for (const key of keys) {
+      page.key({ key });
+      page.key({ key, target: page.approve });
+    }
+    expect(page.clicked.filter((id) => !/^row\d$|^story-(next|prev)$/.test(id))).toEqual([]);
+    expect(page.submits).toBe(0);
   });
 });
 
@@ -424,7 +442,14 @@ function keyPage(js: string) {
   const listeners: Record<string, ((event: any) => void)[]> = {};
   const on = (type: string, fn: (event: any) => void) => (listeners[type] ??= []).push(fn);
   const state = { focused: [] as string[], clicked: [] as string[], submits: 0, prevented: 0, handled: 0 };
-  const el = (id: string) => ({ id, focus: () => state.focused.push(id), click: () => state.clicked.push(id), requestSubmit: () => state.submits++ });
+  const el = (id: string) => ({
+    id,
+    focus: () => state.focused.push(id),
+    click: () => state.clicked.push(id),
+    requestSubmit: () => state.submits++,
+    submit: () => state.submits++,
+    form: { requestSubmit: () => state.submits++, submit: () => state.submits++ },
+  });
   const rows = [0, 1, 2].map((i) => {
     const classes = new Set<string>();
     const link = el(`row${i}`);
@@ -463,6 +488,7 @@ function keyPage(js: string) {
     get prevented() { return state.prevented; },
     get handled() { return state.handled; },
     body,
+    approve: ids["approve-button"],
     key(init: Record<string, unknown>) {
       const event = { target: null, repeat: false, altKey: false, shiftKey: false, ctrlKey: false, metaKey: false, isComposing: false, ...init, preventDefault: () => state.prevented++ };
       const before = state.focused.length + state.clicked.length + Number(sheet.open);

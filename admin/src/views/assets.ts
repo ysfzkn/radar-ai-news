@@ -504,7 +504,8 @@ document.addEventListener("DOMContentLoaded", function () {
     return !!el;
   };
   document.addEventListener("keydown", function (event) {
-    if (event.ctrlKey || event.metaKey || event.altKey || event.isComposing) return;
+    // keyCode 229: a key that an input method is composing with (some browsers send it without isComposing).
+    if (event.ctrlKey || event.metaKey || event.altKey || event.isComposing || event.keyCode === 229) return;
     var target = event.target;
     if (typing(target)) return;
     var key = event.key;
@@ -595,6 +596,7 @@ document.addEventListener("DOMContentLoaded", function () {
   var save = document.getElementById("save-button");
   if (save) {
     document.addEventListener("keydown", function (event) {
+      if (event.isComposing || event.keyCode === 229) return;
       var isSave = (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey &&
         typeof event.key === "string" && event.key.toLowerCase() === "s";
       if (!isSave) return;
