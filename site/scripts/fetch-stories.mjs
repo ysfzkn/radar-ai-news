@@ -70,15 +70,30 @@ export async function refreshStoriesFile(file, apiUrl, fetchImpl = fetch) {
   return stories.length;
 }
 
-async function main() {
-  const file = fileURLToPath(new URL("../.data/stories.json", import.meta.url));
-  const count = await refreshStoriesFile(file, process.env.RADAR_API_URL);
-  console.log(`Fetched ${count} stories.`);
+const STORIES_FILE = fileURLToPath(new URL("../.data/stories.json", import.meta.url));
+
+/**
+ * What `npm run fetch` runs.
+ *
+ * @param {Record<string, string | undefined>} [env]
+ * @param {string} [file]
+ * @param {(url: string, init?: RequestInit) => Promise<Response>} [fetchImpl]
+ * @returns {Promise<number>} the number of stories written
+ */
+export async function main(env = process.env, file = STORIES_FILE, fetchImpl = fetch) {
+  // A demo build ignores the fetched file, so a live build with RADAR_DEMO=1 left in its
+  // environment would publish the demo; stop before the old file is removed.
+  if (env.RADAR_DEMO === "1") {
+    throw new Error("RADAR_DEMO=1 is set, so a build would show demo data; unset it to fetch live stories.");
+  }
+  return refreshStoriesFile(file, env.RADAR_API_URL, fetchImpl);
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  main().catch((error) => {
-    console.error(error.message);
-    process.exit(1);
-  });
+  main()
+    .then((count) => console.log(`Fetched ${count} stories.`))
+    .catch((error) => {
+      console.error(error.message);
+      process.exit(1);
+    });
 }

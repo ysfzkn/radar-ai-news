@@ -66,7 +66,7 @@
 
   /* Category colours: each used only for its tag (text, border, tint), its story's number and
      the target bar. Contrast, colour on --bg / on its tint: protocol 5.9 / 5.5, model 7.4 / 6.5,
-     framework 6.7 / 6.0, tooling 6.3 / 5.8, research 6.1 / 5.6, security 6.1 / 5.6,
+     framework 6.7 / 6.0, tooling 6.3 / 5.8, research 6.1 / 5.6, security 7.5 / 6.6 (a wine red, apart from the brand red),
      industry 8.9 / 8.0, policy 6.9 / 6.1. */
   --cat-protocol: #0f6b63;
   --cat-protocol-soft: #dff3f0;
@@ -78,8 +78,8 @@
   --cat-tooling-soft: #f8ecd8;
   --cat-research: #1b6b3a;
   --cat-research-soft: #e0f2e6;
-  --cat-security: #b3261e;
-  --cat-security-soft: #fbe9e7;
+  --cat-security: #9f1239;
+  --cat-security-soft: #fbe4ea;
   --cat-industry: #3b4656;
   --cat-industry-soft: #e8ebf0;
   --cat-policy: #8e2a8a;

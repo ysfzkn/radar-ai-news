@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { fetchAllStories, refreshStoriesFile } from "../scripts/fetch-stories.mjs";
+import { fetchAllStories, main, refreshStoriesFile } from "../scripts/fetch-stories.mjs";
 
 const story = (n: number) => ({
   uid: n.toString(16).padStart(32, "0"),
@@ -137,6 +137,41 @@ describe("refreshStoriesFile", () => {
       const fake = () => reply({ version: 1, stories: [], next: null });
       await expect(refreshStoriesFile(file, base, fake)).resolves.toBe(0);
       expect(JSON.parse(readFileSync(file, "utf8"))).toEqual({ stories: [] });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("npm run fetch", () => {
+  it("refuses to run with RADAR_DEMO=1, before it removes or fetches anything", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "radar-fetch-"));
+    try {
+      const file = join(dir, "stories.json");
+      writeFileSync(file, JSON.stringify({ stories: [story(9)] }));
+      let calls = 0;
+      const fake = () => {
+        calls += 1;
+        return reply({ version: 1, stories: [story(1)], next: null });
+      };
+      await expect(main({ RADAR_DEMO: "1", RADAR_API_URL: base }, file, fake)).rejects.toThrow(
+        /^RADAR_DEMO=1 is set/,
+      );
+      expect(calls).toBe(0);
+      expect(JSON.parse(readFileSync(file, "utf8"))).toEqual({ stories: [story(9)] });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("fetches as usual without RADAR_DEMO=1", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "radar-fetch-"));
+    try {
+      const file = join(dir, "stories.json");
+      const fake = () => reply({ version: 1, stories: [story(1)], next: null });
+      for (const env of [{ RADAR_API_URL: base }, { RADAR_API_URL: base, RADAR_DEMO: "0" }]) {
+        await expect(main(env, file, fake)).resolves.toBe(1);
+      }
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

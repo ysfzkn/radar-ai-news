@@ -130,7 +130,7 @@ export const COPY: Record<Lang, Copy> = {
     by: "ozkanyusuf.com",
     github: "GitHub",
     subscribeFree: "Ücretsiz abone ol",
-    dontMiss: "Yarınki sayıyı kaçırma.",
+    dontMiss: "Sonraki sayıyı kaçırma.",
     categories: {
       protocol: "Protokol",
       model: "Model",
@@ -256,7 +256,7 @@ export const COPY: Record<Lang, Copy> = {
     subscribe: {
       description: "Radar'ı RSS ile ücretsiz takip et: hesap yok, e-posta yok.",
       intro: [
-        "Radar'a abone olmak bugün RSS akışını takip etmek demek: her gün yeni sayı, kullandığın RSS okuyucusunda kendiliğinden belirir.",
+        "Radar'a abone olmak bugün RSS akışını takip etmek demek: yeni haberler, yayımlandıkça kullandığın RSS okuyucusunda kendiliğinden belirir.",
         "Ücretsiz. Hesap yok, e-posta adresi yok; hiçbir şey kaydedilmez.",
       ],
       feedHeading: "Akış adresi",
@@ -264,7 +264,7 @@ export const COPY: Record<Lang, Copy> = {
       steps: [
         "Bir RSS okuyucusu aç; çoğu ücretsizdir ve telefonda da çalışır.",
         "Yeni bir abonelik ekle ve yukarıdaki adresi yapıştır.",
-        "Kaydet. Her yeni sayı okuyucuna kendiliğinden gelir.",
+        "Kaydet. Her yeni haber okuyucuna kendiliğinden gelir.",
       ],
       otherFeed: "İngilizce sayıların ayrı bir akışı var:",
       otherFeedLink: "İngilizce akış",
@@ -302,7 +302,7 @@ export const COPY: Record<Lang, Copy> = {
     by: "ozkanyusuf.com",
     github: "GitHub",
     subscribeFree: "Subscribe free",
-    dontMiss: "Don't miss tomorrow's issue.",
+    dontMiss: "Don't miss the next issue.",
     categories: {
       protocol: "Protocol",
       model: "Model",
@@ -428,7 +428,7 @@ export const COPY: Record<Lang, Copy> = {
     subscribe: {
       description: "Follow Radar for free with RSS: no account, no e-mail.",
       intro: [
-        "Subscribing to Radar today means following its RSS feed: each day the new issue appears in your feed reader on its own.",
+        "Subscribing to Radar today means following its RSS feed: new stories appear in your feed reader as they are published.",
         "It is free. No account, no e-mail address, nothing stored.",
       ],
       feedHeading: "Feed address",
@@ -436,7 +436,7 @@ export const COPY: Record<Lang, Copy> = {
       steps: [
         "Open a feed reader; most are free and work on a phone too.",
         "Add a new subscription and paste the address above.",
-        "Save it. Every new issue arrives in your reader by itself.",
+        "Save it. Every new story arrives in your reader by itself.",
       ],
       otherFeed: "The Turkish issues have a feed of their own:",
       otherFeedLink: "Turkish feed",

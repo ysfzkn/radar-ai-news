@@ -750,6 +750,21 @@ a.story-cat:hover {
   box-shadow: 1px 1px 0 var(--ink);
 }
 
+/* Inside the lead card the try button is flat: the card already carries the shadow. Hover and
+   focus put it on the chip instead of lifting it. */
+.story-lead .try,
+.story-lead .try:hover,
+.story-lead .try:focus-visible,
+.story-lead .try:active {
+  box-shadow: none;
+  transform: none;
+}
+
+.story-lead .try:hover,
+.story-lead .try:focus-visible {
+  background: var(--chip);
+}
+
 /* On the subscribe page the strip's button is where the reader already is: flat and still. */
 .subscribe[aria-current="page"],
 .subscribe[aria-current="page"]:hover,
@@ -831,7 +846,7 @@ a.story-cat:hover {
   color: var(--muted);
 }
 
-/* Under the closing line: tomorrow's issue and the subscribe button. */
+/* Under the closing line: the next issue and the subscribe button. */
 .closed-sub {
   display: flex;
   flex-wrap: wrap;
@@ -1123,9 +1138,11 @@ a.story-cat:hover {
   }
 }
 
+/* The first frames keep lit arcs at half strength or more, so a view whose timeline does not
+   advance still shows the meter's level. */
 @keyframes arc-in {
   from {
-    opacity: 0;
+    opacity: 0.5;
     transform: translateX(-2px);
   }
 }
@@ -1214,6 +1231,16 @@ a.story-cat:hover {
 
   .story:target::before {
     content: none;
+  }
+
+  /* A landscape page is wider than 48rem; the numbers go back into the label row at their
+     phone-width size instead of hanging in a gutter the page margin would cut. */
+  .story .story-no {
+    position: static;
+    width: auto;
+    padding-right: 0;
+    font-size: 1.0625rem;
+    letter-spacing: 0;
   }
 
   .stories > li {

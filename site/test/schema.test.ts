@@ -14,7 +14,7 @@ describe("parseStories", () => {
   });
 
   it("accepts the hostile and empty fixtures", () => {
-    expect(parseStories(read("./fixtures/hostile.json").stories)).toHaveLength(2);
+    expect(parseStories(read("./fixtures/hostile.json").stories)).toHaveLength(3);
     expect(parseStories(read("./fixtures/empty.json").stories)).toEqual([]);
   });
 

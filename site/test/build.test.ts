@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { COPY } from "../src/lib/copy";
@@ -9,9 +9,11 @@ import { CATEGORIES } from "../src/lib/schema";
 // These tests read the files of finished builds. beforeAll runs four builds one after
 // another (never concurrently): the demo fixture, a hostile file, an empty file, and the
 // demo fixture's stories read as real data (so feeds and pages are built without the demo marks).
+// Each goes to its own git-ignored folder; site/dist, the folder a plain build and a preview use,
+// is never written.
 const root = resolve(import.meta.dirname, "..");
 const astro = join(root, "node_modules", "astro", "bin", "astro.mjs");
-const DEMO = join(root, "dist");
+const DEMO = join(root, "dist-demo");
 const HOSTILE = join(root, "dist-hostile");
 const EMPTY = join(root, "dist-empty");
 const REAL = join(root, "dist-real");
@@ -34,7 +36,24 @@ function build(outDir: string, storiesFile?: string): void {
   });
 }
 
+// The owner's own build in site/dist, as it was before the test builds ran.
+const OWNER = join(root, "dist");
+let ownerBefore = "";
+
+/** Every file under `dir` with its size and modification time, or "absent". */
+function stamp(dir: string): string {
+  if (!existsSync(dir)) return "absent";
+  return allFiles(dir)
+    .map((file) => {
+      const { size, mtimeMs } = statSync(file);
+      return `${file} ${size} ${mtimeMs}`;
+    })
+    .sort()
+    .join("\n");
+}
+
 beforeAll(() => {
+  ownerBefore = stamp(OWNER);
   build(DEMO);
   build(HOSTILE, "test/fixtures/hostile.json");
   build(EMPTY, "test/fixtures/empty.json");
@@ -165,6 +184,22 @@ function anchors(html: string): { tag: string; attrs: Record<string, string> }[]
 
 const EXTERNAL = 'target="_blank" rel="noopener noreferrer"';
 
+/** The pager of an edition page: the links to the previous and the next issue. */
+const pager = (html: string) => html.match(/<p class="pager">([\s\S]*?)<\/p>/)![1];
+
+/** WCAG contrast ratio of two `#rrggbb` colours. */
+function contrast(a: string, b: string): number {
+  const luminance = (hex: string) => {
+    const [r, g, bl] = [1, 3, 5].map((i) => {
+      const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+      return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
+  };
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
 /** The `@media print` block, which closes the stylesheet. */
 function printRules(sheet: string): string {
   const start = sheet.indexOf("\n@media print {");
@@ -186,6 +221,15 @@ function langControl(html: string): { label: string; inner: string } {
 }
 
 describe("built site", () => {
+  it("the test builds go to their own git-ignored folders and leave site/dist untouched", () => {
+    expect(stamp(OWNER)).toBe(ownerBefore);
+    const ignored = readFileSync(join(root, "..", ".gitignore"), "utf8").split(/\r?\n/);
+    for (const dir of [DEMO, HOSTILE, EMPTY, REAL]) {
+      expect(dir).not.toBe(OWNER);
+      expect(ignored, dir).toContain(`${dir.slice(root.length + 1)}/`);
+    }
+  });
+
   it("the Turkish home page is edition 4 with five articles and the künye `Sayı 4 · 20 Kasım 2026 Cuma · 5 haber`", () => {
     const home = page(DEMO, "");
     expect(home).toMatch(/<html lang="tr"/);
@@ -213,11 +257,13 @@ describe("built site", () => {
         if (i > 0) expect(html).toContain(`href="/${prefix}${DEMO_DATES[i - 1]}/"`);
         else expect(text(html)).not.toContain(prefix ? "Previous issue" : "Önceki sayı");
         if (i < DEMO_DATES.length - 1) expect(html).toContain(`href="/${prefix}${DEMO_DATES[i + 1]}/"`);
-        else expect(text(html)).not.toContain(prefix ? "Next issue" : "Sonraki sayı");
+        // The pager only: the line under the end sign also speaks of the next issue.
+        else expect(text(pager(html))).not.toContain(prefix ? "Next issue" : "Sonraki sayı");
       }
     });
     expect(page(DEMO, "")).toContain(`href="/2026-11-19/"`);
-    expect(text(page(DEMO, ""))).not.toContain("Sonraki sayı");
+    expect(text(pager(page(DEMO, "")))).not.toContain("Sonraki sayı");
+    expect(page(DEMO, "")).not.toContain('rel="next"');
   });
 
   it("each article has the why-it-matters line, a source link that opens in a new tab and the echo meter's aria-label", () => {
@@ -326,8 +372,15 @@ describe("built site", () => {
     };
     expect(rule(".index-list li")).toContain("grid-template-columns: 2.25rem minmax(0, 1fr) auto;");
     expect(rule(".index-list a")).toContain("overflow-wrap: anywhere;");
-    // The hostile fixture carries a 60-character token in a title, and the page still builds.
-    expect(page(HOSTILE, "en/2026-11-19")).toContain("x".repeat(60));
+    // The hostile fixture carries a 60-character token in a title in a two-story edition,
+    // so the token is drawn inside an index row.
+    const html = page(HOSTILE, "en/2026-11-19");
+    expect(articles(html)).toHaveLength(2);
+    const index = html.match(/<nav class="index"[^>]*>([\s\S]*?)<\/nav>/);
+    expect(index).not.toBeNull();
+    const rows = [...index![1].matchAll(/<li>([\s\S]*?)<\/li>/g)].map((m) => m[1]);
+    expect(rows).toHaveLength(2);
+    expect(rows.filter((row) => row.includes("x".repeat(60)))).toHaveLength(1);
   });
 
   it("each index row carries that story's echo arcs with the right lit count, hidden from assistive tech", () => {
@@ -528,6 +581,13 @@ describe("built site", () => {
     );
     // The rail and the column shift give way to one column.
     expect(print).toContain(".edition-railed");
+    // A landscape page is wider than 48rem, so the hanging numbers come back into the label row
+    // at their phone-width size instead of hanging in a gutter the page margin cuts.
+    const number = cssRule(print, ".story .story-no");
+    for (const rule of ["position: static;", "width: auto;", "padding-right: 0;", "font-size: 1.0625rem;", "letter-spacing: 0;"]) {
+      expect(number).toContain(rule);
+    }
+    expect(cssRule(css(), ".story-no")).toContain("font-size: 1.0625rem;");
     // The elements the print rules hide carry those classes.
     const edition = page(DEMO, "2026-11-19");
     expect(edition).toMatch(/<nav class="top-nav">/);
@@ -540,10 +600,12 @@ describe("built site", () => {
   });
 
   it("an edition with one story has no index", () => {
-    const html = page(HOSTILE, "en/2026-11-19");
-    expect(articles(html)).toHaveLength(1);
-    expect(html).not.toContain('class="index"');
-    expect(text(html)).not.toContain(COPY.en.inThisIssue);
+    for (const [path, lang] of [["2026-11-20", "tr"], ["en/2026-11-20", "en"]] as const) {
+      const html = page(HOSTILE, path);
+      expect(articles(html), path).toHaveLength(1);
+      expect(html, path).not.toContain('class="index"');
+      expect(text(html), path).not.toContain(COPY[lang].inThisIssue);
+    }
   });
 
   it("the first story of an edition is marked as the lead and no story on a week page is", () => {
@@ -635,7 +697,7 @@ describe("built site", () => {
   it("the end of an edition closes it and points to the neighbouring issues", () => {
     const html = page(DEMO, "2026-11-19");
     const end = html.match(/<div class="end">([\s\S]*?)<\/main>/)![1];
-    expect(text(end)).toMatch(/^Baskı kapandı\. ?Sayı 3 · \d+ haber ?Yarınki sayıyı kaçırma\. ?Ücretsiz abone ol ?← Önceki sayı/);
+    expect(text(end)).toMatch(/^Baskı kapandı\. ?Sayı 3 · \d+ haber ?Sonraki sayıyı kaçırma\. ?Ücretsiz abone ol ?← Önceki sayı/);
     expect(end).toMatch(/<a class="pager-prev" href="\/2026-11-18\/" rel="prev">/);
     expect(end).toMatch(/<a class="pager-next" href="\/2026-11-20\/" rel="next">/);
   });
@@ -990,8 +1052,8 @@ describe("built site", () => {
       expect(text(line![1])).toBe(`${COPY[lang].dontMiss} ${COPY[lang].subscribeFree}`);
       expect(line![1]).toContain(`<a class="subscribe label" href="${routes[lang].subscribe}">`);
     }
-    expect(COPY.tr.dontMiss).toBe("Yarınki sayıyı kaçırma.");
-    expect(COPY.en.dontMiss).toBe("Don't miss tomorrow's issue.");
+    expect(COPY.tr.dontMiss).toBe("Sonraki sayıyı kaçırma.");
+    expect(COPY.en.dontMiss).toBe("Don't miss the next issue.");
   });
 
   it("the subscribe pages show the feed address as text and as a link, have no form and no input", () => {
@@ -1002,8 +1064,12 @@ describe("built site", () => {
       const otherFeed = `${SITE}${routes[other].rss}`;
       expect(h1(html)).toBe(COPY[lang].subscribeFree);
       expect(main).toContain(`<code class="feed-url">${feed}</code>`);
-      expect(main).toContain(`href="${feed}"`);
-      expect(main).toContain(`href="${otherFeed}"`);
+      // The links are site-relative, so they work on a local preview too; the absolute address is the text to copy.
+      const links = anchors(main).filter(({ attrs }) => attrs.type === "application/rss+xml");
+      expect(links.map(({ attrs }) => attrs.href)).toEqual([routes[lang].rss, routes[other].rss]);
+      for (const { tag, attrs } of links) expect(attrs.target, tag).toBeUndefined();
+      expect(main).not.toContain(`href="${feed}"`);
+      expect(main).not.toContain(`href="${otherFeed}"`);
       expect(main).not.toMatch(/<form|<input|<button|<textarea/i);
       expect(text(main)).toContain(COPY[lang].subscribe.noNewsletter);
       expect(main.match(/<ol class="steps"[^>]*>([\s\S]*?)<\/ol>/)![1].match(/<li>/g)).toHaveLength(3);
@@ -1015,10 +1081,19 @@ describe("built site", () => {
     const tr = text(page(DEMO, "abone").match(/<main[\s\S]*?<\/main>/)![0]);
     expect(tr).not.toMatch(/besleme|akış okuyucu/i);
     expect(tr).toContain(
-      "Radar'a abone olmak bugün RSS akışını takip etmek demek: her gün yeni sayı, kullandığın RSS okuyucusunda kendiliğinden belirir.",
+      "Radar'a abone olmak bugün RSS akışını takip etmek demek: yeni haberler, yayımlandıkça kullandığın RSS okuyucusunda kendiliğinden belirir.",
     );
     expect(tr).toContain("Akış adresi");
     expect(tr).toContain("Bir RSS okuyucusu aç; çoğu ücretsizdir ve telefonda da çalışır.");
+    // The feed has one item per story and a day without stories has no issue: no daily promise.
+    const en = text(page(DEMO, "en/subscribe").match(/<main[\s\S]*?<\/main>/)![0]);
+    expect(en).toContain(
+      "Subscribing to Radar today means following its RSS feed: new stories appear in your feed reader as they are published.",
+    );
+    expect(tr).toContain("Kaydet. Her yeni haber okuyucuna kendiliğinden gelir.");
+    expect(en).toContain("Save it. Every new story arrives in your reader by itself.");
+    expect(tr).not.toMatch(/her gün|yeni sayı/i);
+    expect(en).not.toMatch(/each day|every day|new issue/i);
     expect(JSON.stringify(COPY.tr)).not.toMatch(/besleme/i);
     // The strip's button marks the subscribe page as the current page there.
     expect(page(DEMO, "abone")).toContain('<a class="subscribe label" href="/abone/" aria-current="page">');
@@ -1094,7 +1169,7 @@ describe("built site", () => {
       framework: ["#1d4fbf", "#e1ebfb"],
       tooling: ["#8a4b06", "#f8ecd8"],
       research: ["#1b6b3a", "#e0f2e6"],
-      security: ["#b3261e", "#fbe9e7"],
+      security: ["#9f1239", "#fbe4ea"],
       industry: ["#3b4656", "#e8ebf0"],
       policy: ["#8e2a8a", "#f6e4f5"],
     };
@@ -1127,7 +1202,14 @@ describe("built site", () => {
       expect(value(":root", `--cat-${category}-soft`), category).toBe(tint);
       expect(value(`.cat-${category}`, "--cat")).toBe(`var(--cat-${category})`);
       expect(value(`.cat-${category}`, "--cat-soft")).toBe(`var(--cat-${category}-soft)`);
+      // Text contrast of the colour on the page, on its own tint and on white.
+      for (const ground of [value(":root", "--bg")!, tint, value(":root", "--surface")!]) {
+        expect(contrast(colour, ground), `${category} on ${ground}`).toBeGreaterThanOrEqual(4.5);
+      }
     }
+    // Security reads apart from the brand red of the mark and the arcs.
+    expect(table.security[0]).not.toBe(value(":root", "--accent"));
+    expect(table.security[0]).not.toBe(value(":root", "--danger"));
     // Exactly three consumers: the tag, the hanging number and the target bar.
     const users = decls.filter((d) => /var\(--cat(-soft)?[,)]/.test(d.value)).map((d) => d.selector);
     for (const selector of users) {
@@ -1143,8 +1225,9 @@ describe("built site", () => {
       expect(shadow.value === "none" || /^\d+px \d+px 0 var\(--ink\)$/.test(shadow.value), shadow.value).toBe(true);
       for (const part of shadow.selector.split(",").map((x) => x.trim())) {
         expect(part.replace(/:(hover|focus-visible|active)$/, "").replace(/\[aria-current="page"\]$/, "")).toMatch(
-          /^\.(story-lead|subscribe|try)$/,
+          /^(\.story-lead \.try|\.(story-lead|subscribe|try))$/,
         );
+        if (part.startsWith(".story-lead .try")) expect(shadow.value).toBe("none");
       }
     }
     // The lead card: a 3px shadow at phone width, 4px from 48rem.
@@ -1170,6 +1253,21 @@ describe("built site", () => {
     expect(current.find((d) => d.prop === "background" && d.selector === flat.selector)?.value).toBe("var(--chip)");
     expect(current.find((d) => d.prop === "transform" && d.selector === flat.selector)?.value).toBe("none");
     expect(flat.stack.join(" ")).not.toContain("@media");
+    // Inside the lead card the try button is flat: no shadow of its own and no movement, in any
+    // state; its border stays and hover or focus puts it on the chip. Outside the card it keeps its key.
+    const inLead = declarations(css()).filter((d) => d.selector.split(", ").some((s) => s.startsWith(".story-lead .try")));
+    const still = inLead.find((d) => d.prop === "box-shadow")!;
+    expect(still.value).toBe("none");
+    expect(inLead.find((d) => d.prop === "transform" && d.selector === still.selector)?.value).toBe("none");
+    for (const state of ["", ":hover", ":focus-visible", ":active"]) {
+      expect(still.selector.split(", ")).toContain(`.story-lead .try${state}`);
+    }
+    expect(still.stack.join(" ")).not.toContain("@media");
+    const chip = inLead.find((d) => d.prop === "background")!;
+    expect(chip.value).toBe("var(--chip)");
+    expect(chip.selector.split(", ").sort()).toEqual([".story-lead .try:focus-visible", ".story-lead .try:hover"]);
+    expect(inLead.some((d) => /^border/.test(d.prop))).toBe(false);
+    expect(cssRule(css(), ".subscribe,\n.try")).toContain("box-shadow: 3px 3px 0 var(--ink);");
     expect(sheets()).not.toMatch(/gradient\(|backdrop-filter|filter:\s*drop-shadow|text-shadow/);
   });
 
@@ -1212,6 +1310,20 @@ describe("built site", () => {
     }
     // Faded or offset states live only in keyframes, never as an element's default.
     for (const d of decls.filter((x) => x.prop === "opacity")) expect(d.stack.join(" ")).toMatch(/@keyframes|@media print/);
+    // Where a timeline does not advance (a capture, a throttled view), an element sits at its
+    // first keyframe: no keyframe fades a lit arc or a story below half strength.
+    const keyframes = decls.filter((d) => d.stack[0]?.startsWith("@keyframes"));
+    expect(new Set(keyframes.map((d) => d.stack[0]))).toEqual(
+      new Set(["@keyframes arc-in", "@keyframes bar-grow", "@keyframes progress-fill", "@keyframes story-rise"]),
+    );
+    const fades = keyframes.filter((d) => d.prop === "opacity");
+    expect(fades.map((d) => d.stack[0]).sort()).toEqual(["@keyframes arc-in", "@keyframes story-rise"]);
+    for (const d of fades) expect(Number(d.value), `${d.stack[0]} ${d.selector}`).toBeGreaterThanOrEqual(0.5);
+    const arc = keyframes.filter((d) => d.stack[0] === "@keyframes arc-in");
+    expect(arc.map((d) => `${d.selector} ${d.prop}: ${d.value}`)).toEqual([
+      "from opacity: 0.5",
+      "from transform: translateX(-2px)",
+    ]);
   });
 
   it("the masthead shows the issue pill and the total sources", () => {

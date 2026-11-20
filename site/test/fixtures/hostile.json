@@ -42,6 +42,25 @@
           "dev_line": "Nothing to do."
         }
       }
+    },
+    {
+      "uid": "00112233445566778899aabbccddeeff",
+      "category": "security",
+      "publish_mode": "human",
+      "edited": false,
+      "source_count": 1,
+      "source_url": "https://example.com/second",
+      "sources": [{ "name": "Example", "url": "https://example.com/second" }],
+      "try_url": null,
+      "created_at": "2026-11-19T06:00:00.000Z",
+      "published_at": "2026-11-19T06:00:00.000Z",
+      "texts": {
+        "en": {
+          "title": "A second story on the same day, so the edition has an index",
+          "summary": "It is in English only too, so the edition still has no hreflang pair.",
+          "dev_line": "Nothing to do."
+        }
+      }
     }
   ]
 }

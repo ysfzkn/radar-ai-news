@@ -12,9 +12,9 @@ const copy = COPY[lang];
 const page = copy.subscribe;
 const other: Lang = lang === "tr" ? "en" : "tr";
 if (!Astro.site) throw new Error("the subscribe page needs `site` in astro.config.mjs");
-// The feeds' absolute addresses on the configured site: what a feed reader is given.
+// The feed's absolute address on the configured site is the text a reader copies into a feed
+// reader; the links are site-relative, so they also work on a local preview.
 const feed = new URL(routes[lang].rss, Astro.site).href;
-const otherFeed = new URL(routes[other].rss, Astro.site).href;
 ---
 
 <h1 class="kunye label"><span class="kunye-no">{copy.subscribeFree}</span></h1>
@@ -29,7 +29,7 @@ const otherFeed = new URL(routes[other].rss, Astro.site).href;
       <code class="feed-url">{feed}</code>
     </p>
     <p>
-      <a href={feed} type="application/rss+xml">{copy.feedTitle}</a>
+      <a href={routes[lang].rss} type="application/rss+xml">{copy.feedTitle}</a>
     </p>
   </section>
   <section>
@@ -39,7 +39,7 @@ const otherFeed = new URL(routes[other].rss, Astro.site).href;
     </ol>
     <p>
       {page.otherFeed}{" "}
-      <a href={otherFeed} type="application/rss+xml" hreflang={other}>{page.otherFeedLink}</a>
+      <a href={routes[other].rss} type="application/rss+xml" hreflang={other}>{page.otherFeedLink}</a>
     </p>
     <p>{page.noNewsletter}</p>
   </section>
