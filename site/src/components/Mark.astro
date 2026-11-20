@@ -2,19 +2,13 @@
 interface Props {
   /** Width and height in px. */
   size?: number;
-  /** How many arcs, from the innermost, are lit: 0 to 5. */
-  lit?: number;
   /** With a label the mark is an image with that name; without one it is decoration. */
   label?: string;
 }
 
-const { size = 20, lit = 3, label } = Astro.props;
-// Radar's mark: a dot at the bottom-left and five quarter circles around it, opening to
-// the top-right. Each arc runs from straight up to straight right. Colour is CSS only.
-const arcs = [5, 8.5, 12, 15.5, 19].map((r, i) => ({
-  d: `M4 ${20 - r}A${r} ${r} 0 0 1 ${4 + r} 20`,
-  on: i < lit,
-}));
+const { size = 20, label } = Astro.props;
+// Radar's mark: a radar screen. A ring, a sweep from the centre to the top-right, and one
+// blip at the lower left. Colour is CSS only.
 ---
 
 <svg
@@ -26,6 +20,7 @@ const arcs = [5, 8.5, 12, 15.5, 19].map((r, i) => ({
   aria-label={label}
   aria-hidden={label ? undefined : "true"}
 >
-  <circle class="mark-dot" cx="4" cy="20" r="2" />
-  {arcs.map((arc) => <path class={arc.on ? "mark-on" : "mark-off"} d={arc.d} />)}
+  <circle class="mark-ring" cx="12" cy="12" r="9.25"></circle>
+  <line class="mark-sweep" x1="12" y1="12" x2="18.54" y2="5.46"></line>
+  <circle class="mark-blip" cx="7.75" cy="14.25" r="1.9"></circle>
 </svg>

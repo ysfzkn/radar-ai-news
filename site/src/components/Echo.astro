@@ -1,5 +1,4 @@
 ---
-import Mark from "./Mark.astro";
 import { COPY } from "../lib/copy";
 import { echoLevel } from "../lib/editions";
 import type { Lang } from "../lib/schema";
@@ -11,9 +10,23 @@ interface Props {
 
 const { lang, count } = Astro.props;
 const level = echoLevel(count);
+// Five equal arcs side by side, each bulging to the right; the first `level` are lit.
+const arcs = [2, 10.5, 19, 27.5, 36].map((x, i) => ({
+  d: `M${x} 1.5A8.5 8.5 0 0 1 ${x} 12.5`,
+  on: i < level,
+}));
 ---
 
 <span class="echo">
-  <Mark size={22} lit={level} label={COPY[lang].echoLabel(level, count)} />
+  <svg
+    class="echo-arcs"
+    viewBox="0 0 44 14"
+    width="44"
+    height="14"
+    role="img"
+    aria-label={COPY[lang].echoLabel(level, count)}
+  >
+    {arcs.map((arc) => <path class={arc.on ? "echo-on" : "echo-off"} d={arc.d} />)}
+  </svg>
   <span aria-hidden="true">{COPY[lang].sources(count)}</span>
 </span>

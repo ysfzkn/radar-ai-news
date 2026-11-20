@@ -175,11 +175,10 @@ export const COPY: Record<Lang, Copy> = {
         {
           heading: "Haberleri kim yazar?",
           paragraphs: [
-            "Her haberi, altında bağlantısı verilen kaynaklardan bir dil modeli yazar.",
+            "Her haberi bir dil modeli, haberin altında bağlantıları verilen kaynaklardan yazar.",
             "Riskli konulardaki haberler ancak bir insan okuduktan sonra yayımlanır. Geri kalanlar otomatik denetimden geçtikten sonra kendiliğinden yayımlanır.",
             "Yanlış bir haber düzeltilir ya da yayından kaldırılır.",
           ],
-          link: { text: "Yanlış bir haberi GitHub'da bildir", href: ISSUES },
         },
         {
           heading: "Riskli haberler bir insanı bekler",
@@ -310,13 +309,12 @@ export const COPY: Record<Lang, Copy> = {
           ],
         },
         {
-          heading: "Who writes the stories",
+          heading: "Who writes the stories?",
           paragraphs: [
             "Every story is written by a language model from the sources linked under it.",
             "Stories on risky subjects are published only after a person has read them. The rest are published automatically once they pass the automatic check.",
             "A story that is wrong is corrected or taken down.",
           ],
-          link: { text: "Report a wrong story on GitHub", href: ISSUES },
         },
         {
           heading: "Risky stories wait for a person",

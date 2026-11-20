@@ -170,7 +170,7 @@ describe("built site", () => {
   it("the method page explains that every story is written by a model and which ones a person reads first", () => {
     const tr = text(page(DEMO, "yontem"));
     const en = text(page(DEMO, "en/method"));
-    expect(tr).toContain("Her haberi, altında bağlantısı verilen kaynaklardan bir dil modeli yazar.");
+    expect(tr).toContain("Her haberi bir dil modeli, haberin altında bağlantıları verilen kaynaklardan yazar.");
     expect(tr).toContain("Riskli konulardaki haberler ancak bir insan okuduktan sonra yayımlanır.");
     expect(tr).toContain("Geri kalanlar otomatik denetimden geçtikten sonra kendiliğinden yayımlanır.");
     expect(tr).toContain("Yanlış bir haber düzeltilir ya da yayından kaldırılır.");
@@ -180,10 +180,15 @@ describe("built site", () => {
     expect(en).toContain("A story that is wrong is corrected or taken down.");
     expect(tr).not.toContain("İki etiket");
     expect(en).not.toContain("The two labels");
+    expect(en).toContain("Who writes the stories?");
+    expect(tr).toContain("Haberleri kim yazar?");
+    // The call to report a wrong story stays in its own section further down, not repeated here.
     for (const html of [page(DEMO, "yontem"), page(DEMO, "en/method")]) {
-      const section = html.match(/<section>(?:(?!<\/section>)[\s\S])*?(?:dil modeli yazar|written by a language model)[\s\S]*?<\/section>/);
-      expect(section).not.toBeNull();
-      expect(section![0]).toContain('href="https://github.com/ysfzkn/radar-ai-news/issues"');
+      const sections = [...html.matchAll(/<section>[\s\S]*?<\/section>/g)].map((m) => m[0]);
+      const section = sections.find((x) => /dil modeli,|written by a language model/.test(x));
+      expect(section).toBeDefined();
+      expect(section).not.toContain("<a ");
+      expect(html.match(/href="https:\/\/github.com\/ysfzkn\/radar-ai-news\/issues"/g)).toHaveLength(1);
     }
   });
 
@@ -222,6 +227,21 @@ describe("built site", () => {
     }
   });
 
+  it("an index title with a long unbroken token stays inside its column", () => {
+    // A build test cannot measure layout, so the rules that keep a long token from widening
+    // the index track are checked in the stylesheet itself.
+    const css = readFileSync(join(root, "src", "styles", "base.css"), "utf8");
+    const rule = (selector: string) => {
+      const start = css.indexOf(`\n${selector} {`);
+      expect(start, selector).toBeGreaterThan(-1);
+      return css.slice(start, css.indexOf("}", start));
+    };
+    expect(rule(".index-list li")).toContain("grid-template-columns: 2.25rem minmax(0, 1fr);");
+    expect(rule(".index-list a")).toContain("overflow-wrap: anywhere;");
+    // The hostile fixture carries a 60-character token in a title, and the page still builds.
+    expect(page(HOSTILE, "en/2026-11-19")).toContain("x".repeat(60));
+  });
+
   it("an edition with one story has no index", () => {
     const html = page(HOSTILE, "en/2026-11-19");
     expect(articles(html)).toHaveLength(1);
@@ -251,7 +271,7 @@ describe("built site", () => {
     }
   });
 
-  it("the echo meter is the mark with as many lit arcs as the level, and keeps its aria-label", () => {
+  it("the echo meter is five arcs with as many lit as the level, and keeps its aria-label", () => {
     const echo = (article: string) => article.match(/<span class="echo">([\s\S]*?)<\/svg>/)![1];
     const two = articles(page(DEMO, "")).find((a) => a.includes('id="s-5c17e263"'))!;
     const seven = articles(page(DEMO, "2026-11-18")).find((a) => a.includes('id="s-07c29d1e"'))!;
@@ -260,45 +280,55 @@ describe("built site", () => {
       [seven, 5, "5 üzerinden 5: 7 bağımsız kaynak"],
     ] as const) {
       const svg = echo(article);
-      expect(svg).toMatch(/<svg class="mark" viewBox="0 0 24 24" width="22" height="22" role="img" aria-label="([^"]*)"/);
+      expect(svg).toMatch(/<svg class="echo-arcs" viewBox="0 0 44 14" width="44" height="14" role="img" aria-label="([^"]*)"/);
       expect(svg).toContain(`aria-label="${label}"`);
-      expect(svg.match(/class="mark-on"/g) ?? []).toHaveLength(on);
-      expect(svg.match(/class="mark-off"/g) ?? []).toHaveLength(5 - on);
-      expect(svg.match(/<circle class="mark-dot"/g)).toHaveLength(1);
+      expect(svg.match(/class="echo-on"/g) ?? []).toHaveLength(on);
+      expect(svg.match(/class="echo-off"/g) ?? []).toHaveLength(5 - on);
+      for (const x of [2, 10.5, 19, 27.5, 36]) expect(svg).toContain(`d="M${x} 1.5A8.5 8.5 0 0 1 ${x} 12.5"`);
+      expect(svg).not.toContain("mark");
     }
     expect(text(two)).toContain("2 kaynak");
     expect(text(seven)).toContain("7 kaynak");
   });
 
   it("the mark, the echo meter and the favicon carry no colour in attributes except the favicon", () => {
-    const arcs = [5, 8.5, 12, 15.5, 19].map((r) => `d="M4 ${20 - r}A${r} ${r} 0 0 1 ${4 + r} 20"`);
+    // The mark is a radar screen: a ring, a sweep and a blip, and nothing else.
+    const ring = '<circle class="mark-ring" cx="12" cy="12" r="9.25"></circle>';
+    const sweep = '<line class="mark-sweep" x1="12" y1="12" x2="18.54" y2="5.46"></line>';
+    const blip = '<circle class="mark-blip" cx="7.75" cy="14.25" r="1.9"></circle>';
     let marks = 0;
+    let meters = 0;
     for (const file of [DEMO, REAL].flatMap(htmlFiles)) {
       const html = readFileSync(file, "utf8");
       for (const [svg] of html.matchAll(/<svg[\s\S]*?<\/svg>/g)) {
-        expect(svg, file).toMatch(/^<svg class="mark" viewBox="0 0 24 24"/);
         expect(svg, file).not.toMatch(/\s(fill|stroke|color|stop-color)="/);
         expect(svg, file).not.toMatch(/#[0-9a-f]{3,8}\b|rgb\(/i);
-        for (const arc of arcs) expect(svg, file).toContain(arc);
-        marks++;
+        if (svg.startsWith('<svg class="mark" viewBox="0 0 24 24"')) {
+          const inner = svg.slice(svg.indexOf(">") + 1, -"</svg>".length);
+          expect(inner, file).toBe(ring + sweep + blip);
+          marks++;
+        } else {
+          expect(svg, file).toMatch(/^<svg class="echo-arcs" viewBox="0 0 44 14"/);
+          meters++;
+        }
       }
     }
-    expect(marks).toBeGreaterThan(50);
-    // The top strip's mark has three lit arcs and is hidden from screen readers.
+    expect(marks).toBeGreaterThan(20);
+    expect(meters).toBeGreaterThan(50);
+    // Before the wordmark: 20 px, hidden from screen readers.
     const strip = page(DEMO, "").match(/<a class="wordmark"[\s\S]*?<\/svg>/)![0];
-    expect(strip).toMatch(/aria-hidden="true"/);
-    expect(strip.match(/class="mark-on"/g)).toHaveLength(3);
-    // The end of an edition: all five lit, 28 px.
+    expect(strip).toMatch(/<svg class="mark" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">/);
+    // The end of an edition: 28 px.
     const end = page(DEMO, "").match(/<div class="closed">[\s\S]*?<\/svg>/)![0];
-    expect(end).toMatch(/width="28" height="28"/);
-    expect(end.match(/class="mark-on"/g)).toHaveLength(5);
+    expect(end).toMatch(/<svg class="mark" viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">/);
     // The favicon is a standalone file with no stylesheet, so its colours are the table's hex values.
     const favicon = readFileSync(join(DEMO, "favicon.svg"), "utf8");
-    for (const arc of arcs) expect(favicon).toContain(arc);
-    expect(favicon).toContain('stroke="#c2371a"');
-    expect(favicon).toContain('stroke="#83868c"');
-    expect(favicon).toContain('fill="#c2371a"');
-    expect(favicon).not.toMatch(/class=|<style/);
+    expect(favicon).toContain('<circle cx="12" cy="12" r="9.25" fill="none" stroke="#17181a" stroke-width="1.75"/>');
+    expect(favicon).toContain(
+      '<line x1="12" y1="12" x2="18.54" y2="5.46" stroke="#c2371a" stroke-width="1.75" stroke-linecap="round"/>',
+    );
+    expect(favicon).toContain('<circle cx="7.75" cy="14.25" r="1.9" fill="#c2371a"/>');
+    expect(favicon).not.toMatch(/class=|<style|<path/);
   });
 
   it("the end of an edition closes it and points to the neighbouring issues", () => {
