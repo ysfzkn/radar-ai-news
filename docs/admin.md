@@ -18,15 +18,25 @@ It does not store: the fetched source articles, the agent's prompts or model out
 | Save and approve ("Kaydet ve onayla") | `review` | `published` | Saves the form's text if it differs from the stored story, then approves. Every text must be within the publish limits and the "I checked the source" box ("Kaynağı kontrol ettim") must be ticked. Refused, and the story expired, if it is 72 hours old or more. |
 | Reject | `review` | `rejected` | |
 | Unpublish | `published` | `rejected` | A note is required. |
+| Restore ("Geri al: kuyruğa döndür") | `rejected` | `review` | Undoes a rejection or a take-down. Needs the story's current version. Refused once the story's 72 hours have passed; the story then stays rejected and the page says why. Recorded in the history as "Kuyruğa döndürüldü" with who did it. |
 | Expire | `review` aged 72 hours or more | `expired` | Hourly, and whenever the queue is opened. |
 
 The 72 hours run from the moment the agent wrote the story, not from its arrival here, so a story that was pushed late arrives with less time left for review.
 
-`rejected` and `expired` are final. Publish limits: title 90, summary 320, story line ("Neden önemli") 200 characters. The agent may send longer text (up to 300, 1000 and 600); a story over the publish limits must be shortened by hand before it can be approved.
+`expired` is final, and so is `rejected` once its 72 hours have passed. A restored story keeps its original deadline. Publish limits: title 90, summary 320, story line ("Neden önemli") 200 characters. The agent may send longer text (up to 300, 1000 and 600); a story over the publish limits must be shortened by hand before it can be approved.
 
 Save and approve is two guarded steps: first the edit is saved (and the story marked as edited), then the story is approved. If the second step is refused, for example because a text is over the publish limit, the edit stays saved and the story stays in review; the screen says so, and you can shorten the text and try again. If the form has not changed anything, nothing is saved and the stored text is approved. Approve never saves anything on a story that is not in review. Human edits are not re-checked by the fact check: the verifier ran on the agent's text only.
 
 ## The review screen
+
+- **Next story after a decision.** After an approval (also "Kaydet ve onayla") or a rejection, the screen opens the next story waiting in the queue, in queue order, and says what happened ("Onaylandı. Sıradaki haber." or "Reddedildi. Sıradaki haber."). After the last one in the queue it goes back to the first one you skipped; when nothing waits, it shows the queue with "Hepsi tamam." (all done). The next story ignores any search you had typed.
+- **Where you are.** A story page shows its place in its list ("3 / 7") with "← Önceki" and "Sonraki →" links. Opened from today's edition, it steps through the edition instead.
+- **Search and categories.** The queue has a search box over the Turkish and English titles and a row of category chips. Every word you type must appear in the same title; upper and lower case match only for plain Latin letters (not ç, ğ, ı, İ, ö, ş, ü). The address carries `q` and `cat`, the tabs and page links keep them, and "Temizle" clears them. The search works without scripts.
+- **Status strip.** Over the waiting list: how many stories wait, how many were published today (Istanbul day), how long the oldest has waited, and how long until the next one expires (in the warning colour under 6 hours). A waiting story with under 6 hours left has the warning colour on its card's edge too.
+- **Today's edition ("Bugün" tab, `/admin/edition`).** The stories published today in the order the site shows them (newest first), each with its time, category and a "Yayından kaldır…" disclosure holding the take-down form (a reason is still required). After a take-down from here you come back to the edition.
+- **Keyboard.** `j` and `k` move down and up the list and `Enter` opens the selected story; on a story `n` and `p` go to the next and previous story, `a` moves to the approve button and `r` to the rejection note; `?` opens the list of shortcuts ("Klavye: ?" at the bottom of the page). Keys do nothing while you type in a field or hold Ctrl, Cmd or Alt, and no key approves or rejects by itself: you still press the button.
+- **On a phone** (640 px wide or less) the tabs and category chips scroll sideways, and the approve bar is fixed to the bottom of the screen with large buttons; the page leaves room under it so it never covers the last field.
+- **Field counters.** Every edit field, the try link and the notes show a live count against their limit, counted as the server counts (spaces at the ends left out), in red when over. Nothing is blocked by the page: the server decides.
 
 - **Reasons are readable.** The agent writes the reasons it sent a story to review as short English strings. Where their shape is known (a risk flag, a text that is too long, a check on a named field) the screen shows them in Turkish, with a label for the kind of reason. Anything else is shown exactly as written and marked as English.
 - **The source link.** The link to the story's main source sits in the action bar next to the buttons, so you can open it while deciding.
@@ -47,7 +57,7 @@ It fails closed. If sign-in is not configured, the answer is 503, not an open pa
 
 Every `POST` must also carry an `Origin` header equal to the request's own origin, otherwise it is refused with 403. Admin pages are sent with `Referrer-Policy: same-origin`: with `no-referrer`, browsers send `Origin: null` on form posts and every click would be refused. A `POST` with `Origin: null` is still refused.
 
-The screen is light only: there is no dark theme and no theme switch. It works with scripts off; the script only adds the live counters, the unsaved-changes notice, the live preview and the save key. Lists show 50 stories per page, with "Sonraki sayfa" (next page) and "Önceki sayfa" (previous page) links; the address takes `?page=N`.
+The screen is light only: there is no dark theme and no theme switch. It works with scripts off; the script only adds the live counters, the keyboard shortcuts, the unsaved-changes notice, the live preview and the save key. Lists show 50 stories per page, with "Sonraki sayfa" (next page) and "Önceki sayfa" (previous page) links; the address takes `?page=N`.
 
 ## Public read endpoint
 
@@ -137,6 +147,8 @@ If the Worker still refuses a story (for example an empty or over-long text, or 
 To see an approved story on the site, build the site against this server; see [site.md](site.md#against-a-local-admin-service).
 
 Checks: `npm run typecheck` and `npm test` in `admin/`.
+
+After pulling a change that adds a file under `admin/migrations/` (for example `0002_restored_event.sql`, which lets the history record a restore), run `npm run db:migrate:local` again; it applies only the new files and keeps your data. Until then, "Geri al" fails on the local database.
 
 ## Deploy
 
