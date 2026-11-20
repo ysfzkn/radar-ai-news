@@ -232,7 +232,15 @@ app.post("/admin/stories/:uid/approve", async (c) => {
   const form = await readForm(c.req.raw);
   if (!form) return badRequest(c);
   const draft = form.has("tr_title") ? draftOf(form) : undefined;
-  if (form.text("checked") !== "on") return storyPage(c, uid, 400, COPY.mustCheck, draft);
+  if (form.text("checked") !== "on") {
+    // A stale form is a conflict first: re-rendering it with the current version would let the
+    // next click save its old text over the newer one.
+    if (draft) {
+      const current = await getStory(c.env.DB, uid);
+      if (current && current.version !== form.version) return conflictPage(c, uid, draft, ["review"]);
+    }
+    return storyPage(c, uid, 400, COPY.mustCheck, draft);
+  }
   const actor = c.get("identity").email;
   let version = form.version;
   let saved = false;

@@ -618,6 +618,43 @@ describe("save and approve", () => {
     expect(s.texts.tr.title).toBe("A2UI 1.0 aday sürümü yayında");
   });
 
+  it("a stale save-and-approve without the checkbox on a story edited meanwhile is a conflict that keeps the typed text", async () => {
+    const uid = await seed();
+    const stale = { ...(await storedFields(uid)), tr_title: "Bayat başlık" };
+    // Edited in another tab first.
+    expect((await post(`/admin/stories/${uid}/edit`, editFields(1))).status).toBe(303);
+    const res = await post(`/admin/stories/${uid}/approve`, stale);
+    expect(res.status).toBe(409);
+    const body = await res.text();
+    expect(body).toContain(COPY.conflictKept);
+    expect(body).not.toContain(COPY.mustCheck);
+    expect(body).toMatch(/<textarea id="tr_title"[^>]*>Bayat başlık<\/textarea>/);
+    expect(body).toContain('name="version" value="2"');
+    const s = (await getStory(env.DB, uid))!;
+    expect(s).toMatchObject({ status: "review", version: 2, edited: true });
+    expect(s.texts.tr.title).toBe("Yeni başlık");
+    expect(actionsOf(s)).toEqual(["ingested", "edited"]);
+  });
+
+  it("a stale save-and-approve without the checkbox on a story approved meanwhile shows the plain conflict and the stored text", async () => {
+    const uid = await seed();
+    const stale = { ...(await storedFields(uid)), tr_title: "Bayat başlık" };
+    // Approved in another tab first.
+    expect((await post(`/admin/stories/${uid}/approve`, { version: "1", checked: "on" })).status).toBe(303);
+    const res = await post(`/admin/stories/${uid}/approve`, stale);
+    expect(res.status).toBe(409);
+    const body = await res.text();
+    expect(body).toContain(COPY.failures.conflict);
+    expect(body).not.toContain(COPY.conflictKept);
+    expect(body).not.toContain(COPY.mustCheck);
+    expect(body).not.toContain("Bayat başlık");
+    expect(body).toMatch(/<textarea id="tr_title"[^>]*>A2UI 1\.0 aday sürümü yayında<\/textarea>/);
+    const s = (await getStory(env.DB, uid))!;
+    expect(s).toMatchObject({ status: "published", version: 2, edited: false });
+    expect(s.texts.tr.title).toBe("A2UI 1.0 aday sürümü yayında");
+    expect(actionsOf(s)).toEqual(["ingested", "approved"]);
+  });
+
   it("approve with a changed title on a published story answers 409 and saves nothing", async () => {
     const uid = await seed({ status: "published" });
     const before = (await getStory(env.DB, uid))!;
