@@ -14,11 +14,12 @@ on:
         type: string
         default: ""
 
-# Read-only by default; the job below raises this for its one push step.
+# Read-only by default. Only the push job, which runs git and two first-party actions
+# and nothing else, gets write access.
 permissions:
   contents: read
 
-# Two runs never overlap; a second one waits for the first.
+# Two runs never overlap; a second one waits for the first. This covers both jobs.
 concurrency:
   group: radar-daily
   cancel-in-progress: false
@@ -28,10 +29,12 @@ jobs:
     if: vars.RADAR_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # Write access is for the state branch only. The token is handed to the push step
-    # alone; checkout does not keep it, so uv and the agent never see it.
+    # This job runs uv, the dependencies and the agent, so its token can only read. The
+    # encrypted state file leaves it as an artifact for the push job below.
     permissions:
-      contents: write
+      contents: read
+    outputs:
+      packed: ${{ steps.save.outputs.packed }}
     defaults:
       run:
         working-directory: agent
@@ -115,10 +118,38 @@ jobs:
           uv run radar state save --db "$RADAR_DB_PATH" --file "$RUNNER_TEMP/state.bin"
           echo "packed=true" >> "$GITHUB_OUTPUT"
 
-      # The only step that holds the write token, and it runs git alone.
+      # Hands the encrypted file to the push job (it is public on the branch anyway).
+      - name: Hand over the state file
+        if: always() && steps.save.outputs.packed == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: radar-state
+          path: ${{ runner.temp }}/state.bin
+          if-no-files-found: error
+          retention-days: 1
+
+  # The only job with write access. It runs no uv, no dependency and no agent code: a
+  # checkout without credentials, the artifact download, and git. always(): the state
+  # must still be pushed when the run step failed after the save step produced it.
+  push:
+    needs: daily
+    if: always() && vars.RADAR_ENABLED == 'true' && needs.daily.outputs.packed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: radar-state
+          path: ${{ runner.temp }}/state
+
       - name: Push state
         id: push
-        if: always() && steps.save.outputs.packed == 'true'
         env:
           PUSH_TOKEN: ${{ github.token }}
           GIT_AUTHOR_NAME: github-actions[bot]
@@ -127,14 +158,14 @@ jobs:
           GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
         run: |
           # A single parentless commit holding one file.
-          cd "$GITHUB_WORKSPACE"
-          blob=$(git hash-object -w --no-filters "$RUNNER_TEMP/state.bin")
+          blob=$(git hash-object -w --no-filters "$RUNNER_TEMP/state/state.bin")
           tree=$(printf '100644 blob %s\tstate.bin\n' "$blob" | git mktree)
           commit=$(git commit-tree "$tree" -m state)
           # The token reaches this one push through git's environment, as the header
           # actions/checkout would otherwise store: it is not written to .git/config,
-          # not on a command line and never printed.
+          # not on a command line and never printed. Its base64 form is masked too.
           auth=$(printf 'x-access-token:%s' "$PUSH_TOKEN" | base64 -w0)
+          echo "::add-mask::$auth"
           GIT_CONFIG_COUNT=1 \
             GIT_CONFIG_KEY_0="http.$GITHUB_SERVER_URL/.extraheader" \
             GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $auth" \
