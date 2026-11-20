@@ -20,10 +20,12 @@ function readStories(path: string): PublicStory[] {
 }
 
 /**
- * Where the build gets its stories: RADAR_STORIES_FILE, then the file the fetch
- * script wrote, then the demo fixture. Whatever is read is always validated.
+ * Where the build gets its stories: the demo fixture when RADAR_DEMO is "1", else
+ * RADAR_STORIES_FILE, then the file the fetch script wrote, then the demo fixture.
+ * Whatever is read is always validated.
  */
 export function loadData(): SiteData {
+  if (process.env.RADAR_DEMO === "1") return { stories: readStories(fixtureFile), demo: true };
   const override = process.env.RADAR_STORIES_FILE;
   if (override) return { stories: readStories(override), demo: false };
   if (existsSync(fetchedFile)) return { stories: readStories(fetchedFile), demo: false };
