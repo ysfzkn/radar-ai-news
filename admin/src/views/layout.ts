@@ -38,7 +38,9 @@ export function hostOf(url: string): string | null {
   return isHttpUrl(url) ? new URL(url).hostname : null;
 }
 
-export const categoryLabel = (value: string): string => COPY.categories[value] ?? value;
+// Own keys only: a hand-crafted value such as "constructor" is shown as itself.
+export const categoryLabel = (value: string): string =>
+  Object.hasOwn(COPY.categories, value) ? COPY.categories[value]! : value;
 
 // An outbound link when the URL is http(s); otherwise the text alone.
 export function externalLink(url: string, label: string = url): View {

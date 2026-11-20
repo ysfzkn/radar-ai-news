@@ -5,7 +5,7 @@ import { COPY } from "../src/copy";
 import { app } from "../src/index";
 import type { IngestStory } from "../src/schema";
 import { getStory, insertStories, rejectStory } from "../src/stories";
-import { layout } from "../src/views/layout";
+import { categoryLabel, layout } from "../src/views/layout";
 import { html } from "hono/html";
 
 const HOUR = 3600_000;
@@ -978,8 +978,13 @@ describe("feedback and foresight", () => {
           expect(preview).toContain(`id="pv_${lang}_${f}">${s.texts[lang][f]}</`);
       }
       expect(preview).toContain('<div class="pv-story" lang="en">');
-      expect(preview).toContain(`>${COPY.previewDev.tr}</p>`);
-      expect(preview).toContain(`>${COPY.previewDev.en}</p>`);
+      // The story line as the site draws it: one paragraph led by an inline pill, then the text.
+      for (const lang of ["tr", "en"] as const) {
+        expect(preview).toContain(
+          `<p class="pv-why"><span class="pv-why-label">${COPY.previewDev[lang]}</span> <span id="pv_${lang}_dev_line">${s.texts[lang].dev_line}</span></p>`,
+        );
+      }
+      expect(preview).not.toContain("pv-dev");
       expect(COPY.previewDev).toEqual({ tr: "Neden önemli", en: "Why it matters" });
       expect(preview.indexOf('id="pv_tr_title"')).toBeLessThan(preview.indexOf('id="pv_en_title"'));
       // Directly under the reasons, above the fact card.
@@ -1068,7 +1073,25 @@ describe("feedback and foresight", () => {
     const css = await (await get("/admin/app.css")).text();
     expect(css).toMatch(/\.story-side \{[^}]*scrollbar-width: thin;[^}]*scrollbar-color: var\(--control-border\) transparent;/);
     expect(css).toMatch(/\.notice\.done \{[^}]*background: var\(--ok-soft\);[^}]*color: var\(--ok\);/);
-    expect(css).toMatch(/\.pv-dev \{[^}]*border-left: 3px solid var\(--accent\)/);
+    expect(css).not.toContain(".pv-dev");
+    const rule = (selector: string) => css.match(new RegExp(`\\n${selector.replace(/\./g, "\\.")} \\{([^}]*)\\}`))![1];
+    // The pill: ink with the page colour (16.6:1), fully rounded, the label size; inline.
+    const pill = rule(".pv-why-label");
+    for (const d of [
+      "background: var(--ink);",
+      "color: var(--bg);",
+      "border-radius: 999px;",
+      "padding: 0.125rem 0.5rem;",
+      "font-size: 0.75rem;",
+      "letter-spacing: 0.04em;",
+      "text-transform: uppercase;",
+    ])
+      expect(pill).toContain(d);
+    expect(pill).not.toMatch(/display:/);
+    // The line itself: the text at 1rem, no box.
+    const line = rule(".pv-why");
+    expect(line).toContain("font-size: 1rem;");
+    expect(line).not.toMatch(/border|background/);
     expect(css).toMatch(/\.pv-title \{[^}]*font-size: 1\.125rem;[^}]*font-weight: 700;/);
     expect(css).not.toContain("box-shadow");
   });
@@ -1119,4 +1142,105 @@ describe("feedback and foresight", () => {
     expect(side).toContain('id="preview-h"');
     expect(body.indexOf('<section class="danger-card"')).toBeGreaterThan(body.indexOf('id="story-form"'));
   });
+
+  it("a category label never comes from the prototype", () => {
+    expect(categoryLabel("security")).toBe("Güvenlik");
+    for (const value of ["constructor", "toString", "__proto__", "hasOwnProperty"]) expect(categoryLabel(value)).toBe(value);
+  });
+
+  it("the script drops the done parameter from the address once the page has loaded", async () => {
+    const js = await (await get("/admin/app.js")).text();
+    expect(js).toContain("history.replaceState");
+    // Before the queue page's early return, so it runs on every page.
+    expect(js.indexOf("replaceState")).toBeLessThan(js.indexOf("if (!form) return;"));
+    const cases: [string, string | null][] = [
+      ["/admin?done=approved", "/admin"],
+      ["/admin?status=review&done=rejected", "/admin?status=review"],
+      ["/admin/stories/abc?done=saved#story-form", "/admin/stories/abc#story-form"],
+      ["/admin?status=published", null],
+    ];
+    for (const [address, expected] of cases) {
+      const page = runScript(js, address);
+      expect(page.replaced, address).toEqual(expected === null ? [] : [expected]);
+    }
+  });
+
+  it("the save key submits once until the page is shown again, and only as plain Ctrl+S or Cmd+S", async () => {
+    const js = await (await get("/admin/app.js")).text();
+    expect(js).toContain("!event.altKey && !event.shiftKey");
+    expect(js).toContain('addEventListener("pageshow"');
+    const page = runScript(js, "/admin/stories/abc", { form: true });
+    const key = (extra: Record<string, boolean> = {}) => page.key({ key: "s", ctrlKey: true, ...extra });
+    key();
+    expect(page.submits).toBe(1);
+    key();
+    key({ metaKey: true, ctrlKey: false });
+    expect(page.submits).toBe(1);
+    // Restored from the back/forward cache: the key works again.
+    page.fire("pageshow");
+    key({ metaKey: true, ctrlKey: false });
+    expect(page.submits).toBe(2);
+    page.fire("pageshow");
+    key({ altKey: true });
+    key({ shiftKey: true });
+    expect(page.submits).toBe(2);
+    // Every plain save key is taken from the browser, sent or not; the modified ones are left alone.
+    expect(page.prevented).toBe(4);
+  });
 });
+
+interface ScriptPage {
+  replaced: string[];
+  submits: number;
+  prevented: number;
+  key(init: Record<string, unknown>): void;
+  fire(type: string): void;
+}
+
+// Runs app.js against a small stand-in for the browser: the address, history, and with `form`
+// a story form whose save button submits it (firing the form's submit listeners, as a browser does).
+function runScript(js: string, address: string, opts: { form?: boolean } = {}): ScriptPage {
+  const url = new URL(address, ORIGIN);
+  const listeners: Record<string, ((event: any) => void)[]> = {};
+  const on = (type: string, fn: (event: any) => void) => (listeners[type] ??= []).push(fn);
+  const page: ScriptPage = {
+    replaced: [],
+    submits: 0,
+    prevented: 0,
+    key: (init) => {
+      const event = { target: null, repeat: false, altKey: false, shiftKey: false, ctrlKey: false, metaKey: false, ...init, preventDefault: () => page.prevented++ };
+      for (const fn of listeners.keydown ?? []) fn(event);
+    },
+    fire: (type) => {
+      for (const fn of listeners[type] ?? []) fn({ persisted: true });
+    },
+  };
+  const formListeners: Record<string, (() => void)[]> = {};
+  const form = {
+    elements: [],
+    querySelector: () => null,
+    querySelectorAll: () => [],
+    hasAttribute: () => false,
+    addEventListener: (type: string, fn: () => void) => (formListeners[type] ??= []).push(fn),
+    requestSubmit: () => {
+      page.submits++;
+      for (const fn of formListeners.submit ?? []) fn();
+    },
+  };
+  const save = { click: () => form.requestSubmit() };
+  const ids: Record<string, unknown> = opts.form ? { "story-form": form, "save-button": save } : {};
+  const document = {
+    addEventListener: on,
+    querySelectorAll: () => [],
+    getElementById: (id: string) => ids[id] ?? null,
+  };
+  const window = {
+    location: { pathname: url.pathname, search: url.search, hash: url.hash },
+    history: { state: null, replaceState: (_state: unknown, _title: string, next: string) => page.replaced.push(next) },
+    addEventListener: on,
+    removeEventListener: () => {},
+  };
+  new Function("document", "window", "history", "location", js)(document, window, window.history, window.location);
+  for (const fn of listeners.DOMContentLoaded ?? []) fn({});
+  return page;
+}

@@ -73,10 +73,7 @@ function preview(d: Draft): View {
 <p class="pv-meta"><span class="pv-tag" id="pv_${lang}_category"${en ? html` lang="tr"` : ""}>${categoryLabel(d.category)}</span></p>
 <p class="pv-title" id="pv_${lang}_title">${t.title}</p>
 <p class="pv-summary" id="pv_${lang}_summary">${t.summary}</p>
-<div class="pv-dev">
-<p class="pv-dev-label">${COPY.previewDev[lang]}</p>
-<p id="pv_${lang}_dev_line">${t.dev_line}</p>
-</div>
+<p class="pv-why"><span class="pv-why-label">${COPY.previewDev[lang]}</span> <span id="pv_${lang}_dev_line">${t.dev_line}</span></p>
 </div>`;
   };
   return html`<section class="panel preview" aria-labelledby="preview-h">

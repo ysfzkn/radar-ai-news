@@ -203,11 +203,13 @@ main > section { margin-top: var(--space-6); }
 }
 .pv-title { margin-bottom: var(--space-2); font-size: 1.125rem; font-weight: 700; line-height: 1.3; }
 .pv-summary { margin-bottom: var(--space-3); font-size: var(--text-sm); }
-.pv-dev {
-  padding: var(--space-3); font-size: var(--text-sm);
-  background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--accent);
+/* The story line as the site draws it: an inline ink pill (16.6:1), then the text; no box. */
+.pv-why { font-size: 1rem; }
+.pv-why-label {
+  margin-right: 0.125rem; padding: 0.125rem 0.5rem; border-radius: 999px;
+  background: var(--ink); color: var(--bg); font-size: 0.75rem; font-weight: 600;
+  letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap;
 }
-.pv-dev-label { margin-bottom: var(--space-1); color: var(--accent); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
 
 /* Forms */
 .stack > * + * { margin-top: var(--space-4); }
@@ -303,6 +305,16 @@ button:hover { border-color: var(--ink); }
 // without it; the server enforces every limit.
 export const JS = `"use strict";
 document.addEventListener("DOMContentLoaded", function () {
+  // A confirmation is shown once: the done hint leaves the address, so a refresh does not repeat it.
+  if (typeof URLSearchParams === "function" && window.history && typeof window.history.replaceState === "function") {
+    var params = new URLSearchParams(window.location.search);
+    if (params.has("done")) {
+      params.delete("done");
+      var query = params.toString();
+      window.history.replaceState(window.history.state, "", window.location.pathname + (query ? "?" + query : "") + window.location.hash);
+    }
+  }
+
   var fields = document.querySelectorAll("textarea[data-limit]");
   Array.prototype.forEach.call(fields, function (field) {
     var limit = Number(field.getAttribute("data-limit"));
@@ -349,7 +361,11 @@ document.addEventListener("DOMContentLoaded", function () {
   if (kept) setDirty(true);
   form.addEventListener("input", check);
   form.addEventListener("change", check);
-  form.addEventListener("submit", function () { kept = false; setDirty(false); });
+  // Set once the form is on its way, so the save key cannot send it a second time with the old
+  // version; cleared when the page is shown again (also from the back/forward cache).
+  var sent = false;
+  form.addEventListener("submit", function () { sent = true; kept = false; setDirty(false); });
+  window.addEventListener("pageshow", function () { sent = false; });
 
   // The preview follows the form, as text only: each part has the id "pv_" + its field's id.
   // Synced once at load too, for values the browser restored into the fields.
@@ -374,17 +390,18 @@ document.addEventListener("DOMContentLoaded", function () {
     showCategory();
   }
 
-  // Ctrl+S / Cmd+S saves through the Kaydet button, so its formaction applies.
+  // Plain Ctrl+S / Cmd+S saves through the Kaydet button, so its formaction applies.
   var save = document.getElementById("save-button");
   if (save) {
     document.addEventListener("keydown", function (event) {
-      var isSave = (event.ctrlKey || event.metaKey) && typeof event.key === "string" && event.key.toLowerCase() === "s";
+      var isSave = (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey &&
+        typeof event.key === "string" && event.key.toLowerCase() === "s";
       if (!isSave) return;
       // In a field of another form (the reject or take-down note) the key is left to the browser.
       var target = event.target;
       if (target && target.form && target.form !== form) return;
       event.preventDefault();
-      if (event.repeat) return;
+      if (event.repeat || sent) return;
       if (typeof form.requestSubmit === "function") form.requestSubmit(save);
       else save.click();
     });
