@@ -34,6 +34,28 @@ export function shortDate(date: string, lang: Lang): string {
   return `${day} ${COPY[lang].monthsShort[month]}`;
 }
 
+/**
+ * "47. hafta · 16–22 Kasım 2026" for week "2026-W47" from Monday to Sunday;
+ * both ends in full when the week crosses a month: "28 Aralık 2026 – 3 Ocak 2027".
+ */
+export function weekHeading(id: string, from: string, to: string, lang: Lang): string {
+  return `${weekName(id, lang)} · ${dateRange(from, to, lang)}`;
+}
+
+/** "2026-W07" -> "7. hafta" / "Week 7". */
+export function weekName(id: string, lang: Lang): string {
+  return COPY[lang].weekLabel(Number(id.slice(id.indexOf("W") + 1)));
+}
+
+/** "16–22 Kasım 2026", or both ends in full across a month: "28 Aralık 2026 – 3 Ocak 2027". */
+export function dateRange(from: string, to: string, lang: Lang): string {
+  const months = COPY[lang].months;
+  const a = parts(from);
+  const b = parts(to);
+  const full = (d: typeof a) => `${d.day} ${months[d.month]} ${d.year}`;
+  return a.year === b.year && a.month === b.month ? `${a.day}–${full(b)}` : `${full(a)} – ${full(b)}`;
+}
+
 /** "https://www.a2ui.org/x" -> "a2ui.org"; "" if it does not parse. */
 export function hostLabel(url: string): string {
   const candidate = /^[a-z][a-z0-9+.-]*:\/\//i.test(url) ? url : `https://${url}`;

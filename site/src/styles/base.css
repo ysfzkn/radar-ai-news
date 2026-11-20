@@ -132,6 +132,7 @@ a:hover {
 .nav {
   display: flex;
   flex-wrap: wrap;
+  margin: 0;
   padding: 0;
   list-style: none;
   color: var(--muted);
@@ -145,6 +146,14 @@ a:hover {
 
 .nav a {
   text-decoration-color: transparent;
+}
+
+/* Small label links get a taller hit area (at least 24px); inline padding leaves the layout alone. */
+.nav a,
+.foot a,
+.story-sources a,
+a.story-cat {
+  padding-block: 0.35em;
 }
 
 .nav a:hover,
@@ -337,7 +346,8 @@ a:hover {
   color: var(--muted);
 }
 
-.pager-issue {
+.pager-issue,
+.row-date {
   font-family: var(--font-display);
   font-weight: 600;
   text-decoration-line: underline;
@@ -347,8 +357,112 @@ a:hover {
   transition: text-decoration-thickness 120ms ease-out;
 }
 
-.pager a:hover .pager-issue {
+.pager a:hover .pager-issue,
+.row:hover .row-date {
   text-decoration-thickness: 2px;
+}
+
+/* Lists: the archive's editions and a topic's stories, one row each between hairlines. */
+.list {
+  padding: 0;
+  list-style: none;
+}
+
+.list > li {
+  padding-block: var(--space-4);
+}
+
+.list > li + li {
+  border-top: 1px solid var(--line);
+}
+
+.list-title {
+  font-family: var(--font-display);
+  font-size: 1.1875rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  text-wrap: pretty;
+}
+
+.month + .month {
+  margin-top: var(--space-6);
+}
+
+.month-name {
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--control-border);
+  color: var(--muted);
+  font-weight: 400;
+}
+
+/* Archive row: number | date, with the story count under the date, or at the right end from 40em. */
+.row {
+  display: grid;
+  grid-template-columns: 4.75em 1fr;
+  align-items: baseline;
+  column-gap: var(--space-4);
+  text-decoration: none;
+}
+
+.row-no {
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.row-count {
+  grid-column: 2;
+  color: var(--muted);
+}
+
+@media (min-width: 40em) {
+  .row {
+    grid-template-columns: 4.75em 1fr auto;
+  }
+
+  .row-count {
+    grid-column: auto;
+  }
+}
+
+/* The method page: plain running text. */
+.prose h2 {
+  margin-bottom: var(--space-3);
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+
+.prose section + section {
+  margin-top: var(--space-6);
+}
+
+.prose p + p,
+.prose p + ol,
+.prose ol + p {
+  margin-top: var(--space-3);
+}
+
+.steps {
+  padding-left: 1.75em;
+}
+
+.steps li::marker {
+  color: var(--accent);
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+
+.steps li + li {
+  margin-top: var(--space-1);
+}
+
+.steps strong {
+  font-weight: 650;
 }
 
 .foot {

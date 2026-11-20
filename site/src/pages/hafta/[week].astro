@@ -1,0 +1,46 @@
+---
+import Base from "../../layouts/Base.astro";
+import WeekView from "../../components/WeekView.astro";
+import { COPY } from "../../lib/copy";
+import { loadData } from "../../lib/data";
+import { buildWeeks, forLang, type Week } from "../../lib/editions";
+import { weekHeading } from "../../lib/format";
+import { routes } from "../../lib/routes";
+
+export function getStaticPaths() {
+  const stories = loadData().stories;
+  const weeks = buildWeeks(forLang(stories, "tr"));
+  const otherIds = new Set(buildWeeks(forLang(stories, "en")).map((w) => w.id));
+  // Newest first: the older neighbour is at i + 1, the newer one at i - 1.
+  return weeks.map((week, i) => ({
+    params: { week: week.id },
+    props: {
+      week,
+      previous: weeks[i + 1] ?? null,
+      next: weeks[i - 1] ?? null,
+      hasOther: otherIds.has(week.id),
+    },
+  }));
+}
+
+interface Props {
+  week: Week;
+  previous: Week | null;
+  next: Week | null;
+  hasOther: boolean;
+}
+
+const lang = "tr";
+const { week, previous, next, hasOther } = Astro.props;
+const copy = COPY[lang];
+---
+
+<Base
+  lang={lang}
+  title={`${weekHeading(week.id, week.from, week.to, lang)} · ${copy.siteName}`}
+  description={copy.weekIndexTitle}
+  path={routes[lang].week(week.id)}
+  alternate={hasOther ? routes.en.week(week.id) : null}
+>
+  <WeekView lang={lang} week={week} previous={previous} next={next} />
+</Base>

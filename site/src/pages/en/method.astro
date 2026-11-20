@@ -1,0 +1,19 @@
+---
+import Base from "../../layouts/Base.astro";
+import MethodView from "../../components/MethodView.astro";
+import { COPY } from "../../lib/copy";
+import { routes } from "../../lib/routes";
+
+const lang = "en";
+const copy = COPY[lang];
+---
+
+<Base
+  lang={lang}
+  title={`${copy.method.title} · ${copy.siteName}`}
+  description={copy.method.description}
+  path={routes[lang].method}
+  alternate={routes.tr.method}
+>
+  <MethodView lang={lang} />
+</Base>

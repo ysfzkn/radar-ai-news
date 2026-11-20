@@ -1,0 +1,23 @@
+---
+import Base from "../layouts/Base.astro";
+import { COPY } from "../lib/copy";
+import { routes } from "../lib/routes";
+
+// One page for every missing address, so it speaks both languages.
+const { tr, en } = COPY;
+---
+
+<Base
+  lang="tr"
+  title={`${tr.notFoundTitle} · ${en.notFoundTitle} · ${tr.siteName}`}
+  description={tr.tagline}
+  path="/404.html"
+  alternate={null}
+>
+  <h1 class="kunye label">
+    <span class="kunye-no">404</span>{" · "}{tr.notFoundText}{" · "}<span lang="en">{en.notFoundText}</span>
+  </h1>
+  <p class="empty">
+    <a href={routes.tr.home}>{tr.notFoundHome}</a>{" · "}<a href={routes.en.home} hreflang="en" lang="en">{en.notFoundHome}</a>
+  </p>
+</Base>

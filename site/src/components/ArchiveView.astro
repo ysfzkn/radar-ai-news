@@ -1,0 +1,59 @@
+---
+import { COPY } from "../lib/copy";
+import type { Edition } from "../lib/editions";
+import { longDate } from "../lib/format";
+import { routes } from "../lib/routes";
+import type { Lang } from "../lib/schema";
+
+interface Props {
+  lang: Lang;
+  /** Newest first. */
+  editions: Edition[];
+}
+
+const { lang, editions } = Astro.props;
+const copy = COPY[lang];
+
+// Month groups in edition order, keyed "YYYY-MM".
+const months: { key: string; name: string; editions: Edition[] }[] = [];
+for (const edition of editions) {
+  const key = edition.date.slice(0, 7);
+  const last = months.at(-1);
+  if (last?.key === key) {
+    last.editions.push(edition);
+  } else {
+    const [year, month] = key.split("-").map(Number);
+    months.push({ key, name: `${copy.months[month - 1]} ${year}`, editions: [edition] });
+  }
+}
+---
+
+<h1 class="kunye label">
+  <span class="kunye-no">{copy.archiveTitle}</span>
+  {editions.length > 0 && <>{" · "}{copy.issueCount(editions.length)}</>}
+</h1>
+
+{
+  editions.length === 0 ? (
+    <p class="empty">{copy.noEdition}</p>
+  ) : (
+    months.map((month) => (
+      <section class="month">
+        <h2 class="month-name label caps">{month.name}</h2>
+        <ol class="list" role="list">
+          {month.editions.map((edition) => (
+            <li>
+              <a class="row" href={routes[lang].edition(edition.date)}>
+                <span class="row-no">{copy.issue(edition.number)}</span>{" "}
+                <time class="row-date" datetime={edition.date}>
+                  {longDate(edition.date, lang)}
+                </time>{" "}
+                <span class="row-count label">{copy.storyCount(edition.stories.length)}</span>
+              </a>
+            </li>
+          ))}
+        </ol>
+      </section>
+    ))
+  )
+}

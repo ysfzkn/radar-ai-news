@@ -1,0 +1,38 @@
+---
+import { COPY } from "../lib/copy";
+import type { Lang } from "../lib/schema";
+
+interface Props {
+  lang: Lang;
+}
+
+const method = COPY[Astro.props.lang].method;
+---
+
+<h1 class="kunye label"><span class="kunye-no">{method.title}</span></h1>
+
+<div class="prose">
+  {
+    method.sections.map((section) => (
+      <section>
+        <h2>{section.heading}</h2>
+        {section.paragraphs.map((paragraph) => <p>{paragraph}</p>)}
+        {section.steps && (
+          <ol class="steps">
+            {section.steps.map((step) => (
+              <li>
+                <strong>{step.name}.</strong> {step.text}
+              </li>
+            ))}
+          </ol>
+        )}
+        {section.after?.map((paragraph) => <p>{paragraph}</p>)}
+        {section.link && (
+          <p>
+            <a href={section.link.href}>{section.link.text}</a>
+          </p>
+        )}
+      </section>
+    ))
+  }
+</div>

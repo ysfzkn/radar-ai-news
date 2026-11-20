@@ -1,0 +1,23 @@
+---
+import Base from "../../layouts/Base.astro";
+import WeekView from "../../components/WeekView.astro";
+import { COPY } from "../../lib/copy";
+import { loadData } from "../../lib/data";
+import { buildWeeks, forLang } from "../../lib/editions";
+import { routes } from "../../lib/routes";
+
+// The newest week, the same view as its own page.
+const lang = "tr";
+const weeks = buildWeeks(forLang(loadData().stories, lang));
+const copy = COPY[lang];
+---
+
+<Base
+  lang={lang}
+  title={`${copy.weekIndexTitle} · ${copy.siteName}`}
+  description={copy.weekIndexTitle}
+  path={routes[lang].weekIndex}
+  alternate={routes.en.weekIndex}
+>
+  <WeekView lang={lang} week={weeks[0] ?? null} previous={weeks[1] ?? null} next={null} />
+</Base>

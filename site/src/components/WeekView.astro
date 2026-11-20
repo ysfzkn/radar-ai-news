@@ -1,0 +1,65 @@
+---
+import Story from "./Story.astro";
+import { COPY } from "../lib/copy";
+import { istanbulDate, type Week } from "../lib/editions";
+import { dateRange, weekName } from "../lib/format";
+import { routes } from "../lib/routes";
+import type { Lang } from "../lib/schema";
+
+interface Props {
+  lang: Lang;
+  /** The week to show, or null when there are no stories at all. */
+  week: Week | null;
+  /** The older neighbour, or null. */
+  previous: Week | null;
+  /** The newer neighbour, or null. */
+  next: Week | null;
+}
+
+const { lang, week, previous, next } = Astro.props;
+const copy = COPY[lang];
+---
+
+{
+  week ? (
+    <>
+      <h1 class="kunye label">
+        <span class="kunye-no">{weekName(week.id, lang)}</span>
+        {" · "}
+        {dateRange(week.from, week.to, lang)}
+      </h1>
+      <ol class="stories" role="list">
+        {week.stories.map((story, i) => (
+          <li>
+            <Story lang={lang} story={story} index={i + 1} date={istanbulDate(story.published_at)} />
+          </li>
+        ))}
+      </ol>
+      {(previous || next) && (
+        <div class="end">
+          <p class="pager">
+            {previous && (
+              <a class="pager-prev" href={routes[lang].week(previous.id)} rel="prev">
+                <span class="pager-dir label caps">← {copy.previousWeek}</span>
+                <span class="pager-issue">{weekName(previous.id, lang)}</span>
+              </a>
+            )}
+            {next && (
+              <a class="pager-next" href={routes[lang].week(next.id)} rel="next">
+                <span class="pager-dir label caps">{copy.nextWeek} →</span>
+                <span class="pager-issue">{weekName(next.id, lang)}</span>
+              </a>
+            )}
+          </p>
+        </div>
+      )}
+    </>
+  ) : (
+    <>
+      <h1 class="kunye label">
+        <span class="kunye-no">{copy.weekIndexTitle}</span>
+      </h1>
+      <p class="empty">{copy.weekEmpty}</p>
+    </>
+  )
+}

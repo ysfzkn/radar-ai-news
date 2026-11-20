@@ -3,6 +3,7 @@ import Echo from "./Echo.astro";
 import { COPY } from "../lib/copy";
 import { anchorId } from "../lib/editions";
 import { hostLabel, httpUrl, shortDate } from "../lib/format";
+import { routes } from "../lib/routes";
 import type { Lang, PublicStory, Source } from "../lib/schema";
 
 interface Props {
@@ -36,7 +37,7 @@ const tryUrl = httpUrl(story.try_url);
 <article id={anchorId(story.uid)} class="story">
   <p class="story-meta label">
     <span class="story-no">{String(index).padStart(2, "0")}</span>{" "}
-    <span class="story-cat caps">{copy.categories[story.category]}</span>{" "}
+    <a class="story-cat caps" href={routes[lang].topic(story.category)}>{copy.categories[story.category]}</a>{" "}
     <time datetime={date}>{shortDate(date, lang)}</time>{" "}
     <Echo lang={lang} count={story.source_count} />
   </p>

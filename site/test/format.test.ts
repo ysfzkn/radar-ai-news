@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hostLabel, httpUrl, longDate, shortDate } from "../src/lib/format";
+import { hostLabel, httpUrl, longDate, shortDate, weekHeading } from "../src/lib/format";
 
 describe("dates", () => {
   it("formats 2026-11-20 as `20 Kasım 2026 Cuma` and `Friday, 20 November 2026`", () => {
@@ -15,6 +15,31 @@ describe("dates", () => {
   it("names a Sunday and a leap day correctly", () => {
     expect(longDate("2026-11-22", "en")).toBe("Sunday, 22 November 2026");
     expect(longDate("2028-02-29", "tr")).toBe("29 Şubat 2028 Salı");
+  });
+});
+
+describe("weekHeading", () => {
+  it("names a week inside one month as `47. hafta · 16–22 Kasım 2026` and `Week 47 · 16–22 November 2026`", () => {
+    expect(weekHeading("2026-W47", "2026-11-16", "2026-11-22", "tr")).toBe("47. hafta · 16–22 Kasım 2026");
+    expect(weekHeading("2026-W47", "2026-11-16", "2026-11-22", "en")).toBe(
+      "Week 47 · 16–22 November 2026",
+    );
+  });
+
+  it("writes both ends in full when the week spans two months or two years", () => {
+    expect(weekHeading("2026-W49", "2026-11-30", "2026-12-06", "tr")).toBe(
+      "49. hafta · 30 Kasım 2026 – 6 Aralık 2026",
+    );
+    expect(weekHeading("2026-W53", "2026-12-28", "2027-01-03", "tr")).toBe(
+      "53. hafta · 28 Aralık 2026 – 3 Ocak 2027",
+    );
+    expect(weekHeading("2026-W53", "2026-12-28", "2027-01-03", "en")).toBe(
+      "Week 53 · 28 December 2026 – 3 January 2027",
+    );
+  });
+
+  it("drops the leading zero of a single-digit week", () => {
+    expect(weekHeading("2027-W05", "2027-02-01", "2027-02-07", "en")).toBe("Week 5 · 1–7 February 2027");
   });
 });
 

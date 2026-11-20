@@ -1,0 +1,21 @@
+---
+import Base from "../layouts/Base.astro";
+import ArchiveView from "../components/ArchiveView.astro";
+import { COPY } from "../lib/copy";
+import { loadData } from "../lib/data";
+import { buildEditions, forLang } from "../lib/editions";
+import { routes } from "../lib/routes";
+
+const lang = "tr";
+const copy = COPY[lang];
+---
+
+<Base
+  lang={lang}
+  title={`${copy.archiveTitle} · ${copy.siteName}`}
+  description={copy.tagline}
+  path={routes[lang].archive}
+  alternate={routes.en.archive}
+>
+  <ArchiveView lang={lang} editions={buildEditions(forLang(loadData().stories, lang))} />
+</Base>
