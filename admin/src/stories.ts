@@ -757,22 +757,26 @@ function publicTryUrl(raw: string): string | null {
 // the first `limit` rows, which the following page starts after. A language with a blank text is
 // left out, and a story left with no language is not returned; `next` still comes from the rows
 // read, so such a story is stepped over, never repeated, and a page may hold fewer than `limit`.
+// The page query: binds are the cursor's published_at twice and uid (with a cursor), then the
+// limit. Migration 0003's index (status, published_at DESC, uid) matches its WHERE, its keyset and
+// its ORDER BY, so a page reads only its own rows, in order, with no sort.
+export const publishedPageSql = (withCursor: boolean): string =>
+  `SELECT uid, category, publish_mode, edited, source_count, source_url, sources, fact_card,
+              created_at, published_at
+         FROM stories
+        WHERE status = 'published' AND published_at IS NOT NULL
+              ${withCursor ? "AND (published_at < ? OR (published_at = ? AND uid > ?))" : ""}
+        ORDER BY published_at DESC, uid ASC
+        LIMIT ?`;
+
 export async function listPublished(
   db: D1Database,
   limit: number,
   cursor: PublicCursor | null,
 ): Promise<{ stories: PublicStory[]; next: PublicCursor | null }> {
-  const keyset = cursor ? "AND (published_at < ? OR (published_at = ? AND uid > ?))" : "";
   const binds = cursor ? [cursor.published_at, cursor.published_at, cursor.uid] : [];
   const { results } = await db
-    .prepare(
-      `SELECT uid, category, publish_mode, edited, source_count, source_url, sources, fact_card,
-              created_at, published_at
-         FROM stories
-        WHERE status = 'published' AND published_at IS NOT NULL ${keyset}
-        ORDER BY published_at DESC, uid ASC
-        LIMIT ?`,
-    )
+    .prepare(publishedPageSql(cursor !== null))
     .bind(...binds, limit + 1)
     .all<PublicRow>();
   const rows = results.slice(0, limit);

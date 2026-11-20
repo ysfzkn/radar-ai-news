@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import sample from "../fixtures/ingest-sample.json";
 import { app } from "../src/index";
 import type { IngestStory } from "../src/schema";
-import { insertStories, listPublished } from "../src/stories";
+import { insertStories, listPublished, publishedPageSql } from "../src/stories";
 
 type Json = Record<string, any>;
 
@@ -288,5 +288,24 @@ describe("GET /api/stories", () => {
     // One SELECT for the stories, then at most one batch (one query) for the texts.
     expect(calls.filter((c) => c === "batch").length).toBeLessThanOrEqual(1);
     expect(calls.filter((c) => c === "prepare").length).toBeLessThanOrEqual(2);
+  });
+});
+
+describe("the public feed's index", () => {
+  // The planner's answer for the exact statement listPublished runs, with and without a cursor.
+  const plan = async (cursor: boolean): Promise<string[]> => {
+    const binds = cursor ? ["2026-11-20T05:00:00.000Z", "2026-11-20T05:00:00.000Z", "a".repeat(32), 51] : [51];
+    const { results } = await env.DB.prepare(`EXPLAIN QUERY PLAN ${publishedPageSql(cursor)}`)
+      .bind(...binds)
+      .all<{ detail: string }>();
+    return results.map((r) => r.detail);
+  };
+
+  it("reads published rows through idx_stories_status_published in feed order, with no sort step", async () => {
+    for (const cursor of [false, true]) {
+      const details = await plan(cursor);
+      expect(details.join(" | ")).toMatch(/USING INDEX idx_stories_status_published/);
+      expect(details.join(" | ")).not.toMatch(/TEMP B-TREE/);
+    }
   });
 });

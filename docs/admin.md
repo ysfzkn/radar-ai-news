@@ -61,7 +61,7 @@ The screen is light only: there is no dark theme and no theme switch. It works w
 
 ## Public read endpoint
 
-`GET /api/stories` is public and needs no sign-in. It returns only `published` stories and only what a reader sees: no reasons, score, fact card, history or e-mail addresses. It is what the static site reads at build time. It leaves out sources without a name and any language with an empty text, and does not return a story that has no usable language left. Parameters, response shape and paging are described in [site.md](site.md#the-public-read-contract-version-1). Responses carry `Cache-Control: public, max-age=60`.
+`GET /api/stories` is public and needs no sign-in. It returns only `published` stories and only what a reader sees: no reasons, score, fact card, history or e-mail addresses. It is what the static site reads at build time. It leaves out sources without a name and any language with an empty text, and does not return a story that has no usable language left. Parameters, response shape and paging are described in [site.md](site.md#the-public-read-contract-version-1). Responses carry `Cache-Control: public, max-age=60`. Migration `0003_public_feed_index.sql` adds an index on `(status, published_at DESC, uid)`, the endpoint's filter, order and page cursor, so a call reads only the rows of its page instead of every published story; a test checks with `EXPLAIN QUERY PLAN` that the query uses it and needs no sort.
 
 ## Ingest contract (version 1)
 
