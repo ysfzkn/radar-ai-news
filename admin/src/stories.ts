@@ -75,7 +75,7 @@ export async function insertStories(
 
 export const REVIEW_TTL_HOURS = 72;
 const TTL_MS = REVIEW_TTL_HOURS * 60 * 60 * 1000;
-const NOTE_MAX = 500;
+export const NOTE_MAX = 500;
 const TEXT_FIELDS = ["title", "summary", "dev_line"] as const;
 const LANGS = ["tr", "en"] as const;
 const STATUSES: Status[] = ["review", "published", "rejected", "expired"];

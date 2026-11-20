@@ -1,7 +1,7 @@
 import { html } from "hono/html";
 import { COPY } from "../copy";
 import { CATEGORIES, PUBLISH_LIMITS, type Lang } from "../schema";
-import type { StoryFull } from "../stories";
+import { NOTE_MAX, type StoryFull } from "../stories";
 import { categoryLabel, externalLink, formatDate, storyPath, timeLeft, type View } from "./layout";
 
 type TextSet = StoryFull["texts"][Lang];
@@ -17,8 +17,8 @@ export interface Draft {
 const LANGS: readonly Lang[] = ["tr", "en"];
 const FIELDS: readonly TextField[] = ["title", "summary", "dev_line"];
 const ROWS: Record<TextField, number> = { title: 2, summary: 5, dev_line: 3 };
-const NOTE_MAX = 500;
 const BLANK: TextSet = { title: "", summary: "", dev_line: "" };
+const FORM_ID = "story-form";
 
 const textsOf = (s: StoryFull, lang: Lang): TextSet => s.texts[lang] ?? BLANK;
 
@@ -32,31 +32,43 @@ export function draftFrom(s: StoryFull): Draft {
 
 const list = (items: string[]): string => (items.length > 0 ? items.join(", ") : COPY.none);
 
-function statusLine(s: StoryFull, now: Date): View {
-  const parts: View[] = [html`<span class="status">${COPY.statusLine[s.status]}</span>`];
+// The same chip classes as the queue cards.
+const chip = (text: string, tone?: "accent" | "warn" | "ok" | "status"): View =>
+  html`<span class="${tone ? `chip ${tone}` : "chip"}">${text}</span>`;
+
+function statusChips(s: StoryFull, now: Date): View {
+  const chips: View[] = [chip(COPY.statusLine[s.status], s.status === "published" ? "ok" : "status")];
   if (s.status === "review") {
     const left = timeLeft(s.expires_at, now);
-    parts.push(html`<span class="${left.warn ? "warn" : ""}">${left.text}</span>`);
+    chips.push(chip(left.text, left.warn ? "warn" : undefined));
   } else if (s.status === "published") {
-    if (s.publish_mode) parts.push(html`<span>${COPY.publishMode[s.publish_mode]}</span>`);
-    if (s.published_at) parts.push(html`<span>${COPY.publishedAt(formatDate(s.published_at))}</span>`);
+    if (s.publish_mode) chips.push(chip(COPY.publishMode[s.publish_mode]));
+    if (s.published_at) chips.push(chip(COPY.publishedAt(formatDate(s.published_at))));
   } else if (s.decided_at) {
-    parts.push(html`<span>${COPY.decidedAt(formatDate(s.decided_at))}</span>`);
+    chips.push(chip(COPY.decidedAt(formatDate(s.decided_at))));
   }
-  parts.push(html`<span>${categoryLabel(s.category)}</span>`, html`<span>${COPY.sourceCount(s.source_count)}</span>`);
-  if (s.edited) parts.push(html`<span>${COPY.edited}</span>`);
-  return html`<p class="status-line">${parts.map((p, i) => (i === 0 ? p : html` · ${p}`))}</p>`;
+  chips.push(chip(categoryLabel(s.category)), chip(COPY.sourceCount(s.source_count)));
+  if (s.edited) chips.push(chip(COPY.edited, "accent"));
+  return html`<p class="chips">${chips}</p>`;
+}
+
+function reasons(s: StoryFull): View {
+  if (s.reasons.length === 0) return html``;
+  return html`<section class="panel reasons-panel" aria-labelledby="reasons-h">
+<h2 id="reasons-h">${COPY.reasonsHeading}</h2>
+<ul class="reasons" lang="en">${s.reasons.map((r) => html`<li>${r}</li>`)}</ul>
+</section>`;
 }
 
 function factCard(s: StoryFull): View {
   const f = s.fact_card;
-  return html`<section aria-labelledby="fact-h">
+  return html`<section class="panel" aria-labelledby="fact-h">
 <h2 id="fact-h">${COPY.factCardHeading}</h2>
 <dl class="facts">
-<dt>${COPY.fact.what}</dt><dd>${f.what || COPY.none}</dd>
-<dt>${COPY.fact.who}</dt><dd>${list(f.who)}</dd>
-<dt>${COPY.fact.numbers}</dt><dd>${list(f.numbers)}</dd>
-<dt>${COPY.fact.versions}</dt><dd>${list(f.versions)}</dd>
+<dt>${COPY.fact.what}</dt><dd lang="en">${f.what || COPY.none}</dd>
+<dt>${COPY.fact.who}</dt><dd lang="en">${list(f.who)}</dd>
+<dt>${COPY.fact.numbers}</dt><dd lang="en">${list(f.numbers)}</dd>
+<dt>${COPY.fact.versions}</dt><dd lang="en">${list(f.versions)}</dd>
 <dt>${COPY.fact.tryUrl}</dt><dd>${f.try_url ? externalLink(f.try_url) : COPY.none}</dd>
 </dl>
 </section>`;
@@ -66,7 +78,7 @@ function sources(s: StoryFull): View {
   const items = s.sources.map(
     (src) => html`<li>${externalLink(src.url, src.name || src.url)} <span class="muted">${COPY.tier(src.tier)}</span></li>`,
   );
-  return html`<section aria-labelledby="sources-h">
+  return html`<section class="panel" aria-labelledby="sources-h">
 <h2 id="sources-h">${COPY.sourcesHeading}</h2>
 <p class="main-source"><span class="muted">${COPY.mainSource}:</span> ${externalLink(s.source_url)}</p>
 <ul class="sources">${items}</ul>
@@ -86,20 +98,35 @@ function textField(lang: Lang, field: TextField, value: string): View {
 
 const versionField = (s: StoryFull) => html`<input type="hidden" name="version" value="${s.version}">`;
 
+// The buttons point at the one form; each picks its route with formaction.
+function actionBar(s: StoryFull): View {
+  const save = (cls: string) =>
+    html`<button type="submit" class="${cls}" form="${FORM_ID}" formaction="${storyPath(s.uid)}/edit">${COPY.save}</button>`;
+  if (s.status !== "review") return html`<div class="action-bar"><div class="bar-buttons">${save("primary")}</div></div>`;
+  return html`<div class="action-bar">
+<div class="check"><input type="checkbox" id="checked" name="checked" value="on"><label for="checked">${COPY.checked}</label></div>
+<div class="bar-buttons">
+${save("secondary")}
+<button type="submit" class="primary" form="${FORM_ID}" formaction="${storyPath(s.uid)}/approve" aria-describedby="approve-note">${COPY.approve}</button>
+</div>
+</div>`;
+}
+
 function editForm(s: StoryFull, d: Draft): View {
   const options = CATEGORIES.map(
     (c) => html`<option value="${c}"${c === d.category ? html` selected` : ""}>${categoryLabel(c)}</option>`,
   );
   const groups = LANGS.map(
-    (lang) => html`<fieldset class="lang-group">
+    (lang) => html`<fieldset class="panel lang-group">
 <legend>${COPY.langs[lang]}</legend>
 ${FIELDS.map((f) => textField(lang, f, d.texts[lang][f]))}
 </fieldset>`,
   );
-  return html`<section aria-labelledby="edit-h">
+  return html`<section class="edit" aria-labelledby="edit-h">
 <h2 id="edit-h">${COPY.editHeading}</h2>
-<form method="post" action="${storyPath(s.uid)}/edit" class="stack">
+<form method="post" action="${storyPath(s.uid)}/edit" id="${FORM_ID}" class="stack">
 ${versionField(s)}
+<div class="panel stack">
 <div class="field">
 <label for="category">${COPY.category}</label>
 <select id="category" name="category">${options}</select>
@@ -109,23 +136,19 @@ ${versionField(s)}
 <input id="try_url" name="try_url" type="url" inputmode="url" value="${d.try_url}" aria-describedby="try_url_hint">
 <p class="hint" id="try_url_hint">${COPY.tryUrlHint}</p>
 </div>
+</div>
 <p class="hint">${COPY.limitHint}</p>
 ${groups}
-<div class="actions"><button type="submit" class="secondary">${COPY.save}</button></div>
+${s.status === "review" ? html`<p class="hint" id="approve-note">${COPY.approveNote}</p>` : ""}
+${actionBar(s)}
 </form>
 </section>`;
 }
 
-function reviewDecision(s: StoryFull): View {
-  return html`<section aria-labelledby="decide-h" class="decide">
+function rejectCard(s: StoryFull): View {
+  return html`<section class="danger-card" aria-labelledby="decide-h">
 <h2 id="decide-h">${COPY.decisionHeading}</h2>
-<form method="post" action="${storyPath(s.uid)}/approve" class="stack">
-${versionField(s)}
-<p class="hint">${COPY.approveHint}</p>
-<div class="check"><input type="checkbox" id="checked" name="checked" value="on" required><label for="checked">${COPY.checked}</label></div>
-<div class="actions"><button type="submit" class="primary">${COPY.approve}</button></div>
-</form>
-<form method="post" action="${storyPath(s.uid)}/reject" class="stack destructive">
+<form method="post" action="${storyPath(s.uid)}/reject" class="stack">
 ${versionField(s)}
 <div class="field">
 <label for="reject_note">${COPY.rejectNote}</label>
@@ -136,10 +159,10 @@ ${versionField(s)}
 </section>`;
 }
 
-function publishedDecision(s: StoryFull): View {
-  return html`<section aria-labelledby="decide-h" class="decide">
+function takeDownCard(s: StoryFull): View {
+  return html`<section class="danger-card" aria-labelledby="decide-h">
 <h2 id="decide-h">${COPY.decisionHeading}</h2>
-<form method="post" action="${storyPath(s.uid)}/unpublish" class="stack destructive">
+<form method="post" action="${storyPath(s.uid)}/unpublish" class="stack">
 ${versionField(s)}
 <div class="field">
 <label for="unpublish_note">${COPY.unpublishNote}</label>
@@ -153,7 +176,7 @@ ${versionField(s)}
 function readOnlyTexts(s: StoryFull): View {
   const groups = LANGS.map((lang) => {
     const t = textsOf(s, lang);
-    return html`<div class="lang-group">
+    return html`<div class="panel lang-group">
 <h3>${COPY.langs[lang]}</h3>
 <dl class="texts" lang="${lang}">
 <dt lang="tr">${COPY.fields.title}</dt><dd>${t.title}</dd>
@@ -162,7 +185,7 @@ function readOnlyTexts(s: StoryFull): View {
 </dl>
 </div>`;
   });
-  return html`<section aria-labelledby="texts-h">
+  return html`<section class="stack" aria-labelledby="texts-h">
 <h2 id="texts-h">${COPY.textsHeading}</h2>
 <p class="hint">${COPY.readOnly}</p>
 ${groups}
@@ -176,29 +199,32 @@ function history(s: StoryFull): View {
 ${e.note ? html`<p class="note">${e.note}</p>` : ""}
 </li>`,
   );
-  return html`<section aria-labelledby="history-h">
+  return html`<section class="panel history-panel" aria-labelledby="history-h">
 <h2 id="history-h">${COPY.historyHeading}</h2>
 <ol class="history">${items}</ol>
 </section>`;
 }
 
+// One column below 64rem (head, reasons, fact card, sources, form, decision card, history);
+// from 64rem the side column (reasons to history) sits sticky on the right of the form.
 export function storyView(s: StoryFull, now: Date, draft: Draft = draftFrom(s)): View {
   const editable = s.status === "review" || s.status === "published";
   return html`<p class="back"><a href="/admin?status=${s.status}">${COPY.back}</a></p>
-<article>
+<article class="story">
+<div class="story-head">
 <h1 class="story-title">${textsOf(s, "tr").title}</h1>
-${statusLine(s, now)}
-${s.reasons.length > 0
-  ? html`<section aria-labelledby="reasons-h">
-<h2 id="reasons-h">${COPY.reasonsHeading}</h2>
-<ul class="reasons">${s.reasons.map((r) => html`<li>${r}</li>`)}</ul>
-</section>`
-  : ""}
+${statusChips(s, now)}
+</div>
+<div class="story-side">
+${reasons(s)}
 ${factCard(s)}
 ${sources(s)}
-${editable ? editForm(s, draft) : readOnlyTexts(s)}
-${s.status === "review" ? reviewDecision(s) : s.status === "published" ? publishedDecision(s) : ""}
 ${history(s)}
+</div>
+<div class="story-main">
+${editable ? editForm(s, draft) : readOnlyTexts(s)}
+${s.status === "review" ? rejectCard(s) : s.status === "published" ? takeDownCard(s) : ""}
+</div>
 </article>`;
 }
 

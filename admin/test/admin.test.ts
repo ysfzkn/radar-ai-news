@@ -64,6 +64,21 @@ const editFields = (version: number, change: Record<string, string> = {}): Recor
   ...change,
 });
 
+// The edit fields exactly as the stored story holds them (what an untouched form posts).
+async function storedFields(uid: string): Promise<Record<string, string>> {
+  const s = (await getStory(env.DB, uid))!;
+  const fields: Record<string, string> = {
+    version: String(s.version),
+    category: s.category,
+    try_url: s.fact_card.try_url ?? "",
+  };
+  for (const lang of ["tr", "en"] as const)
+    for (const f of ["title", "summary", "dev_line"] as const) fields[`${lang}_${f}`] = s.texts[lang][f];
+  return fields;
+}
+
+const actionsOf = (s: { events: { action: string }[] }): string[] => s.events.map((e) => e.action);
+
 describe("admin screen", () => {
   it("shows the review queue with the Turkish title, the reasons and the time left", async () => {
     await seed({ ageMs: 57.5 * HOUR });
@@ -297,7 +312,7 @@ describe("admin screen", () => {
   it("shows the review buttons and the published buttons", async () => {
     const review = await seed();
     const body = await (await get(`/admin/stories/${review}`)).text();
-    for (const s of ["Neden onay bekliyor", "Kaydet", "Onayla ve yayınla", "Kaynağı kontrol ettim", "Reddet"])
+    for (const s of ["Neden onay bekliyor", "Kaydet", "Kaydet ve onayla", "Kaynağı kontrol ettim", "Reddet"])
       expect(body).toContain(s);
     expect(body).not.toContain("Yayından kaldır");
     expect(body).toContain('lang="en"');
@@ -306,7 +321,7 @@ describe("admin screen", () => {
     const pub = await (await get(`/admin/stories/${published}`)).text();
     expect(pub).toContain("Kaydet");
     expect(pub).toContain("Yayından kaldır");
-    expect(pub).not.toContain("Onayla ve yayınla");
+    expect(pub).not.toContain("Kaydet ve onayla");
   });
 
   it("rejected and expired stories render no form", async () => {
@@ -456,5 +471,122 @@ describe("admin screen", () => {
     const body = await res.text();
     expect(body).not.toContain(COPY.notFound);
     expect(body).not.toContain("Bekleyen");
+  });
+});
+
+describe("save and approve", () => {
+  it("save-and-approve stores the typed text and publishes it", async () => {
+    const uid = await seed();
+    const fields = { ...(await storedFields(uid)), tr_title: "Elle düzeltilmiş başlık", checked: "on" };
+    const res = await post(`/admin/stories/${uid}/approve`, fields);
+    expect(res.status).toBe(303);
+    expect(res.headers.get("Location")).toBe("/admin");
+    const s = (await getStory(env.DB, uid))!;
+    expect(s).toMatchObject({ status: "published", publish_mode: "human", edited: true, version: 3 });
+    expect(s.texts.tr.title).toBe("Elle düzeltilmiş başlık");
+    expect(actionsOf(s)).toEqual(["ingested", "edited", "approved"]);
+  });
+
+  it("save-and-approve with unchanged text publishes without an edit event", async () => {
+    const uid = await seed();
+    const fields = await storedFields(uid);
+    // Surrounding spaces are not a change: the stored text is trimmed.
+    const res = await post(`/admin/stories/${uid}/approve`, {
+      ...fields,
+      tr_title: `  ${fields.tr_title}\n`,
+      checked: "on",
+    });
+    expect(res.status).toBe(303);
+    const s = (await getStory(env.DB, uid))!;
+    expect(s).toMatchObject({ status: "published", edited: false, version: 2 });
+    expect(actionsOf(s)).toEqual(["ingested", "approved"]);
+  });
+
+  it("save-and-approve without the checkbox saves nothing and keeps the typed text in the form", async () => {
+    const uid = await seed();
+    const fields = { ...(await storedFields(uid)), tr_title: "Kaydedilmemiş başlık" };
+    const res = await post(`/admin/stories/${uid}/approve`, fields);
+    expect(res.status).toBe(400);
+    const body = await res.text();
+    expect(body).toContain(COPY.mustCheck);
+    expect(body).toMatch(/<textarea id="tr_title"[^>]*>Kaydedilmemiş başlık<\/textarea>/);
+    const s = (await getStory(env.DB, uid))!;
+    expect(s).toMatchObject({ status: "review", version: 1, edited: false });
+    expect(s.texts.tr.title).toBe("A2UI 1.0 aday sürümü yayında");
+  });
+
+  it("save-and-approve with a 100-character title saves the edit, stays in review and says so", async () => {
+    const uid = await seed();
+    const long = "ç".repeat(100);
+    const res = await post(`/admin/stories/${uid}/approve`, { ...(await storedFields(uid)), tr_title: long, checked: "on" });
+    expect(res.status).toBe(400);
+    const body = await res.text();
+    expect(body).toContain(`${COPY.savedNotApproved} Yayınlamak için metin çok uzun: Türkçe başlık`);
+    expect(body).toContain("100 / 90");
+    expect(body).toContain('name="version" value="2"'); // the saved version, ready for the next try
+    const s = (await getStory(env.DB, uid))!;
+    expect(s).toMatchObject({ status: "review", version: 2, edited: true });
+    expect(s.texts.tr.title).toBe(long);
+    expect(actionsOf(s)).toEqual(["ingested", "edited"]);
+  });
+
+  it("save-and-approve with a stale version answers 409 and changes nothing", async () => {
+    const uid = await seed();
+    const fields = { ...(await storedFields(uid)), version: "7", tr_title: "Bayat başlık", checked: "on" };
+    const res = await post(`/admin/stories/${uid}/approve`, fields);
+    expect(res.status).toBe(409);
+    const body = await res.text();
+    expect(body).toContain(COPY.failures.conflict);
+    expect(body).not.toContain(COPY.savedNotApproved);
+    const s = (await getStory(env.DB, uid))!;
+    expect(s).toMatchObject({ status: "review", version: 1, edited: false });
+    expect(s.texts.tr.title).toBe("A2UI 1.0 aday sürümü yayında");
+    expect(actionsOf(s)).toEqual(["ingested"]);
+  });
+
+  it("approve without edit fields still approves the saved text", async () => {
+    const uid = await seed();
+    await post(`/admin/stories/${uid}/edit`, editFields(1));
+    const res = await post(`/admin/stories/${uid}/approve`, { version: "2", checked: "on" });
+    expect(res.status).toBe(303);
+    const s = (await getStory(env.DB, uid))!;
+    expect(s).toMatchObject({ status: "published", version: 3 });
+    expect(s.texts.tr.title).toBe("Yeni başlık");
+    expect(actionsOf(s)).toEqual(["ingested", "edited", "approved"]);
+  });
+
+  it("the save button posts to /edit and the approve button to /approve from one form", async () => {
+    const uid = await seed();
+    const body = await (await get(`/admin/stories/${uid}`)).text();
+    expect(body.match(/<form [^>]*id="story-form"/g)?.length).toBe(1);
+    const buttons = body.match(/<button [^>]*>[^<]*<\/button>/g) ?? [];
+    const save = buttons.find((b) => b.includes(`>${COPY.save}<`));
+    const approve = buttons.find((b) => b.includes(`>${COPY.approve}<`));
+    expect(save).toMatch(/form="story-form"/);
+    expect(save).toMatch(/formaction="[^"]*\/stories\/[0-9a-f]+\/edit"/);
+    expect(approve).toMatch(/form="story-form"/);
+    expect(approve).toMatch(/formaction="[^"]*\/stories\/[0-9a-f]+\/approve"/);
+    expect(approve).toMatch(/class="[^"]*primary/);
+    expect(body).toContain(COPY.approveNote);
+  });
+
+  it("the checkbox is not required in HTML", async () => {
+    const uid = await seed();
+    const body = await (await get(`/admin/stories/${uid}`)).text();
+    const form = body.slice(body.indexOf('id="story-form"'));
+    const box = form.slice(0, form.indexOf("</form>")).match(/<input [^>]*id="checked"[^>]*>/)?.[0];
+    expect(box).toBeDefined(); // inside the story form
+    expect(box).not.toContain("required");
+  });
+
+  it("a published story shows Kaydet and the take-down form but no approve button", async () => {
+    const uid = await seed({ status: "published" });
+    const body = await (await get(`/admin/stories/${uid}`)).text();
+    expect(body).toMatch(/<button [^>]*formaction="[^"]*\/edit"[^>]*>Kaydet<\/button>/);
+    expect(body).toMatch(/<form [^>]*action="[^"]*\/unpublish"/);
+    expect(body).toContain(COPY.unpublish);
+    expect(body).not.toContain(COPY.approve);
+    expect(body).not.toContain("/approve");
+    expect(body).not.toContain('id="checked"');
   });
 });
