@@ -10,6 +10,7 @@ from urllib.parse import urljoin, urlsplit
 
 import httpx
 
+from radar.fetch.common import FetchRefused, get
 from radar.models import Candidate, Cluster, SourceDoc
 from radar.text import clean_summary
 
@@ -86,8 +87,8 @@ def _links(region: str, base_url: str) -> list[str]:
 
 def _fetch(url: str, client: httpx.Client) -> str:
     try:
-        response = client.get(url)
-    except httpx.HTTPError:
+        response = get(client, url)
+    except (httpx.HTTPError, FetchRefused):
         return ""
     if not response.is_success:
         return ""

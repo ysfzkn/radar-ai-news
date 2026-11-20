@@ -6,6 +6,7 @@ import httpx
 import pytest
 
 from radar.fetch import fetch_all, make_client
+from radar.fetch.common import MAX_BYTES, FetchRefused, get, public_http_url
 from radar.fetch.feed import fetch_feed
 from radar.fetch.hn import fetch_hn
 from radar.models import Source, Tier
@@ -144,7 +145,7 @@ def test_make_client_defaults():
     with make_client() as c:
         assert c.timeout.read == 15
         assert c.headers["user-agent"] == "radar-bot/0.1 (+https://radar.ozkanyusuf.com)"
-        assert c.follow_redirects is True
+        assert c.follow_redirects is False
 
 
 @pytest.mark.parametrize(
@@ -196,3 +197,166 @@ def test_feed_skips_an_entry_with_a_relative_link(now):
     body = feed_with_links("/relative/path", "https://e.test/good")
     items = fetch_feed(s, client_for({s.url: body}), now)
     assert [i.url for i in items] == ["https://e.test/good"]
+
+
+def routed(handler) -> httpx.Client:
+    return httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True)
+
+
+def test_a_body_over_the_cap_fails_that_source_only(now):
+    a, b = src("a"), src("b")
+    big = b"x" * (6 * 1024 * 1024)
+    client = client_for({a.url: big, b.url: fixture("atom.xml")})
+    report = fetch_all([a, b], client, now)
+    assert set(report.errors) == {"a"}
+    assert report.errors["a"].startswith("FetchRefused")
+    assert len(report.items) == 2
+
+
+def test_a_declared_content_length_over_the_cap_is_refused_without_reading():
+    class Exploding(httpx.SyncByteStream):
+        def __iter__(self):
+            raise AssertionError("body was read")
+            yield b""
+
+    def handler(request):
+        return httpx.Response(
+            200, headers={"content-length": str(MAX_BYTES + 1)}, stream=Exploding()
+        )
+
+    with pytest.raises(FetchRefused):
+        get(routed(handler), "https://a.test/x")
+
+
+@pytest.mark.parametrize(
+    "target",
+    [
+        "http://169.254.169.254/latest",
+        "http://10.0.0.1/x",
+        "http://127.0.0.1/x",
+        "http://[::1]/x",
+        "http://localhost/x",
+    ],
+)
+def test_a_redirect_to_a_link_local_or_private_address_is_refused(target):
+    seen = []
+
+    def handler(request):
+        seen.append(str(request.url))
+        return httpx.Response(302, headers={"location": target})
+
+    with pytest.raises(FetchRefused):
+        get(routed(handler), "https://a.test/x")
+    assert seen == ["https://a.test/x"]
+
+
+def test_a_redirect_to_a_public_address_is_followed():
+    def handler(request):
+        if request.url.host == "a.test":
+            return httpx.Response(301, headers={"location": "https://93.184.216.34/y"})
+        return httpx.Response(200, content=b"hello")
+
+    response = get(routed(handler), "https://a.test/x")
+    assert response.content == b"hello"
+    assert response.text == "hello"
+
+
+def test_more_than_five_redirects_is_refused():
+    def handler(request):
+        n = int(request.url.path.strip("/") or 0)
+        return httpx.Response(302, headers={"location": f"/{n + 1}"})
+
+    with pytest.raises(FetchRefused):
+        get(routed(handler), "https://a.test/0")
+
+
+def test_five_redirects_are_followed():
+    def handler(request):
+        n = int(request.url.path.strip("/") or 0)
+        if n < 5:
+            return httpx.Response(302, headers={"location": f"/{n + 1}"})
+        return httpx.Response(200, content=b"done")
+
+    assert get(routed(handler), "https://a.test/0").content == b"done"
+
+
+def test_a_relative_location_is_resolved_against_the_current_url():
+    seen = []
+
+    def handler(request):
+        seen.append(str(request.url))
+        if request.url.path == "/dir/start":
+            return httpx.Response(302, headers={"location": "next"})
+        return httpx.Response(200, content=b"ok")
+
+    get(routed(handler), "https://a.test/dir/start")
+    assert seen == ["https://a.test/dir/start", "https://a.test/dir/next"]
+
+
+def test_a_refused_start_url_is_never_sent():
+    def handler(request):
+        raise AssertionError("sent")
+
+    with pytest.raises(FetchRefused):
+        get(routed(handler), "http://127.0.0.1/x")
+
+
+def test_json_and_error_status_behave_as_before():
+    def handler(request):
+        if request.url.path == "/bad":
+            return httpx.Response(503, content=b"down")
+        return httpx.Response(200, json={"hits": []}, headers={"content-encoding": "identity"})
+
+    client = routed(handler)
+    assert get(client, "https://a.test/ok").json() == {"hits": []}
+    with pytest.raises(httpx.HTTPStatusError):
+        get(client, "https://a.test/bad").raise_for_status()
+
+
+@pytest.mark.parametrize(
+    ("url", "ok"),
+    [
+        ("ftp://example.com/x", False),
+        ("file:///etc/passwd", False),
+        ("https:///nohost", False),
+        ("not a url", False),
+        ("http://0.0.0.0/", False),
+        ("http://127.0.0.1/", False),
+        ("http://10.1.2.3/", False),
+        ("http://172.16.0.1/", False),
+        ("http://192.168.1.1/", False),
+        ("http://169.254.169.254/", False),
+        ("http://[::1]/", False),
+        ("http://[fe80::1]/", False),
+        ("http://[fc00::1]/", False),
+        ("http://[ff02::1]/", False),
+        ("http://[::ffff:10.0.0.1]/", False),
+        ("http://224.0.0.1/", False),
+        ("http://localhost/", False),
+        ("http://app.localhost/", False),
+        ("http://printer.local/", False),
+        ("http://db.internal/", False),
+        ("https://example.com/x", True),
+        ("http://93.184.216.34/", True),
+        ("http://[::ffff:93.184.216.34]/", True),
+        ("https://[2606:2800:220:1:248:1893:25c8:1946]/", True),
+    ],
+)
+def test_public_http_url(url, ok):
+    assert public_http_url(url) is ok
+
+
+def test_existing_fetch_behaviour_is_unchanged_for_a_normal_feed(now):
+    s = src("a")
+    gz_free = fixture("atom.xml")
+    items = fetch_feed(s, client_for({s.url: gz_free}), now)
+    assert len(items) == 2
+
+
+def test_the_article_page_fetch_is_guarded_too():
+    from radar.source import _fetch
+
+    def handler(request):
+        return httpx.Response(302, headers={"location": "http://10.0.0.1/x"})
+
+    assert _fetch("https://a.test/x", routed(handler)) == ""

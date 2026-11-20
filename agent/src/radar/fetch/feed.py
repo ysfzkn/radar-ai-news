@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 import feedparser
 import httpx
 
-from radar.fetch.common import limit_items, safe_canonical
+from radar.fetch.common import get, limit_items, safe_canonical
 from radar.models import RawItem, Source
 from radar.text import clean_summary
 
@@ -19,7 +19,7 @@ def _published(entry, now: datetime) -> datetime:
 
 
 def fetch_feed(source: Source, client: httpx.Client, now: datetime) -> list[RawItem]:
-    response = client.get(source.url)
+    response = get(client, source.url)
     response.raise_for_status()
     parsed = feedparser.parse(response.content)
     items = []
