@@ -1,4 +1,4 @@
-"""Command line entry point: `radar collect`, `run`, `budget`, `check-sources` and `push`."""
+"""Command line entry point: `radar collect`, `run`, `budget`, `push`, `state` and more."""
 
 import argparse
 import json
@@ -336,6 +336,33 @@ def _run_push(args: argparse.Namespace) -> int:
     return 1 if stats["rejected"] else 0
 
 
+def _run_state(args: argparse.Namespace) -> int:
+    from radar.state import MIN_PASSPHRASE, StateError, pack, unpack
+
+    passphrase = os.environ.get("RADAR_STATE_KEY") or ""
+    if len(passphrase) < MIN_PASSPHRASE:
+        print(
+            f"Set RADAR_STATE_KEY to a passphrase of at least {MIN_PASSPHRASE} characters.",
+            file=sys.stderr,
+        )
+        return 2
+    db_path = str(resolve(args.db))
+    try:
+        if args.state_command == "save":
+            size = pack(db_path, args.file, passphrase)
+            print(f"saved {size} bytes to {args.file}")
+        else:
+            unpack(args.file, db_path, passphrase, force=args.force)
+            print(f"loaded {db_path}")
+    except StateError as exc:
+        print(f"state: {exc}", file=sys.stderr)
+        return 1
+    except OSError as exc:
+        print(f"state: {exc.strerror or type(exc).__name__}", file=sys.stderr)
+        return 1
+    return 0
+
+
 def _positive_int(text: str) -> int:
     value = int(text)
     if value < 1:
@@ -382,6 +409,18 @@ def main(argv: list[str] | None = None) -> int:
         "--list-refused", action="store_true", help="list refused stories and send nothing"
     )
     p_push.set_defaults(run=_run_push)
+
+    p_state = commands.add_parser("state", help="keep the database as one encrypted file")
+    state_commands = p_state.add_subparsers(dest="state_command", required=True)
+    p_save = state_commands.add_parser("save", help="write the database to an encrypted file")
+    p_save.add_argument("--db", default=os.environ.get("RADAR_DB_PATH") or DEFAULT_DB)
+    p_save.add_argument("--file", required=True)
+    p_save.set_defaults(run=_run_state)
+    p_load = state_commands.add_parser("load", help="restore the database from an encrypted file")
+    p_load.add_argument("--db", default=os.environ.get("RADAR_DB_PATH") or DEFAULT_DB)
+    p_load.add_argument("--file", required=True)
+    p_load.add_argument("--force", action="store_true", help="replace an existing database")
+    p_load.set_defaults(run=_run_state)
 
     args = parser.parse_args(argv)
     return args.run(args)
