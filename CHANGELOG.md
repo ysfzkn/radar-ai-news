@@ -11,6 +11,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Repository scaffold, community files and CI.
 
+## [0.4.0] - 2026-11-20
+
+### Added
+
+- Public site (`site/`, a static Astro site): numbered daily editions in Turkish and English, archive, topic pages, weekly digest, method page and RSS feeds. No client JavaScript, no cookies, no third-party requests. Without a data source it builds with invented demo data and a banner; if the API cannot be reached the build fails.
+- Public read endpoint `GET /api/stories` on the admin service: published stories only, only reader-facing fields, paged with a cursor.
+- Optional deploy hook: when the published set changes, the admin service posts to the URL in the `SITE_DEPLOY_HOOK` secret (an `https://` URL). Written from documentation, never run against a real hook.
+- Admin lists show 50 stories per page, with next and previous page links.
+- Documentation: `docs/site.md`.
+
+### Changed
+
+- "Kaydet ve onayla" saves the edited text and then approves it. If the approval is refused, the edit stays saved and the story stays in review. Approve never saves anything on a story that is not in review.
+- The admin screen is light only.
+- Admin pages send `Referrer-Policy: same-origin`. With `no-referrer`, browsers sent `Origin: null` on form posts and every click was refused. A `POST` with `Origin: null` is still refused.
+
 ## [0.3.0] - 2026-11-20
 
 ### Added

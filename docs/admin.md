@@ -2,7 +2,7 @@
 
 `admin/` is a small Cloudflare Worker (TypeScript, Hono, D1). The agent sends it finished stories with `radar push`; a person reads the ones that need a check, edits them if needed, and approves or rejects them. The screen is in Turkish.
 
-Today the Worker stores stories and lets you review them. There is no public site yet that reads the published stories, and nothing sends a notice when a story arrives.
+The Worker stores stories, lets you review them, and serves the published ones to the public site through a read-only endpoint (see [Public read endpoint](#public-read-endpoint)). The site is described in [site.md](site.md). Nothing sends a notice when a story arrives.
 
 ## What it stores, and what it does not
 
@@ -14,15 +14,15 @@ It does not store: the fetched source articles, the agent's prompts or model out
 
 | Action | From | To | Rules |
 | --- | --- | --- | --- |
-| Edit | `review` or `published` | same status | Marks the story as edited. Needs the story's current version. |
-| Approve | `review` | `published` | Every text must be within the publish limits and the "I checked the source" box must be ticked. Refused, and the story expired, if it is 72 hours old or more. |
+| Edit ("Kaydet") | `review` or `published` | same status | Marks the story as edited. Needs the story's current version. |
+| Save and approve ("Kaydet ve onayla") | `review` | `published` | Saves the form's text if it differs from the stored story, then approves. Every text must be within the publish limits and the "I checked the source" box ("Kaynağı kontrol ettim") must be ticked. Refused, and the story expired, if it is 72 hours old or more. |
 | Reject | `review` | `rejected` | |
 | Unpublish | `published` | `rejected` | A note is required. |
 | Expire | `review` aged 72 hours or more | `expired` | Hourly, and whenever the queue is opened. |
 
 `rejected` and `expired` are final. Publish limits: title 90, summary 320, developer line 200 characters. The agent may send longer text (up to 300, 1000 and 600); a story over the publish limits must be shortened by hand before it can be approved.
 
-Approve publishes the text as last saved, so save your edits before you approve. Human edits are not re-checked by the fact check: the verifier ran on the agent's text only.
+Save and approve is two guarded steps: first the edit is saved (and the story marked as edited), then the story is approved. If the second step is refused, for example because a text is over the publish limit, the edit stays saved and the story stays in review; the screen says so, and you can shorten the text and try again. If the form has not changed anything, nothing is saved and the stored text is approved. Approve never saves anything on a story that is not in review. Human edits are not re-checked by the fact check: the verifier ran on the agent's text only.
 
 ## Sign-in
 
@@ -30,7 +30,13 @@ Cloudflare Access sits in front of `/admin*`. The Worker does not rely on that a
 
 It fails closed. If sign-in is not configured, the answer is 503, not an open page. The one exception is development: with `DEV_NO_AUTH=1` set and a request to `localhost`, `127.0.0.1` or `[::1]`, the check is skipped. It works nowhere else.
 
-Every `POST` must also carry an `Origin` header equal to the request's own origin, otherwise it is refused with 403.
+Every `POST` must also carry an `Origin` header equal to the request's own origin, otherwise it is refused with 403. Admin pages are sent with `Referrer-Policy: same-origin`: with `no-referrer`, browsers send `Origin: null` on form posts and every click would be refused. A `POST` with `Origin: null` is still refused.
+
+The screen is light only: there is no dark theme and no theme switch. Lists show 50 stories per page, with "Sonraki sayfa" (next page) and "Önceki sayfa" (previous page) links; the address takes `?page=N`.
+
+## Public read endpoint
+
+`GET /api/stories` is public and needs no sign-in. It returns only `published` stories and only what a reader sees: no reasons, score, fact card, history or e-mail addresses. It is what the static site reads at build time. Parameters, response shape and paging are described in [site.md](site.md#the-public-read-contract-version-1). Responses carry `Cache-Control: public, max-age=60`.
 
 ## Ingest contract (version 1)
 
@@ -83,7 +89,7 @@ cd admin
 npm run seed                      # posts three invented demo stories
 ```
 
-Open <http://localhost:8787/admin>. The demo data is two stories in the review queue and one published story. One review story is 2 hours old. The other is 68 hours old, so the queue shows `Kalan süre: 4 sa` (4 hours left) on it in a warning colour; it also has a risk flag and a Turkish title of 100 characters, which is over the publish limit of 90, so it must be shortened before it can be approved. Running `npm run seed` again does nothing: the stories are duplicates. The seed script reads the token from `.dev.vars`, never prints it, and refuses any address that is not `localhost`, `127.0.0.1` or `[::1]`. The 68-hour story expires about 4 hours after you seed, because expiry runs whenever the queue is opened. To get the demo data back, delete `admin/.wrangler/`, then run `npm run db:migrate:local` and `npm run seed` again.
+Open <http://localhost:8787/admin>. The demo data is two stories in the review queue and one published story. One review story is 2 hours old. The other is about 68 hours old when seeded, so the queue shows a remaining time such as `Kalan süre: 4 sa` (4 hours left) on it in a warning colour; it also has a risk flag and a Turkish title of 100 characters, which is over the publish limit of 90, so it must be shortened to 90 characters or fewer before `Kaydet ve onayla` accepts it (the screen then says the Turkish title is too long and the story stays in review). Running `npm run seed` again does nothing: the stories are duplicates. The seed script reads the token from `.dev.vars`, never prints it, and refuses any address that is not `localhost`, `127.0.0.1` or `[::1]`. The 68-hour story expires about 4 hours after you seed, because expiry runs whenever the queue is opened. To get the demo data back, delete `admin/.wrangler/`, then run `npm run db:migrate:local` and `npm run seed` again.
 
 The example file sets `INGEST_TOKEN=change-me` and `DEV_NO_AUTH=1`; change the token if you like.
 
@@ -113,6 +119,8 @@ Before sending, `radar push` trims what it safely can to the ingest limits: at m
 
 If the Worker still refuses a story (for example an empty or over-long text, or a source link it cannot parse), that story is skipped and the rest of its batch is sent again, so other stories are not held up. The skipped story's uid is listed under `rejected`, one line per skipped story on stderr names the field the Worker objected to, and the command exits 1. The story stays unpushed: it is sent again, and refused again, on every later push, so every later push exits 1 until the story is corrected or removed in the local database. There is no command for that yet.
 
+To see an approved story on the site, build the site against this server; see [site.md](site.md#against-a-local-admin-service).
+
 Checks: `npm run typecheck` and `npm test` in `admin/`.
 
 ## Deploy
@@ -133,4 +141,5 @@ These steps were written from Cloudflare's documentation and have not been run. 
 
    Both must be set. With only one of them set, or neither, sign-in answers 503 and nothing gets in. Optionally add `ADMIN_EMAILS` the same way. Do not set `DEV_NO_AUTH`. You can set variables in the Cloudflare dashboard instead, but by default `wrangler deploy` treats `wrangler.jsonc` as the source of truth and overwrites dashboard variables, unless `keep_vars` is set to `true` (this is described in the installed wrangler's config schema).
 5. Deploy: `npx wrangler deploy`. The hourly expiry cron (`17 * * * *`) in `wrangler.jsonc` is registered by the deploy.
-6. Check that `/healthz` answers `ok` and that `/admin` asks you to sign in.
+6. Check that `/healthz` answers `ok`, that `/admin` asks you to sign in, and that `/api/stories` answers without signing in.
+7. Optional: set `SITE_DEPLOY_HOOK` so the site is rebuilt when the published set changes: `npx wrangler secret put SITE_DEPLOY_HOOK`, with an `https://` deploy-hook URL from the site's host. The Worker posts to it (empty `POST`) after a story is approved, unpublished, edited while published, or ingested as already published. A value that is not `https://` is ignored, the URL is never logged, and a failed call is ignored. This has never been run against a real hook; see [site.md](site.md#deploy).

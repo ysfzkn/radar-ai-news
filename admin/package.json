@@ -1,6 +1,6 @@
 {
   "name": "radar-admin",
-  "version": "1.0.0",
+  "version": "0.4.0",
   "scripts": {
     "dev": "wrangler dev",
     "test": "vitest run",
