@@ -61,6 +61,10 @@ Stories the agent is unsure about wait in a review queue in the admin service (`
 
 The public site (`site/`, a static Astro site) shows published stories as daily editions in Turkish and English. You can run it with invented demo data, or build it against a local admin service to see a story you approved. It needs Node 22 and no account. See [site.md](site.md).
 
+## Run it every day
+
+The agent can run by itself every morning on GitHub Actions: `radar daily` collects, writes, pushes and sends a notice when a story needs you, and the database is kept between runs as one encrypted file. This has never run on GitHub. How it works and how to set it up: [automation.md](automation.md).
+
 ## Where the data lives
 
 The local database is a SQLite file at `dev-notes/local.db` in the repository root. The folder is created on first run and is git-ignored. Point somewhere else with `--db PATH` or the `RADAR_DB_PATH` environment variable. Delete the file to start over.

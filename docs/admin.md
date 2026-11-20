@@ -2,7 +2,7 @@
 
 `admin/` is a small Cloudflare Worker (TypeScript, Hono, D1). The agent sends it finished stories with `radar push`; a person reads the ones that need a check, edits them if needed, and approves or rejects them. The screen is in Turkish.
 
-The Worker stores stories, lets you review them, and serves the published ones to the public site through a read-only endpoint (see [Public read endpoint](#public-read-endpoint)). The site is described in [site.md](site.md). Nothing sends a notice when a story arrives.
+The Worker stores stories, lets you review them, and serves the published ones to the public site through a read-only endpoint (see [Public read endpoint](#public-read-endpoint)). The site is described in [site.md](site.md). Nothing in the admin service sends a notice when a story arrives; the daily job does that after pushing (see [automation.md](automation.md)).
 
 ## What it stores, and what it does not
 
@@ -23,6 +23,14 @@ It does not store: the fetched source articles, the agent's prompts or model out
 `rejected` and `expired` are final. Publish limits: title 90, summary 320, developer line 200 characters. The agent may send longer text (up to 300, 1000 and 600); a story over the publish limits must be shortened by hand before it can be approved.
 
 Save and approve is two guarded steps: first the edit is saved (and the story marked as edited), then the story is approved. If the second step is refused, for example because a text is over the publish limit, the edit stays saved and the story stays in review; the screen says so, and you can shorten the text and try again. If the form has not changed anything, nothing is saved and the stored text is approved. Approve never saves anything on a story that is not in review. Human edits are not re-checked by the fact check: the verifier ran on the agent's text only.
+
+## The review screen
+
+- **Reasons are readable.** The agent writes the reasons it sent a story to review as short English strings. Where their shape is known (a risk flag, a text that is too long, a check on a named field) the screen shows them in Turkish, with a label for the kind of reason. Anything else is shown exactly as written and marked as English.
+- **The source link.** The link to the story's main source sits in the action bar next to the buttons, so you can open it while deciding.
+- **Unsaved changes.** When you have typed something that is not saved, the screen says so ("Kaydedilmemiş değişiklik var") until you save or leave.
+- **When the story changed elsewhere.** If someone else saved the story first, the save is refused. For a story that is still open to the action you were taking, the text you typed stays in the form, the form takes the story's current version, and the message says that saving now will overwrite the other change. Nothing is overwritten until you save again.
+- **When an automatically published story goes live.** `published_at` of a story the agent published is the moment the admin service received it, not the moment the agent created it, so editions on the site follow arrival.
 
 ## Sign-in
 

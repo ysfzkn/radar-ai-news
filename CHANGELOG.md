@@ -11,6 +11,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Repository scaffold, community files and CI.
 
+## [0.5.0] - 2026-11-20
+
+### Added
+
+- `radar daily`: collect, run and push in one command, then send a notice by Telegram or e-mail (any SMTP server) when a story waits for review or something needs attention. A notice never contains story text.
+- `radar state save` and `radar state load`: the database as one encrypted file (gzip, scrypt-derived key, Fernet), keyed by `RADAR_STATE_KEY` (at least 16 characters).
+- Scheduled workflow `.github/workflows/daily.yml`: runs `radar daily` at 04:15 UTC when the repository variable `RADAR_ENABLED` is `true`, and keeps the database between runs on the branch `radar-state`. Written and checked by a test that reads the file; it has never run on GitHub.
+- `radar push --list-refused` and `--retry-refused`. A story the admin service refuses is parked at once with the field the service named and is not sent again.
+- A source fetcher that reads at most 5 MB per response and follows a redirect only to a public http(s) address, at most 5 hops. Host names are not resolved, so a public name that points at a private address is not caught.
+- Admin screen: reasons shown in Turkish where their shape is known, a source link in the action bar, an unsaved-changes notice.
+- Site: an edition opens with a masthead (issue, date, number of stories, reading time) and an index of the day's stories; the first story is the lead.
+- Documentation: `docs/automation.md`.
+
+### Changed
+
+- Site: stories no longer carry a label. The method page explains that every story is written by a language model and which ones a person reads first. The brand mark is redrawn.
+- Admin: when a save meets a newer version, the typed text is kept (for a story still open to that action), the form takes the current version and the message says saving will overwrite the other change.
+- Admin: an auto-published story's `published_at` is the moment the admin service received it.
+
 ## [0.4.0] - 2026-11-20
 
 ### Added

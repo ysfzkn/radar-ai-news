@@ -1,5 +1,7 @@
 # The agent
 
+The daily job on GitHub Actions, its notices and its saved state are described in [automation.md](automation.md). This page covers the agent itself.
+
 `radar run` turns the collector's candidates into stories: it scores them, writes the best ones in Turkish and English, checks the text against its source and decides whether a human must look at it. Everything lands in the local SQLite database. Nothing is published anywhere.
 
 ## The seven steps
@@ -48,6 +50,11 @@ uv run radar run                 # collect, then score, write, verify, route
 uv run radar run --max-stories 2 # a smaller, cheaper run
 uv run radar run --dry-run       # collect only, no credential needed
 uv run radar budget              # today's spend
+uv run radar push                # send finished stories to the admin service
+uv run radar push --list-refused # show stories the service refused
+uv run radar daily               # collect, run, push, then send a notice if one is needed
+uv run radar state save --file state.bin   # the database as one encrypted file
+uv run radar state load --file state.bin   # restore it
 ```
 
 `radar run` needs an Anthropic credential, found the way the Anthropic SDK finds it: the environment variable `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN`; the workload identity variables (`ANTHROPIC_FEDERATION_RULE_ID`, `ANTHROPIC_ORGANIZATION_ID` and `ANTHROPIC_IDENTITY_TOKEN` or `ANTHROPIC_IDENTITY_TOKEN_FILE`); or a profile stored by the Anthropic CLI login, that is the file `configs/<profile>.json` in the SDK's config directory. That directory is `ANTHROPIC_CONFIG_DIR` if set, otherwise `%APPDATA%\Anthropic` on Windows and `~/.config/anthropic` elsewhere; the profile is `ANTHROPIC_PROFILE`, else the name in the `active_config` file there, else `default`. An empty directory does not count. Without a credential it prints a message and exits 2 before collecting. The key is read only by the SDK; Radar never stores or logs it.
@@ -59,6 +66,28 @@ uv run radar budget              # today's spend
 `radar budget` prints one JSON line for the current Istanbul day: `cap_usd`, `spent_usd`, `left_usd`, `tokens`, `calls` and a `by_step` breakdown.
 
 `radar push` sends finished stories to the admin service (see [admin.md](admin.md)) and prints one JSON line: `pushed`, `duplicates`, `batches`, `rejected` (uids the service refused in this call) and `parked` (stories refused earlier or now, still unsent). A refused story is parked in the database with the field the service named, and later pushes leave it out. Exit code 1 means a story was refused in this call or the push failed; stories parked by earlier runs do not fail it. `radar push --list-refused` prints one line per parked story (uid, time of the refusal, field, Turkish title) and sends nothing; it needs neither the admin URL nor the token. `radar push --retry-refused` sends parked stories again too; one that is accepted, or reported as a duplicate, is no longer parked, and one refused again keeps its place with the new field and time.
+`radar daily` runs collect, run and push in one process and then sends a notice by Telegram or e-mail when one is needed; its output, exit codes and notices are in [automation.md](automation.md). `radar state save --file FILE` writes the database as one encrypted file and `radar state load --file FILE` restores it (add `--force` to replace an existing database); both read the passphrase from `RADAR_STATE_KEY`, which must be at least 16 characters (a newline at the end counts as a character). They exit 2 without a usable passphrase and 1 when the file or key is wrong. Both take `--db`, like the other commands.
+
+## What the fetcher accepts
+
+A source response is read up to 5 MB; a larger one is refused (by its declared length, or while it is being read) and the source is counted as failed. The fetcher follows a redirect only when the target is an `http://` or `https://` address that is not obviously internal, and at most 5 times. An address is refused when it is not http(s), when it is `localhost` or a name ending in `.localhost`, `.local` or `.internal`, or when it is an IP address that is not publicly routable (private, loopback, link-local and similar ranges; numeric shorthand such as `2130706433` is treated as an address). Host names are not resolved: a public-looking name whose DNS record points at a private address is not caught by this check.
+
+## Environment variables
+
+`.env.example` lists them. The agent reads only the process environment; it does not load a `.env` file.
+
+| Variable | Used by | Meaning |
+| --- | --- | --- |
+| `ANTHROPIC_API_KEY` | `run`, `daily` | Model credential (other ways are described above) |
+| `RADAR_DB_PATH` | all commands | Database path; `--db` overrides it |
+| `RADAR_DAILY_CAP_USD` | `run`, `daily`, `budget` | Daily spend cap, default 0.25 |
+| `RADAR_ADMIN_URL`, `RADAR_INGEST_TOKEN` | `push`, `daily` | Admin service origin and its ingest token |
+| `RADAR_STATE_KEY` | `state` | Passphrase for the saved database, 16 characters or more |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | `daily` | Telegram notices, on when both are set |
+| `RADAR_SMTP_HOST`, `RADAR_SMTP_PORT`, `RADAR_SMTP_USER`, `RADAR_SMTP_PASSWORD`, `RADAR_MAIL_FROM`, `RADAR_MAIL_TO` | `daily` | E-mail notices, on when the host is set; port defaults to 587 |
+
+Secrets are never accepted as command-line flags and never printed.
+
 ## Running without publishing
 
 Stories are rows in the local database (`dev-notes/local.db`, or `--db`/`RADAR_DB_PATH`). `published` and `review` are only status values; no website, feed or message is produced by this version. Delete the database file to start over.

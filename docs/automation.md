@@ -1,0 +1,148 @@
+# Running it every day
+
+The agent can run by itself every morning on GitHub Actions. This page describes what the job does, how it keeps its database between runs, when it sends a notice, and how to set it up.
+
+> **Status:** the workflow (`.github/workflows/daily.yml`) has never run on GitHub. Nothing in this project has been pushed or deployed. It is checked by a test that reads the file, and its two state steps were run by hand against a scratch Git repository on a laptop. The Telegram and e-mail paths were exercised only against fakes: no real message was ever sent. Expect to adjust the setup the first time you try it.
+
+## What the job does
+
+The workflow is `.github/workflows/daily.yml`. It starts at 04:15 UTC (07:15 in Istanbul), which leaves time to review before 08:00, and it can also be started by hand from the Actions tab. GitHub's scheduler can start a run several minutes late, sometimes much later at busy hours, so do not count on the exact minute.
+
+It does nothing unless the repository variable `RADAR_ENABLED` is `true`. Two runs never overlap: a second one waits for the first (it is queued, not cancelled). A run is stopped after 20 minutes.
+
+The steps, in order:
+
+1. Check out the repository, install [uv](https://docs.astral.sh/uv/) and the agent's dependencies (`uv sync`).
+2. **Restore state.** Fetch the encrypted database from the branch `radar-state` and decrypt it (see [The state file](#the-state-file)). If the branch does not exist yet, print one line and start from an empty database.
+3. **Run.** `uv run radar daily`, with `--max-stories` only when the manual-run input `max_stories` is filled in (it must be a whole number).
+4. **Save state.** Whether or not the run succeeded, write the database back to the `radar-state` branch. If the run wrote no database (it failed before it began), there is nothing to save and this step does nothing. This step is skipped when the restore step itself failed, so a wrong key never overwrites good state with a new one.
+
+Only the steps that need a secret get it, through the step's `env:`. No step prints a secret or passes one on a command line. The workflow's own token needs `contents: write` for one reason: replacing the `radar-state` branch. The only third-party actions are `actions/checkout` and `astral-sh/setup-uv`.
+
+## What `radar daily` does
+
+`radar daily` runs the whole chain in one process:
+
+1. **Collect** the sources and rank candidates, as `radar collect` does.
+2. **Run** the agent (score, write, verify, route), under the hard daily spend cap, as `radar run` does.
+3. **Push** the finished stories to the admin service, as `radar push` does. Without `RADAR_ADMIN_URL` and `RADAR_INGEST_TOKEN` this step is skipped.
+4. **Send a notice** when one is needed.
+
+Run it locally from `agent/`:
+
+```bash
+uv run radar daily
+uv run radar daily --max-stories 2
+```
+
+PowerShell is the same; set variables with `$env:NAME = "value"`.
+
+It prints one JSON line to standard output: `collected` (the collector's statistics), `run` (the agent's statistics, or `null` if that step did not happen), `push` (the push statistics, `{"skipped": true}` when it was skipped, or `null`), `review` and `published` (stories of this run that were pushed and are waiting for review or were published automatically), `cap_reached`, `failed_step` (`collect`, `run`, `push` or `null`), `error` (one line, or `null`) and `admin_url`.
+
+**Exit codes:** 0 when no step failed, 1 when a step failed (the first failure is the one reported). A failed step does not stop the others from being tried where that is safe: a failed run still pushes what was already written, and a failed collection skips the run and the push. Reaching the daily cap is not a failure: stories already written are kept and the exit code is still 0. A failed notice is one line on standard error and does not change the exit code. Failures are named by the step and the error's class; the text of an error is shown only for errors written for this purpose, with addresses and secrets removed.
+
+## Notices
+
+A notice is sent when at least one story of the run is waiting for review, or when something needs attention: a step failed, the daily cap stopped the run, half or more of the sources failed, or the admin service refused a story. A quiet, healthy run sends nothing.
+
+A notice is a few lines of Turkish text: the date, how many stories wait for review (with the address of the review screen), how many were published automatically, and one line for each kind of trouble. A refused story is described by the name of the field the service objected to (for example `texts.tr.title`). **A notice never contains story text.**
+
+Two channels exist, and both can be on at once:
+
+- **Telegram**, when `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are set.
+- **E-mail** through any SMTP server, when `RADAR_SMTP_HOST` is set. The connection always upgrades with STARTTLS. The port is `RADAR_SMTP_PORT` (default 587); the login happens only if `RADAR_SMTP_USER` is set, with `RADAR_SMTP_PASSWORD`. The sender is `RADAR_MAIL_FROM` (default: the SMTP user) and the recipient is `RADAR_MAIL_TO`.
+
+With neither set, the summary is only printed. A channel that fails prints one line on standard error and never includes a token, a URL or a password.
+
+## The state file
+
+The agent keeps everything it knows in one SQLite database: the sources, items, clusters, drafts of stories that have not been pushed or reviewed yet, and the spend ledger that enforces the daily cap. A GitHub runner starts empty every time, so the job saves the database at the end of each run and restores it at the start of the next.
+
+**What the file is.** `radar state save` takes a consistent copy of the database, compresses it with gzip and encrypts it. The key is derived from the passphrase in `RADAR_STATE_KEY` with scrypt and a fresh random salt each time, and the encryption is Fernet from the `cryptography` package. The file is `state.bin`, and it is force-pushed as the only commit of the branch `radar-state`: the branch always has exactly one commit with one file, and old states are not kept.
+
+**Why it is encrypted.** The repository is public. The database holds drafts of stories that are still waiting for a person, and the spend ledger. A public branch must not reveal either. The branch is public too, so the file is readable by anyone, and the passphrase is what protects it: use a long random one.
+
+**The passphrase.** `RADAR_STATE_KEY` must be at least 16 characters, otherwise the state commands exit with code 2. Every character counts, including a newline at the end: a value saved in a secret with a trailing newline is a different key from the same text without one. Paste it without one.
+
+**How the branch is pushed.** The save step builds the commit directly (`git commit-tree`, with the identity `github-actions[bot]`) and pushes it with the credentials that `actions/checkout` already stored for the workflow's token, so the token is never in a command line, a URL or an environment variable of its own. Nothing from that branch is ever checked out into the work tree.
+
+**The first run.** When the branch `radar-state` does not exist, the restore step prints one line, the run starts from an empty database, and the save step creates the branch.
+
+**A wrong key.** When the branch exists but cannot be decrypted or read (a different passphrase, a damaged file), the restore step fails and the job stops before any model call. This is deliberate: starting over silently would reset the spend ledger, and the agent would write and push old stories again. The save step is skipped, so the saved state is left alone. Fix the secret, or, if the state is lost for good, delete the `radar-state` branch to start over on purpose.
+
+**Reading the state yourself.** Fetch `state.bin` from the branch, then, in `agent/` (the database path is your choice; `radar budget` shows the spend ledger):
+
+```bash
+git fetch origin radar-state
+git show FETCH_HEAD:state.bin > state.bin
+export RADAR_STATE_KEY=...           # the same passphrase
+uv run radar state load --db /tmp/radar-copy.db --file state.bin
+uv run radar budget --db /tmp/radar-copy.db
+```
+
+PowerShell:
+
+```powershell
+git fetch origin radar-state
+cmd /c "git show FETCH_HEAD:state.bin > state.bin"   # a plain `>` can change bytes in older PowerShell
+$env:RADAR_STATE_KEY = "..."
+uv run radar state load --db radar-copy.db --file state.bin
+uv run radar budget --db radar-copy.db
+```
+
+`radar state load` refuses to replace a database that already exists unless you add `--force`; it checks the restored database for damage before putting it in place; and it removes the old database's side files so they cannot be replayed over it. `radar state save --db PATH --file FILE` is the opposite direction. A bad key or file prints one line (`state: cannot decrypt (wrong key or damaged file)`, for example) and exits 1.
+
+**Rotating the key.** The job can only read a state saved with the key it is given, so the file on the branch has to be re-encrypted before the secret changes. On your machine, in `agent/`:
+
+```bash
+git fetch origin radar-state
+git show FETCH_HEAD:state.bin > old.bin
+RADAR_STATE_KEY=<old passphrase> uv run radar state load --db rotate.db --file old.bin
+RADAR_STATE_KEY=<new passphrase> uv run radar state save --db rotate.db --file new.bin
+```
+
+In PowerShell, set `$env:RADAR_STATE_KEY` to the old passphrase before the `load` and to the new one before the `save`, and use `cmd /c` for the `git show` line as above. Then replace the branch with a single commit that holds `new.bin` as `state.bin` (the same way the save step does: `git hash-object -w`, `git mktree`, `git commit-tree`, then `git push --force origin <commit>:refs/heads/radar-state`), and only then update the `RADAR_STATE_KEY` secret. Delete `old.bin`, `new.bin` and `rotate.db` afterwards. The two state commands are the ones the job uses; the whole rotation was not run end to end.
+
+## Refused stories
+
+If the admin service refuses a story, the agent parks it at once with the name of the field the service objected to, and does not send it again. The notice mentions the field name. `radar push --list-refused` lists parked stories without contacting the service, and `radar push --retry-refused` sends them again after you have fixed the cause. Details: [admin.md](admin.md#when-a-push-is-refused). To look at the parked stories of the saved state, load it as shown above first.
+
+## Set it up
+
+This part has not been tried on GitHub.
+
+1. Push the repository to GitHub, and deploy the admin service and the site first ([admin.md](admin.md#deploy), [site.md](site.md#deploy)). The job pushes to the admin service; it cannot do that before it exists.
+2. Add the secrets and variables below under Settings, Secrets and variables, Actions.
+3. Make a first manual run (see below) before turning on the schedule.
+4. Set the repository variable `RADAR_ENABLED` to `true`.
+
+| Name | Kind | What it is for | Needed |
+| --- | --- | --- | --- |
+| `ANTHROPIC_API_KEY` | secret | Model calls | required |
+| `RADAR_STATE_KEY` | secret | Passphrase (16 characters or more) that encrypts the saved database | required |
+| `RADAR_INGEST_TOKEN` | secret | Token the admin service accepts for pushes (its `INGEST_TOKEN`) | required to push |
+| `RADAR_ADMIN_URL` | variable | The admin service's origin, `https://...` | required to push |
+| `RADAR_ENABLED` | variable | `true` turns the scheduled run on | required |
+| `RADAR_DAILY_CAP_USD` | variable | Daily spend cap in dollars (default 0.25) | optional |
+| `TELEGRAM_BOT_TOKEN` | secret | Telegram notices | optional |
+| `TELEGRAM_CHAT_ID` | secret | Telegram chat that receives them | optional |
+| `RADAR_SMTP_HOST` | secret | SMTP server for e-mail notices (turns e-mail on) | optional |
+| `RADAR_SMTP_PORT` | secret | SMTP port (default 587) | optional |
+| `RADAR_SMTP_USER` | secret | SMTP user name | optional |
+| `RADAR_SMTP_PASSWORD` | secret | SMTP password | optional |
+| `RADAR_MAIL_FROM` | secret | Sender address of the notice | optional |
+| `RADAR_MAIL_TO` | secret | Recipient address of the notice | optional |
+
+Without the push settings the job still collects and writes stories, and the summary says the push was skipped; nothing reaches the review screen.
+
+**The first manual run.** Open the Actions tab, pick the "Daily" workflow, choose "Run workflow" and enter `2` as `max_stories`. This writes at most two stories, which keeps the first paid run small. The job only starts if `RADAR_ENABLED` is `true`, so set it first; you can unset it again right after to keep the schedule off. Afterwards:
+
+- read the log of the run: the one JSON line, and the "Saved state" line at the end;
+- check that the branch `radar-state` exists with one commit and one file;
+- run `radar budget` on the loaded state (see [Reading the state yourself](#the-state-file)) and compare `spent_usd` with the usage shown in the Anthropic Console. The meter's prices are a snapshot and may be out of date; see [agent.md](agent.md#the-budget).
+
+**Stopping it.** Delete the variable `RADAR_ENABLED` or set it to anything other than `true`. The job is skipped from the next start on. A run already in progress finishes. Disabling the workflow in the Actions tab works too.
+
+## The site is not rebuilt on a timer
+
+Nothing rebuilds the site on a schedule. The admin service's deploy hook fires when the set of published stories changes (a story is approved, unpublished, edited while published, or arrives already published), and no page of the site depends on the clock, so a rebuild with no change would produce the same pages. See [site.md](site.md#deploy). This part has never been run against a real hook either.
