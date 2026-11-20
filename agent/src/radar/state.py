@@ -49,15 +49,19 @@ def _remove(name: str | None) -> None:
             os.unlink(name)
 
 
-def _copy_database(db_path: str, copy_path: str) -> None:
-    """A consistent copy through SQLite's backup API; the live file's bytes are never read."""
-    source = sqlite3.connect(db_path)
+def _copy_database(db_path: str) -> bytes:
+    """A consistent copy of the database as bytes; nothing plain is written to disk.
+
+    The source is opened read-only, so packing never modifies or checkpoints it.
+    """
+    source = sqlite3.connect(f"file:{Path(db_path).as_posix()}?mode=ro", uri=True)
     try:
-        target = sqlite3.connect(copy_path)
+        memory = sqlite3.connect(":memory:")
         try:
-            source.backup(target)
+            source.backup(memory)
+            return memory.serialize()
         finally:
-            target.close()
+            memory.close()
     finally:
         source.close()
 
@@ -68,15 +72,12 @@ def pack(db_path: str, out_path: str, passphrase: str) -> int:
     if not os.path.isfile(db_path):
         raise StateError(f"no database at {db_path}")
     out = Path(out_path)
-    copy_name = out_name = None
+    out_name = None
     try:
-        copy_name = _temp_file(out.parent)
         try:
-            _copy_database(db_path, copy_name)
+            raw = _copy_database(db_path)
         except sqlite3.Error:
             raise StateError("cannot read the database") from None
-        with open(copy_name, "rb") as handle:
-            raw = handle.read()
         salt = secrets.token_bytes(SALT_BYTES)
         token = Fernet(_key(passphrase, salt)).encrypt(gzip.compress(raw))
         data = MAGIC + salt + token
@@ -87,7 +88,6 @@ def pack(db_path: str, out_path: str, passphrase: str) -> int:
         out_name = None
         return len(data)
     finally:
-        _remove(copy_name)
         _remove(out_name)
 
 
@@ -134,6 +134,13 @@ def unpack(in_path: str, db_path: str, passphrase: str, force: bool = False) -> 
             handle.write(raw)
         if not _integrity_ok(temp_name):
             raise StateError("the decrypted data is not a sound database")
+        # Side files of an older database would be replayed over the restored one.
+        for suffix in ("-wal", "-shm", "-journal"):
+            side = Path(f"{target}{suffix}")
+            try:
+                side.unlink(missing_ok=True)
+            except OSError:
+                raise StateError(f"cannot remove {side}") from None
         os.replace(temp_name, target)
         temp_name = None
     finally:

@@ -98,7 +98,7 @@ def test_a_truncated_file_and_a_file_with_one_flipped_byte_fail(filled, tmp_path
     good = packed(filled, tmp_path).read_bytes()
     target = tmp_path / "bad" / "radar.db"
     flipped = []
-    for position in (len(MAGIC) + 20, len(good) // 2, len(good) - 1):
+    for position in (len(MAGIC), len(MAGIC) + 15, len(MAGIC) + 20, len(good) // 2, len(good) - 1):
         data = bytearray(good)
         data[position] ^= 0x01
         flipped.append(bytes(data))
@@ -257,3 +257,88 @@ def test_state_module_does_not_import_anthropic():
         "sys.exit(1 if any(m.startswith('anthropic') for m in sys.modules) else 0)"
     )
     assert subprocess.run([sys.executable, "-c", code]).returncode == 0
+
+
+def make_wal_db(path, rows, keep_open=False):
+    conn = sqlite3.connect(str(path))
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA wal_autocheckpoint=0")
+    conn.execute("CREATE TABLE t (x TEXT)")
+    conn.executemany("INSERT INTO t VALUES (?)", [(r,) for r in rows])
+    conn.commit()
+    if keep_open:
+        return conn
+    conn.close()
+    return None
+
+
+def rows_of(path) -> list[str]:
+    conn = sqlite3.connect(str(path))
+    try:
+        return [r[0] for r in conn.execute("SELECT x FROM t ORDER BY x")]
+    finally:
+        conn.close()
+
+
+def test_load_with_force_removes_a_stale_wal_and_shm(tmp_path):
+    import shutil
+
+    make_wal_db(tmp_path / "new.db", ["new1", "new2"])
+    out = tmp_path / "state.bin"
+    pack(str(tmp_path / "new.db"), str(out), PASSPHRASE)
+    live = make_wal_db(tmp_path / "old.db", ["old1", "old2"], keep_open=True)
+    target = tmp_path / "radar.db"
+    for suffix in ("", "-wal", "-shm"):
+        shutil.copy(str(tmp_path / "old.db") + suffix, str(target) + suffix)
+    live.close()
+    assert os.path.getsize(str(target) + "-wal") > 0
+    unpack(str(out), str(target), PASSPHRASE, force=True)
+    assert rows_of(target) == ["new1", "new2"]
+    assert not [n for n in os.listdir(tmp_path) if n.startswith("radar.db-")]
+
+
+def test_load_with_force_removes_a_stale_journal_and_orphan_side_files(tmp_path):
+    make_wal_db(tmp_path / "new.db", ["new1"])
+    out = tmp_path / "state.bin"
+    pack(str(tmp_path / "new.db"), str(out), PASSPHRASE)
+    make_wal_db(tmp_path / "radar.db", ["old1"])
+    (tmp_path / "radar.db-journal").write_bytes(b"stale journal bytes")
+    unpack(str(out), str(tmp_path / "radar.db"), PASSPHRASE, force=True)
+    assert rows_of(tmp_path / "radar.db") == ["new1"]
+    assert not (tmp_path / "radar.db-journal").exists()
+    # side files with no database beside them go too
+    orphan = tmp_path / "fresh" / "radar.db"
+    orphan.parent.mkdir()
+    (tmp_path / "fresh" / "radar.db-wal").write_bytes(b"junk")
+    unpack(str(out), str(orphan), PASSPHRASE)
+    assert os.listdir(orphan.parent) == ["radar.db"]
+
+
+def test_pack_never_leaves_a_plain_database_in_the_output_directory(filled, tmp_path, monkeypatch):
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    seen: list[bytes] = []
+    real = state.Fernet.encrypt
+
+    def spy(self, data):
+        for name in os.listdir(out_dir):
+            with open(out_dir / name, "rb") as handle:
+                seen.append(handle.read(16))
+        return real(self, data)
+
+    monkeypatch.setattr(state.Fernet, "encrypt", spy)
+    pack(str(filled), str(out_dir / "state.bin"), PASSPHRASE)
+    assert not any(head.startswith(b"SQLite format 3") for head in seen)
+    assert os.listdir(out_dir) == ["state.bin"]
+
+
+def test_pack_includes_uncheckpointed_wal_rows_and_does_not_touch_the_source(tmp_path):
+    live = make_wal_db(tmp_path / "live.db", ["a", "b", "c"], keep_open=True)
+    before_wal = (tmp_path / "live.db-wal").read_bytes()
+    out = tmp_path / "state.bin"
+    pack(str(tmp_path / "live.db"), str(out), PASSPHRASE)
+    assert (tmp_path / "live.db-wal").read_bytes() == before_wal
+    restored = tmp_path / "restored.db"
+    unpack(str(out), str(restored), PASSPHRASE)
+    live.close()
+    assert rows_of(restored) == ["a", "b", "c"]
