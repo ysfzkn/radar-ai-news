@@ -19,6 +19,7 @@ const TOO_LONG = /^([a-z]+)\.([a-z_]+): too long \((\d+) > (\d+)\)$/;
 
 const LINK = /^link or domain '(.*)'$/;
 const BACKTICKS = /^backticks$/;
+const HANDLE = /^handle '(.*)'$/;
 const COMMAND = /^command-like text '(.*)'$/;
 const FOREIGN_TRY = /^fact_card\.try_url: host '(.*)' is not a source host$/;
 const FACT_WHAT = /^fact_card\.what:\s*/;
@@ -27,6 +28,8 @@ const FACT_WHAT = /^fact_card\.what:\s*/;
 function injectionText(where: string, tail: string): string | undefined {
   const link = LINK.exec(tail);
   if (link) return COPY.hasLinkReason(where, link[1]!);
+  const handle = HANDLE.exec(tail);
+  if (handle) return COPY.hasHandleReason(where, handle[1]!);
   if (BACKTICKS.test(tail)) return COPY.hasBackticksReason(where);
   const command = COMMAND.exec(tail);
   if (command) return COPY.hasCommandReason(where, command[1]!);

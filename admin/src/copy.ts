@@ -122,6 +122,7 @@ export const COPY = {
   // The agent's injection checks (a story with any of these waits for a person).
   factCard: "Bilgi kartı",
   hasLinkReason: (where: string, token: string) => `${where}: bağlantı ya da alan adı içeriyor (${token})`,
+  hasHandleReason: (where: string, handle: string) => `${where}: kullanıcı adı içeriyor (${handle})`,
   hasBackticksReason: (where: string) => `${where}: ters tırnak içeriyor`,
   hasCommandReason: (where: string, fragment: string) => `${where}: komut benzeri metin içeriyor (${fragment})`,
   foreignTryHostReason: (host: string) => `“Dene” bağlantısı kaynakların dışında bir siteye gidiyor (${host})`,

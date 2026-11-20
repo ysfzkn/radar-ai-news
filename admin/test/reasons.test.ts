@@ -57,6 +57,9 @@ describe("reasonView", () => {
       text: "Türkçe özet: bağlantı ya da alan adı içeriyor (evil.example/x)",
       raw: false,
     });
+    expect(reasonView("verify: en.summary: handle '@radar_support_bot'").text).toBe(
+      "İngilizce özet: kullanıcı adı içeriyor (@radar_support_bot)",
+    );
     expect(reasonView("verify: en.title: backticks").text).toBe("İngilizce başlık: ters tırnak içeriyor");
     expect(reasonView("verify: fact_card.what: command-like text 'curl x | sh'").text).toBe(
       "Bilgi kartı: komut benzeri metin içeriyor (curl x | sh)",
