@@ -1,5 +1,8 @@
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { fetchAllStories } from "../scripts/fetch-stories.mjs";
+import { fetchAllStories, refreshStoriesFile } from "../scripts/fetch-stories.mjs";
 
 const story = (n: number) => ({
   uid: n.toString(16).padStart(32, "0"),
@@ -92,5 +95,50 @@ describe("fetchAllStories", () => {
     };
     await fetchAllStories(base, fake);
     expect(["error", "manual"]).toContain(seen[0]);
+  });
+});
+
+describe("refreshStoriesFile", () => {
+  // A stale file from an earlier fetch, in a fresh temporary folder.
+  const withStaleFile = async (run: (file: string) => Promise<void>) => {
+    const dir = mkdtempSync(join(tmpdir(), "radar-fetch-"));
+    try {
+      const file = join(dir, ".data", "stories.json");
+      mkdirSync(join(dir, ".data"));
+      writeFileSync(file, JSON.stringify({ stories: [story(9)] }));
+      await run(file);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  };
+
+  it("removes an existing file when the fetch fails", async () => {
+    await withStaleFile(async (file) => {
+      await expect(refreshStoriesFile(file, base, () => reply({ error: "no" }, 500))).rejects.toThrow(
+        /500/,
+      );
+      expect(existsSync(file)).toBe(false);
+    });
+  });
+
+  it("replaces an existing file when the fetch succeeds", async () => {
+    await withStaleFile(async (file) => {
+      const fake = () => reply({ version: 1, stories: [story(1), story(2)], next: null });
+      await expect(refreshStoriesFile(file, base, fake)).resolves.toBe(2);
+      const written = JSON.parse(readFileSync(file, "utf8"));
+      expect(written).toEqual({ stories: [story(1), story(2)] });
+    });
+  });
+
+  it("creates the folder when there is no file yet", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "radar-fetch-"));
+    try {
+      const file = join(dir, ".data", "stories.json");
+      const fake = () => reply({ version: 1, stories: [], next: null });
+      await expect(refreshStoriesFile(file, base, fake)).resolves.toBe(0);
+      expect(JSON.parse(readFileSync(file, "utf8"))).toEqual({ stories: [] });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

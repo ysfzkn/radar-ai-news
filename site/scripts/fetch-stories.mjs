@@ -1,4 +1,5 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const MAX_PAGES = 200;
@@ -51,12 +52,28 @@ export async function fetchAllStories(apiUrl, fetchImpl = fetch) {
   throw new Error(`more than ${MAX_PAGES} pages of stories; refusing to continue`);
 }
 
-async function main() {
-  const stories = await fetchAllStories(process.env.RADAR_API_URL);
-  const file = fileURLToPath(new URL("../.data/stories.json", import.meta.url));
-  mkdirSync(new URL("../.data/", import.meta.url), { recursive: true });
+/**
+ * Removes `file` first, then fetches every story and writes it back. After a failed
+ * fetch no older file is left behind, so a later plain build falls back to the demo
+ * data and its banner instead of quietly using stale stories.
+ *
+ * @param {string} file
+ * @param {string | undefined} apiUrl
+ * @param {(url: string, init?: RequestInit) => Promise<Response>} [fetchImpl]
+ * @returns {Promise<number>} the number of stories written
+ */
+export async function refreshStoriesFile(file, apiUrl, fetchImpl = fetch) {
+  rmSync(file, { force: true });
+  const stories = await fetchAllStories(apiUrl, fetchImpl);
+  mkdirSync(dirname(file), { recursive: true });
   writeFileSync(file, JSON.stringify({ stories }, null, 2) + "\n");
-  console.log(`Fetched ${stories.length} stories.`);
+  return stories.length;
+}
+
+async function main() {
+  const file = fileURLToPath(new URL("../.data/stories.json", import.meta.url));
+  const count = await refreshStoriesFile(file, process.env.RADAR_API_URL);
+  console.log(`Fetched ${count} stories.`);
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {

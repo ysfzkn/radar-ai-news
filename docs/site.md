@@ -123,7 +123,7 @@ Things to know:
 
 - A plain `npm run build` or `npm run dev` also uses `site/.data/stories.json` if it exists. To go back to demo data, delete the `site/.data/` folder. The site's own tests refuse to run while that folder exists, so they cannot quietly build real data.
 - `RADAR_STORIES_FILE` can point at any file in the same shape (`{"stories": [...]}`); it takes priority over the other two sources.
-- If the API cannot be reached or answers something invalid, the fetch exits with an error and the build does not start. The site never builds from half the data. A `site/.data/stories.json` left by an earlier successful fetch stays in place, though, so delete it if you do not want a later plain build to use it.
+- If the API cannot be reached or answers something invalid, the fetch exits with an error and the build does not start. The site never builds from half the data. The fetch deletes any older `site/.data/stories.json` before it starts, so after a failed fetch a later plain build falls back to the demo data and shows its banner instead of quietly using stale stories.
 
 Checks: `npm run check` (types), `npm test` and `npm run build` in `site/`.
 
