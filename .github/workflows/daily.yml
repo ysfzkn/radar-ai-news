@@ -14,9 +14,9 @@ on:
         type: string
         default: ""
 
-# Write access is for the state branch only.
+# Read-only by default; the job below raises this for its one push step.
 permissions:
-  contents: write
+  contents: read
 
 # Two runs never overlap; a second one waits for the first.
 concurrency:
@@ -28,21 +28,27 @@ jobs:
     if: vars.RADAR_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Write access is for the state branch only. The token is handed to the push step
+    # alone; checkout does not keep it, so uv and the agent never see it.
+    permissions:
+      contents: write
     defaults:
       run:
         working-directory: agent
     steps:
-      # The save step pushes with the credentials checkout leaves in the git configuration.
-      - uses: actions/checkout@v4
+      # Actions are pinned to a commit; the comment names the release.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          persist-credentials: true
+          persist-credentials: false
 
       - name: Choose the database path
         run: echo "RADAR_DB_PATH=$RUNNER_TEMP/radar.db" >> "$GITHUB_ENV"
 
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+        with:
+          version: "0.10.7"
 
-      - run: uv sync
+      - run: uv sync --locked
 
       - name: Restore state
         id: restore
@@ -101,21 +107,36 @@ jobs:
         if: always() && steps.restore.outcome == 'success'
         env:
           RADAR_STATE_KEY: ${{ secrets.RADAR_STATE_KEY }}
-          GIT_AUTHOR_NAME: github-actions[bot]
-          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
-          GIT_COMMITTER_NAME: github-actions[bot]
-          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
         run: |
           if [ ! -f "$RADAR_DB_PATH" ]; then
             echo "No database was written; nothing to save."
             exit 0
           fi
           uv run radar state save --db "$RADAR_DB_PATH" --file "$RUNNER_TEMP/state.bin"
-          # A single parentless commit holding one file, pushed with the credentials
-          # that actions/checkout left in the work tree's git configuration.
+          echo "packed=true" >> "$GITHUB_OUTPUT"
+
+      # The only step that holds the write token, and it runs git alone.
+      - name: Push state
+        id: push
+        if: always() && steps.save.outputs.packed == 'true'
+        env:
+          PUSH_TOKEN: ${{ github.token }}
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        run: |
+          # A single parentless commit holding one file.
           cd "$GITHUB_WORKSPACE"
           blob=$(git hash-object -w --no-filters "$RUNNER_TEMP/state.bin")
           tree=$(printf '100644 blob %s\tstate.bin\n' "$blob" | git mktree)
           commit=$(git commit-tree "$tree" -m state)
-          git push --quiet --force origin "$commit:refs/heads/radar-state"
+          # The token reaches this one push through git's environment, as the header
+          # actions/checkout would otherwise store: it is not written to .git/config,
+          # not on a command line and never printed.
+          auth=$(printf 'x-access-token:%s' "$PUSH_TOKEN" | base64 -w0)
+          GIT_CONFIG_COUNT=1 \
+            GIT_CONFIG_KEY_0="http.$GITHUB_SERVER_URL/.extraheader" \
+            GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $auth" \
+            git push --quiet --force origin "$commit:refs/heads/radar-state"
           echo "Saved state to the radar-state branch."

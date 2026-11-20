@@ -43,7 +43,9 @@ def test_schedule_and_manual_trigger():
 
 def test_permissions_and_concurrency():
     data = load("daily.yml")
-    assert data["permissions"] == {"contents": "write"}
+    assert data["permissions"] == {"contents": "read"}
+    # The job needs write for the one step that pushes the state branch; nothing else.
+    assert job()["permissions"] == {"contents": "write"}
     assert data["concurrency"] == {"group": "radar-daily", "cancel-in-progress": False}
 
 
@@ -77,7 +79,8 @@ def test_trigger_keys_and_checkout_credentials():
     assert set(triggers(load("daily.yml"))) == {"schedule", "workflow_dispatch"}
     checkout = steps()[0]
     assert checkout["uses"].startswith("actions/checkout@")
-    assert checkout["with"]["persist-credentials"] is True
+    # No token is left in .git/config for later steps (uv, the agent) to find.
+    assert checkout["with"]["persist-credentials"] is False
 
 
 def test_missing_key_stops_restore_before_anything_else():
@@ -95,14 +98,18 @@ def test_one_push_to_the_state_branch_only():
         if "git push" in line
     ]
     assert len(pushes) == 1 and pushes[0].endswith(':refs/heads/radar-state"')
-    assert "--no-filters" in steps()[step_index("save")]["run"]
+    assert "--no-filters" in steps()[step_index("push")]["run"]
 
 
 def test_steps_run_restore_then_daily_then_save():
     restore, run, save = step_index("restore"), step_index("daily"), step_index("save")
-    assert restore < run < save
+    push = step_index("push")
+    assert restore < run < save < push == save + 1
     assert "always()" in steps()[save]["if"]
     assert "steps.restore.outcome == 'success'" in steps()[save]["if"]
+    assert "always()" in steps()[push]["if"]
+    assert "steps.save.outputs.packed == 'true'" in steps()[push]["if"]
+    assert 'echo "packed=true" >> "$GITHUB_OUTPUT"' in steps()[save]["run"]
     assert "always()" not in str(steps()[run].get("if", ""))
 
 
@@ -151,9 +158,53 @@ def test_dispatch_input_goes_through_env_and_is_checked():
 
 def test_no_token_in_a_url_or_argument():
     text = (WORKFLOWS / "daily.yml").read_text(encoding="utf-8")
-    assert not re.search(r"https?://[^\s\"']*\$\{?GITHUB_TOKEN", text)
-    assert "x-access-token" not in text
+    assert not re.search(r"https?://[^\s\"']*\$\{?[A-Z_]*TOKEN", text)
     assert "GITHUB_TOKEN" not in text
+    assert "git config" not in text and "git remote" not in text
+
+
+def test_the_write_token_reaches_only_the_push_step():
+    text = (WORKFLOWS / "daily.yml").read_text(encoding="utf-8")
+    assert text.count("github.token") == 1
+    holders = [s["id"] for s in steps() if "github.token" in str(s)]
+    assert holders == ["push"]
+    push = steps()[step_index("push")]
+    assert push["env"]["PUSH_TOKEN"] == "${{ github.token }}"
+    script = push["run"]
+    # Only git runs with the token: not uv, not the agent.
+    assert "uv " not in script and "radar" not in script.replace("radar-state", "")
+    # Handed to the one push through git's environment, so it is neither written to
+    # .git/config nor visible on a command line; it is never printed.
+    assert "x-access-token" in script and "base64 -w0" in script
+    assert 'GIT_CONFIG_KEY_0="http.$GITHUB_SERVER_URL/.extraheader"' in script
+    assert "GIT_CONFIG_VALUE_0=" in script
+    assert script.count("PUSH_TOKEN") == 1
+    assert not re.search(r"\becho\b.*(PUSH_TOKEN|auth)", script)
+
+
+SHA_PIN = re.compile(r"^\s*(?:- )?uses: ([\w.-]+/[\w.-]+)@([0-9a-f]{40}) # (v\d+\.\d+\.\d+)$")
+
+
+def test_every_action_is_pinned_to_a_commit_with_its_version_noted():
+    for name in ("daily.yml", "ci.yml"):
+        lines = (WORKFLOWS / name).read_text(encoding="utf-8").splitlines()
+        uses = [x for x in lines if re.match(r"^\s*(- )?uses:", x)]
+        assert uses, name
+        for line in uses:
+            assert SHA_PIN.match(line), line
+
+
+def test_uv_itself_is_pinned_and_the_lock_is_enforced():
+    setup = next(s for s in steps() if s.get("uses", "").startswith("astral-sh/setup-uv@"))
+    assert re.fullmatch(r"\d+\.\d+\.\d+", str(setup["with"]["version"]))
+    syncs = [s["run"] for s in steps() if "uv sync" in s.get("run", "")]
+    assert syncs == ["uv sync --locked"]
+
+
+def test_ci_has_a_read_only_token():
+    assert load("ci.yml")["permissions"] == {"contents": "read"}
+    for j in load("ci.yml")["jobs"].values():
+        assert "permissions" not in j
 
 
 def test_ci_workflow_keeps_its_three_jobs():
