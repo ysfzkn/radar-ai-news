@@ -16,6 +16,7 @@ import {
   queueFilter,
   rejectStory,
   restoreStory,
+  searchTerms,
   storyPosition,
   unpublishStory,
 } from "../src/stories";
@@ -156,6 +157,27 @@ describe("queue filter", () => {
     expect(await uids("ajan framework")).toEqual([]);
     expect(await uids(long)).toEqual([a]);
     expect(await uids(`${long}%`)).toEqual([]);
+  });
+});
+
+describe("queue search and Turkish letters", () => {
+  it("şifre finds Şifre and istanbul finds İstanbul, and the other way round", async () => {
+    const sifre = await seed({ mutate: (s) => (s.texts.tr.title = "Şifre yöneticisinde açık") });
+    const ist = await seed({ mutate: (s) => (s.texts.tr.title = "İstanbul'da yapay zekâ buluşması") });
+    const upper = await seed({ mutate: (s) => (s.texts.tr.title = "ILIK GELİŞME") });
+    const uids = async (q: string) => (await listStories(db, "review", 50, 0, { q, cat: null })).map((s) => s.uid);
+    expect(await uids("şifre")).toEqual([sifre]);
+    expect(await uids("ŞİFRE")).toEqual([sifre]);
+    expect(await uids("istanbul")).toEqual([ist]);
+    expect(await uids("İSTANBUL")).toEqual([ist]);
+    expect(await uids("ılık gelişme")).toEqual([upper]);
+    expect(await countStories(db, "review", { q: "istanbul", cat: null })).toBe(1);
+  });
+
+  it("uses at most ten words and says which", () => {
+    const words = Array.from({ length: 12 }, (_, i) => `w${i + 1}`);
+    expect(searchTerms(words.join(" "))).toEqual({ used: words.slice(0, 10), ignored: 2 });
+    expect(searchTerms("  a   b ")).toEqual({ used: ["a", "b"], ignored: 0 });
   });
 });
 

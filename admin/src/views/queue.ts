@@ -1,7 +1,7 @@
 import { html } from "hono/html";
 import { COPY } from "../copy";
 import { CATEGORIES, type Status } from "../schema";
-import { NO_FILTER, QUERY_MAX, type QueueFilter, type StorySummary } from "../stories";
+import { NO_FILTER, QUERY_MAX, searchTerms, type QueueFilter, type StorySummary } from "../stories";
 import {
   RADAR_MARK,
   categoryLabel,
@@ -78,6 +78,8 @@ function search(status: Status, f: QueueFilter, total: number | null): View {
   const chipLink = (label: string, cat: string | null) =>
     html`<li><a class="chip-link" href="${listHref(status, { q: f.q, cat })}"${f.cat === cat ? html` aria-current="true"` : ""}>${label}</a></li>`;
   const active = f.q !== "" || f.cat !== null;
+  // The results line names only the words the search used.
+  const terms = searchTerms(f.q);
   return html`<form class="search" method="get" action="/admin" role="search">
 <input type="hidden" name="status" value="${status}">
 ${f.cat ? html`<input type="hidden" name="cat" value="${f.cat}">` : ""}
@@ -91,7 +93,7 @@ ${f.cat ? html`<input type="hidden" name="cat" value="${f.cat}">` : ""}
 ${chipLink(COPY.allCategories, null)}
 ${CATEGORIES.map((c) => chipLink(categoryLabel(c), c))}
 </ul></nav>
-${active ? html`<p class="results">${total === null ? "" : COPY.results(total)}${f.cat ? html` · <strong>${categoryLabel(f.cat)}</strong>` : ""}${f.q ? html` · <strong>“${f.q}”</strong>` : ""} <a class="clear" href="${listHref(status)}">${COPY.clearFilter}</a></p>` : ""}`;
+${active ? html`<p class="results">${total === null ? "" : COPY.results(total)}${f.cat ? html` · <strong>${categoryLabel(f.cat)}</strong>` : ""}${terms.used.length > 0 ? html` · <strong>“${terms.used.join(" ")}”</strong>` : ""}${terms.ignored > 0 ? html` · ${COPY.termsIgnored(terms.ignored)}` : ""} <a class="clear" href="${listHref(status)}">${COPY.clearFilter}</a></p>` : ""}`;
 }
 
 function emptyState(status: Status, filtered: boolean): View {

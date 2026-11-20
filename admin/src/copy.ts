@@ -140,6 +140,7 @@ export const COPY = {
   allCategories: "Tümü",
   clearFilter: "Temizle",
   results: (n: number) => `${n} sonuç`,
+  termsIgnored: (n: number) => `ilk 10 kelime arandı, kalan ${n} kelime yok sayıldı`,
 
   // The status strip over the review queue.
   stripLabel: "Kuyruğun durumu",

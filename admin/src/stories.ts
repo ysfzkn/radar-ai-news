@@ -177,13 +177,30 @@ export function queueFilter(rawQ: string | undefined, rawCat: string | undefined
 export const likePattern = (q: string): string => `%${q.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
 
 // D1 refuses a LIKE pattern over 50 bytes; a longer word is matched with instr() instead (also
-// literal, but case-sensitive).
+// literal, and case-sensitive within each case form). At most MAX_TERMS words, each with up to
+// four case forms, keep a statement under D1's 100 bound parameters.
 const LIKE_MAX_BYTES = 50;
 const MAX_TERMS = 10;
 const utf8Length = (value: string): number => new TextEncoder().encode(value).length;
 
-// The WHERE clauses and binds a filter adds to a query over `stories s`. Every word of `q` must
-// appear in the same title, Turkish or English (LIKE ignores case for ASCII letters only).
+// The words of `q` the search uses (the first MAX_TERMS) and how many it leaves out.
+export function searchTerms(q: string): { used: string[]; ignored: number } {
+  const all = q.split(/\s+/).filter((t) => t !== "");
+  return { used: all.slice(0, MAX_TERMS), ignored: Math.max(0, all.length - MAX_TERMS) };
+}
+
+// SQLite's LIKE folds ASCII letters only, so "şifre" would miss "Şifre" and "istanbul" would miss
+// "İstanbul". A word is matched in its own spelling and in its Turkish-locale lower, upper and
+// capitalised forms (ş/Ş, i/İ, ı/I); LIKE still folds the ASCII letters of each.
+export function caseVariants(term: string): string[] {
+  const lower = term.toLocaleLowerCase("tr");
+  const first = Array.from(lower)[0] ?? "";
+  const capital = first.toLocaleUpperCase("tr") + lower.slice(first.length);
+  return [...new Set([term, lower, term.toLocaleUpperCase("tr"), capital])];
+}
+
+// The WHERE clauses and binds a filter adds to a query over `stories s`. Every word of `q` (in one
+// of its case forms) must appear in the same title, Turkish or English. All values are bound.
 function filterSql(f: QueueFilter): { sql: string; binds: unknown[] } {
   const parts: string[] = [];
   const binds: unknown[] = [];
@@ -191,16 +208,19 @@ function filterSql(f: QueueFilter): { sql: string; binds: unknown[] } {
     parts.push("AND s.category = ?");
     binds.push(f.cat);
   }
-  const terms = f.q.split(/\s+/).filter((t) => t !== "").slice(0, MAX_TERMS);
+  const terms = searchTerms(f.q).used;
   if (terms.length > 0) {
     const tests = terms.map((term) => {
-      const like = likePattern(term);
-      if (utf8Length(like) <= LIKE_MAX_BYTES) {
-        binds.push(like);
-        return "f.title LIKE ? ESCAPE '\\'";
-      }
-      binds.push(term);
-      return "instr(f.title, ?) > 0";
+      const forms = caseVariants(term).map((form) => {
+        const like = likePattern(form);
+        if (utf8Length(like) <= LIKE_MAX_BYTES) {
+          binds.push(like);
+          return "f.title LIKE ? ESCAPE '\\'";
+        }
+        binds.push(form);
+        return "instr(f.title, ?) > 0";
+      });
+      return `(${forms.join(" OR ")})`;
     });
     parts.push(`AND EXISTS (SELECT 1 FROM story_texts f WHERE f.story_uid = s.uid AND ${tests.join(" AND ")})`);
   }

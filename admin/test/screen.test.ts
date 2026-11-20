@@ -158,6 +158,18 @@ describe("search and filter in the queue", () => {
     expect(await text("/admin?q=_")).toContain(COPY.emptyFiltered);
   });
 
+  it("past ten words the results line names the words used and says the rest were ignored", async () => {
+    await seed({ title: "w1 w2 w3 w4 w5 w6 w7 w8 w9 w10" });
+    const words = Array.from({ length: 12 }, (_, i) => `w${i + 1}`).join(" ");
+    const body = await text(`/admin?q=${encodeURIComponent(words)}`);
+    const results = body.match(/<p class="results">.*?<\/p>/s)?.[0] ?? "";
+    expect(results).toContain("1 sonuç · <strong>“w1 w2 w3 w4 w5 w6 w7 w8 w9 w10”</strong>");
+    expect(results).not.toContain("w11");
+    expect(results).toContain(COPY.termsIgnored(2));
+    const short = await text("/admin?q=w1");
+    expect(short.match(/<p class="results">.*?<\/p>/s)?.[0]).not.toContain(COPY.termsIgnored(1).slice(0, 8));
+  });
+
   it("paging links carry the search", async () => {
     const stories = Array.from({ length: 51 }, (_, i) => {
       const s = structuredClone((sample as Json).stories[0]) as Json;
