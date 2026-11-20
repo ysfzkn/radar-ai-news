@@ -2,13 +2,13 @@
 
 # Radar
 
-**The day's AI and agentic news for developers. Five minutes, no noise.**
+**The day's tech and AI news. Five minutes, no noise.**
 
-Written by an agent. Approved by a human. Every claim linked to its primary source.
+Written by an agent. Checked by a human where it counts. Every claim linked to its primary source.
 
-[radar.ozkanyusuf.com](https://radar.ozkanyusuf.com) · [How it works](#how-it-works) · [Quickstart](#quickstart) · [Suggest a source](#suggest-a-source)
+[radar.ozkanyusuf.com](https://radar.ozkanyusuf.com) (launching soon) · [How it works](#how-it-works) · [Quickstart](#quickstart) · [Suggest a source](#suggest-a-source)
 
-[![CI](https://github.com/ysfzkn/radar/actions/workflows/ci.yml/badge.svg)](https://github.com/ysfzkn/radar/actions/workflows/ci.yml)
+[![CI](https://github.com/ysfzkn/radar-ai-news/actions/workflows/ci.yml/badge.svg)](https://github.com/ysfzkn/radar-ai-news/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Status: in development](https://img.shields.io/badge/status-in%20development-orange.svg)](#status)
 
@@ -20,30 +20,30 @@ Written by an agent. Approved by a human. Every claim linked to its primary sour
 
 I missed A2UI. A protocol I ended up shipping in my own product, and I only heard about it from someone else, weeks late. The news was out there; it was buried under funding rounds, benchmark drama and forty rewrites of the same press release.
 
-Radar is the feed I wanted: **one short edition a day, 5–8 stories, each ending with one line that answers "what does this mean for me as a developer?"** Then it stops. No infinite scroll, no ads, no pop-ups.
+Radar is the feed I wanted: **one short edition a day, 5–8 stories, each ending with one line that says why it matters.** Then it stops. No infinite scroll, no ads, no pop-ups.
 
-It is published in **Turkish and English**. Turkish comes first, because that is where a developer-focused daily was missing.
+It is published in **Turkish and English**. Turkish comes first, because that is where a daily like this was missing.
 
 ## What a story looks like
 
 ```
-PROTOCOL · Nov 19                                    ●●●●○ 4 sources
+01  PROTOCOL                                          ))))) 4 sources
 
 A2UI reaches 1.0 release candidate
 
 Google's protocol for agent-generated interfaces is now a release
 candidate. The agent sends JSON; the client renders its own components.
 
-→ For developers: if your chat UI needs a form or a table, you can try
-  it without writing a custom component.
+WHY IT MATTERS  If your chat UI needs a form or a table, you can try
+it without writing a custom component.
 
-Source: a2ui.org · GitHub                            [ Try it today ]
-Written by AI · auto-published
+Source: a2ui.org · GitHub
+[ ▸ Try it today · github.com ]
 ```
 
 Two small signals carry a lot:
 
-- **Echo meter** — how many independent sources covered the story. It separates what is actually making waves from what one blog is excited about.
+- **Echo meter** — five arcs; the lit ones show how many independent sources covered the story. It separates what is actually making waves from what one blog is excited about.
 - **Try it today** — shown when there is a repo or quickstart you can run right now.
 
 ## How it works
@@ -57,7 +57,7 @@ flowchart LR
     W --> R[Readers<br/>web · RSS]
 ```
 
-The pipeline has seven steps. **Four of them never call a model.**
+The pipeline has seven steps. **Only two of them call a model.**
 
 | # | Step | Model | What it does |
 | --- | --- | --- | --- |
@@ -76,17 +76,17 @@ The pipeline has seven steps. **Four of them never call a model.**
 - **Risky stories wait for a human.** Security incidents, accusations, funding figures, third-party benchmark claims and regulation always go to review. Unreviewed items expire after 72 hours; they are never published by default.
 - **A budget, enforced in code.** The design target is under 30K tokens a day, with a hard daily spend cap. Token use per step is logged for every run.
 - **We do not summarize the summarizers.** Other newsletters are used only to check what we missed, never as text to rewrite.
-- **Labeled honestly.** Every story says whether a human approved it or it was auto-published.
+- **No ghostwriter.** A model writes every story, and Radar says so. The Künye page shows how it works and which stories a person reads first. When a story is wrong, it is corrected or pulled.
 
 ## Status
 
-Radar is being built in the open, one plan at a time.
+Radar is being built in the open, one plan at a time. The code for the first five is in this repository; the public launch is in progress.
 
-- [ ] **1. Collector** — source registry, fetchers, deduplication, prefilter
-- [ ] **2. Agent** — scoring, fact cards, bilingual writing, verification, token meter
-- [ ] **3. Admin** — review queue, edit, approve, reject, expiry
-- [ ] **4. Site** — daily edition, archive, topics, weekly digest, RSS
-- [ ] **5. Automation** — scheduled runs, notifications, alerts
+- [x] **1. Collector** — source registry, fetchers, deduplication, prefilter
+- [x] **2. Agent** — scoring, fact cards, bilingual writing, verification, token meter
+- [x] **3. Admin** — review queue, edit, approve, reject, expiry
+- [x] **4. Site** — daily edition, archive, topics, weekly digest, RSS, a free RSS subscription
+- [x] **5. Automation** — a scheduled daily run, notices, saved state
 - [ ] **6. Launch**
 
 ## Quickstart
@@ -94,8 +94,8 @@ Radar is being built in the open, one plan at a time.
 The collector runs locally with no API key and no account.
 
 ```bash
-git clone https://github.com/OWNER/radar.git
-cd radar/agent
+git clone https://github.com/ysfzkn/radar-ai-news.git
+cd radar-ai-news/agent
 uv sync
 uv run pytest
 uv run radar collect --show 5
@@ -114,7 +114,7 @@ Full instructions, including running your own Radar on your own domain: [docs/se
 
 ## Suggest a source
 
-The source list is a plain file: [`sources.yaml`](sources.yaml). If Radar should be reading something it is not, [open a source suggestion](https://github.com/OWNER/radar/issues/new?template=source_suggestion.yml) or send a pull request. How sources are tiered and weighted: [docs/sources.md](docs/sources.md).
+The source list is a plain file: [`sources.yaml`](sources.yaml). If Radar should be reading something it is not, [open a source suggestion](https://github.com/ysfzkn/radar-ai-news/issues/new?template=source_suggestion.yml) or send a pull request. How sources are tiered and weighted: [docs/sources.md](docs/sources.md).
 
 Turkish sources are especially welcome.
 
