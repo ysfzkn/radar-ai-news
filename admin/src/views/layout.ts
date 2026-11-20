@@ -49,17 +49,9 @@ export function externalLink(url: string, label: string = url): View {
 
 export const storyPath = (uid: string): string => `/admin/stories/${encodeURIComponent(uid)}`;
 
-// The product's radar mark: a dot at the lower left and five quarter arcs around it, the three
-// inner ones lit. Built from constants only; its colours come from the stylesheet.
-const ARC_RADII = [5, 8.5, 12, 15.5, 19] as const;
-const LIT_ARCS = 3;
-
-function radarMark(): View {
-  const arcs = ARC_RADII.map(
-    (r, i) => html`<path class="${i < LIT_ARCS ? "mark-lit" : "mark-dim"}" d="M4 ${20 - r}A${r} ${r} 0 0 1 ${4 + r} 20"/>`,
-  );
-  return html`<svg class="mark" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><circle class="mark-dot" cx="4" cy="20" r="2"/>${arcs}</svg>`;
-}
+// The product's radar mark: a radar screen (a ring, a sweep from the centre, one blip).
+// Constants only; its colours come from the stylesheet.
+const RADAR_MARK = html`<svg class="mark" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><circle class="mark-ring" cx="12" cy="12" r="9.25"/><line class="mark-sweep" x1="12" y1="12" x2="18.54" y2="5.46"/><circle class="mark-blip" cx="7.75" cy="14.25" r="1.9"/></svg>`;
 
 export interface Shell {
   title: string;
@@ -88,7 +80,7 @@ export function layout(p: Shell): View {
 <body>
 <header class="top">
 <div class="top-inner">
-<a class="brand" href="/admin">${radarMark()}<span class="wordmark">${COPY.brand}</span> <span class="brand-suffix">${COPY.brandSuffix}</span></a>
+<a class="brand" href="/admin">${RADAR_MARK}<span class="wordmark">${COPY.brand}</span> <span class="brand-suffix">${COPY.brandSuffix}</span></a>
 <span class="who">${p.email}</span>
 </div>
 </header>

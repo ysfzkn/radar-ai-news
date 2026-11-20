@@ -85,10 +85,9 @@ p { margin: 0; }
   font-size: var(--text-lg); line-height: 1; text-decoration: none;
 }
 .mark { flex: none; width: 18px; height: 18px; }
-.mark path { fill: none; stroke-width: 1.75; stroke-linecap: round; }
-.mark-lit { stroke: var(--accent); }
-.mark-dim { stroke: var(--control-border); }
-.mark-dot { fill: var(--accent); }
+.mark-ring { fill: none; stroke: var(--ink); stroke-width: 1.75; }
+.mark-sweep { stroke: var(--accent); stroke-width: 1.75; stroke-linecap: round; }
+.mark-blip { fill: var(--accent); }
 .wordmark { font-weight: 700; letter-spacing: -0.01em; }
 .brand-suffix { color: var(--muted); font-weight: 500; }
 .who { flex-basis: 100%; padding-bottom: var(--space-2); overflow-wrap: anywhere; }

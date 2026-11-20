@@ -803,21 +803,23 @@ describe("review screen", () => {
     expect(js).toContain("data-limit"); // the live counters stay
   });
 
-  it("the brand is the radar mark: an 18 px inline svg with three lit arcs, hidden from assistive tech", async () => {
+  it("the brand is the radar mark: an 18 px inline svg of a radar screen, hidden from assistive tech", async () => {
     const body = await (await get("/admin")).text();
     const svg = body.match(/<svg [^>]*>[\s\S]*?<\/svg>/)?.[0] ?? "";
     expect(svg).toContain('class="mark"');
     expect(svg).toContain('viewBox="0 0 24 24"');
     expect(svg).toContain('width="18" height="18"');
     expect(svg).toContain('aria-hidden="true"');
-    expect(svg).toContain('<circle class="mark-dot" cx="4" cy="20" r="2"/>');
-    expect(svg.match(/class="mark-lit"/g)?.length).toBe(3);
-    expect(svg.match(/class="mark-dim"/g)?.length).toBe(2);
-    expect(svg).toContain('d="M4 15A5 5 0 0 1 9 20"');
-    expect(svg).toContain('d="M4 1A19 19 0 0 1 23 20"');
+    expect(svg).toContain('<circle class="mark-ring" cx="12" cy="12" r="9.25"/>');
+    expect(svg).toContain('<line class="mark-sweep" x1="12" y1="12" x2="18.54" y2="5.46"/>');
+    expect(svg).toContain('<circle class="mark-blip" cx="7.75" cy="14.25" r="1.9"/>');
+    expect(svg.match(/<(circle|line|path|rect|polygon|polyline|ellipse)[\s/>]/g)?.length).toBe(3);
     expect(svg).not.toMatch(/(fill|stroke|style)=/);
     const css = await (await get("/admin/app.css")).text();
-    expect(css).not.toContain(".brand::before");
+    expect(css).toMatch(/\.mark-ring \{[^}]*stroke: var\(--ink\)/);
+    expect(css).toMatch(/\.mark-sweep \{[^}]*stroke: var\(--accent\)/);
+    expect(css).toMatch(/\.mark-blip \{[^}]*fill: var\(--accent\)/);
+    for (const old of [".brand::before", "mark-lit", "mark-dim", "mark-dot"]) expect(css).not.toContain(old);
   });
   it("a page that keeps unsaved typed text marks the form dirty; a normal story page does not", async () => {
     const uid = await seed();
