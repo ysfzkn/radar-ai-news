@@ -119,6 +119,12 @@ export const COPY = {
     regulation: "düzenleme",
   } satisfies Record<(typeof RISK_FLAGS)[number], string>,
   tooLongReason: (field: string, n: string, max: string) => `${field} çok uzun (${n} / ${max})`,
+  // The agent's injection checks (a story with any of these waits for a person).
+  factCard: "Bilgi kartı",
+  hasLinkReason: (where: string, token: string) => `${where}: bağlantı ya da alan adı içeriyor (${token})`,
+  hasBackticksReason: (where: string) => `${where}: ters tırnak içeriyor`,
+  hasCommandReason: (where: string, fragment: string) => `${where}: komut benzeri metin içeriyor (${fragment})`,
+  foreignTryHostReason: (host: string) => `“Dene” bağlantısı kaynakların dışında bir siteye gidiyor (${host})`,
 
   // Said after a successful action, from the redirect's `done` hint.
   done: {

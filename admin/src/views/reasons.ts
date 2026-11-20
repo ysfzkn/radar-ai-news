@@ -17,6 +17,22 @@ const VERIFY = /^verify:\s*/;
 const PATH = /^([a-z]+)\.([a-z_]+):\s*/;
 const TOO_LONG = /^([a-z]+)\.([a-z_]+): too long \((\d+) > (\d+)\)$/;
 
+const LINK = /^link or domain '(.*)'$/;
+const BACKTICKS = /^backticks$/;
+const COMMAND = /^command-like text '(.*)'$/;
+const FOREIGN_TRY = /^fact_card\.try_url: host '(.*)' is not a source host$/;
+const FACT_WHAT = /^fact_card\.what:\s*/;
+
+// The injection checks' wording after the path, in Turkish; undefined for anything else.
+function injectionText(where: string, tail: string): string | undefined {
+  const link = LINK.exec(tail);
+  if (link) return COPY.hasLinkReason(where, link[1]!);
+  if (BACKTICKS.test(tail)) return COPY.hasBackticksReason(where);
+  const command = COMMAND.exec(tail);
+  if (command) return COPY.hasCommandReason(where, command[1]!);
+  return undefined;
+}
+
 // "tr.title" -> "Türkçe başlık" when both parts are known; otherwise undefined.
 function knownLabel(lang: string, field: string): string | undefined {
   if (lang !== "tr" && lang !== "en") return undefined;
@@ -48,8 +64,15 @@ export function reasonView(reason: string): ReasonView {
     if (long && longLabel) {
       return { kind: "verify", label, text: COPY.tooLongReason(longLabel, long[3]!, long[4]!), raw: false };
     }
+    const foreign = FOREIGN_TRY.exec(rest);
+    if (foreign) return { kind: "verify", label, text: COPY.foreignTryHostReason(foreign[1]!), raw: false };
     const path = PATH.exec(rest);
     const pathLabel = path ? knownLabel(path[1]!, path[2]!) : undefined;
+    const fact = FACT_WHAT.exec(rest);
+    const where = path && pathLabel ? pathLabel : fact ? COPY.factCard : undefined;
+    const tail = path && pathLabel ? rest.slice(path[0].length) : fact ? rest.slice(fact[0].length) : "";
+    const injection = where ? injectionText(where, tail) : undefined;
+    if (injection) return { kind: "verify", label, text: injection, raw: false };
     const text = path && pathLabel ? `${pathLabel}: ${rest.slice(path[0].length)}` : rest;
     return { kind: "verify", label, text, raw: true };
   }

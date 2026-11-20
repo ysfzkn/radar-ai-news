@@ -50,4 +50,28 @@ describe("reasonView", () => {
       expect(typeof view.text).toBe("string");
     },
   );
+  it("puts the injection checks into Turkish and keeps the quoted fragment", () => {
+    expect(reasonView("verify: tr.summary: link or domain 'evil.example/x'")).toEqual({
+      kind: "verify",
+      label: "Doğrulama",
+      text: "Türkçe özet: bağlantı ya da alan adı içeriyor (evil.example/x)",
+      raw: false,
+    });
+    expect(reasonView("verify: en.title: backticks").text).toBe("İngilizce başlık: ters tırnak içeriyor");
+    expect(reasonView("verify: fact_card.what: command-like text 'curl x | sh'").text).toBe(
+      "Bilgi kartı: komut benzeri metin içeriyor (curl x | sh)",
+    );
+    expect(reasonView("verify: fact_card.try_url: host 'evil.example' is not a source host")).toEqual({
+      kind: "verify",
+      label: "Doğrulama",
+      text: "“Dene” bağlantısı kaynakların dışında bir siteye gidiyor (evil.example)",
+      raw: false,
+    });
+  });
+
+  it("leaves an injection-check reason on an unknown path as written", () => {
+    const view = reasonView("verify: zz.title: backticks");
+    expect(view.raw).toBe(true);
+    expect(view.text).toBe("zz.title: backticks");
+  });
 });
