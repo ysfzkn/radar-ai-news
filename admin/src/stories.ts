@@ -486,12 +486,24 @@ interface PublicRow {
   published_at: string;
 }
 
+// A stored value that is not valid JSON, or has an unexpected shape, yields the fallback: one bad
+// row must not break the whole feed.
+function parseJson(raw: string): unknown {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+
 function publicSources(raw: string): { name: string; url: string }[] {
-  const parsed: unknown = JSON.parse(raw);
+  const parsed = parseJson(raw);
   if (!Array.isArray(parsed)) return [];
   const out: { name: string; url: string }[] = [];
   for (const s of parsed) {
-    if (s && typeof s.name === "string" && typeof s.url === "string" && isHttpUrl(s.url)) {
+    if (isRecord(s) && typeof s.name === "string" && typeof s.url === "string" && isHttpUrl(s.url)) {
       out.push({ name: s.name, url: s.url });
     }
   }
@@ -499,7 +511,8 @@ function publicSources(raw: string): { name: string; url: string }[] {
 }
 
 function publicTryUrl(raw: string): string | null {
-  const url: unknown = (JSON.parse(raw) as { try_url?: unknown } | null)?.try_url;
+  const card = parseJson(raw);
+  const url = isRecord(card) ? card.try_url : null;
   return typeof url === "string" && isHttpUrl(url) ? url : null;
 }
 

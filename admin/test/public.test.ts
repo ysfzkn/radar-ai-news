@@ -166,6 +166,32 @@ describe("GET /api/stories", () => {
     expect(again.publish_mode).toBe("auto");
   });
 
+  it("keeps one malformed stored row from breaking the feed", async () => {
+    const good = await seed("published", "2026-11-20T05:00:00.000Z");
+    const badSources = await seed("published", "2026-11-20T04:00:00.000Z");
+    const badCard = await seed("published", "2026-11-20T03:00:00.000Z");
+    const oddShapes = await seed("published", "2026-11-20T02:00:00.000Z");
+    const nullCard = await seed("published", "2026-11-20T01:00:00.000Z");
+    await env.DB.batch([
+      env.DB.prepare("UPDATE stories SET sources = 'not json' WHERE uid = ?").bind(badSources),
+      env.DB.prepare("UPDATE stories SET fact_card = 'not json' WHERE uid = ?").bind(badCard),
+      env.DB
+        .prepare("UPDATE stories SET sources = ?, fact_card = ? WHERE uid = ?")
+        .bind(JSON.stringify([null, "x", 5, { name: "Ok", url: "https://ok.example/" }]), '"text"', oddShapes),
+      env.DB.prepare("UPDATE stories SET sources = ?, fact_card = 'null' WHERE uid = ?").bind('{"a":1}', nullCard),
+    ]);
+    const res = await get("/api/stories");
+    expect(res.status).toBe(200);
+    const byUid = new Map<string, Json>((((await res.json()) as Json).stories as Json[]).map((s) => [s.uid, s]));
+    expect(byUid.size).toBe(5);
+    expect(byUid.get(good)!.sources).toHaveLength(1);
+    expect(byUid.get(badSources)).toMatchObject({ sources: [] });
+    expect(byUid.get(badCard)).toMatchObject({ try_url: null });
+    expect(byUid.get(badCard)!.sources).toHaveLength(1);
+    expect(byUid.get(oddShapes)).toMatchObject({ sources: [{ name: "Ok", url: "https://ok.example/" }], try_url: null });
+    expect(byUid.get(nullCard)).toMatchObject({ sources: [], try_url: null });
+  });
+
   it("leaves out a language whose text row is missing", async () => {
     const uid = await seed("published");
     await env.DB.prepare("DELETE FROM story_texts WHERE story_uid = ? AND lang = 'en'").bind(uid).run();
