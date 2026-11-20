@@ -110,3 +110,9 @@ const CATEGORY_CLASS: Record<Category, string> = {
 export function categoryClass(category: Category): string {
   return CATEGORY_CLASS[category];
 }
+
+/** "20 Kasım 2026" / "20 November 2026": a date without its weekday. */
+export function plainDate(date: string, lang: Lang): string {
+  const { year, month, day } = parts(date);
+  return `${day} ${COPY[lang].months[month]} ${year}`;
+}

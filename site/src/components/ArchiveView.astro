@@ -1,9 +1,10 @@
 ---
+import HeatStrip from "./HeatStrip.astro";
 import { COPY } from "../lib/copy";
 import type { Edition } from "../lib/editions";
-import { longDate } from "../lib/format";
+import { categoryClass, longDate } from "../lib/format";
 import { routes } from "../lib/routes";
-import type { Lang } from "../lib/schema";
+import { CATEGORIES, type Lang } from "../lib/schema";
 
 interface Props {
   lang: Lang;
@@ -13,6 +14,7 @@ interface Props {
 
 const { lang, editions } = Astro.props;
 const copy = COPY[lang];
+const text = copy.search;
 
 // Month groups in edition order, keyed "YYYY-MM".
 const months: { key: string; name: string; editions: Edition[] }[] = [];
@@ -26,6 +28,17 @@ for (const edition of editions) {
     months.push({ key, name: `${copy.months[month - 1]} ${year}`, editions: [edition] });
   }
 }
+
+// What the search script needs to write a result: month names, and the count and source
+// phrases with {n} where the number goes.
+const labels = {
+  months: copy.months,
+  sourceOne: copy.sources(1),
+  sourceMany: copy.sources(2).replace("2", "{n}"),
+  countNone: text.count(0),
+  countOne: text.count(1),
+  countMany: text.count(2).replace("2", "{n}"),
+};
 ---
 
 <h1 class="kunye label">
@@ -34,33 +47,98 @@ for (const edition of editions) {
 </h1>
 
 {
+  editions.length > 0 && (
+    <>
+      <section
+        class="search"
+        aria-label={text.region}
+        hidden
+        data-search
+        data-src={`/search-${lang}.json`}
+        data-failed={text.failed}
+        data-labels={JSON.stringify(labels)}
+      >
+        <div class="search-field">
+          <label class="label caps" for="search-q">
+            {text.label}
+          </label>
+          <input class="search-input" id="search-q" type="search" name="q" autocomplete="off" />
+        </div>
+        <div class="chips" role="radiogroup" aria-label={text.topics}>
+          <button class="chip label caps" type="button" role="radio" aria-checked="true" data-category="">
+            {text.allTopics}
+          </button>
+          {CATEGORIES.map((category) => (
+            <button
+              class={`chip label caps ${categoryClass(category)}`}
+              type="button"
+              role="radio"
+              aria-checked="false"
+              data-category={category}
+            >
+              {copy.categories[category]}
+            </button>
+          ))}
+        </div>
+        <div class="search-filters">
+          <label class="search-month label">
+            <span class="caps">{text.month}</span>{" "}
+            <select class="search-select" data-month>
+              <option value="">{text.allMonths}</option>
+              {months.map((month) => (
+                <option value={month.key}>{month.name}</option>
+              ))}
+            </select>
+          </label>
+          <label class="search-echo label">
+            <input type="checkbox" data-echo /> {text.echo}
+          </label>
+          <button class="search-clear label caps" type="button" data-clear>
+            {text.clear}
+          </button>
+        </div>
+        <p class="search-count label" aria-live="polite" data-count />
+        <ol class="list search-results" role="list" data-results hidden />
+      </section>
+      <HeatStrip lang={lang} editions={editions} />
+    </>
+  )
+}
+
+{
   editions.length === 0 ? (
     <p class="empty">{copy.noEdition}</p>
   ) : (
-    months.map((month) => (
-      <section class="month">
-        <h2 class="month-name label caps">{month.name}</h2>
-        <ol class="list" role="list">
-          {month.editions.map((edition) => {
-            // Editions are already in reading order: the first story is the lead.
-            const total = edition.stories.reduce((sum, story) => sum + story.source_count, 0);
-            return (
-              <li>
-                <a class="row" href={routes[lang].edition(edition.date)}>
-                  <span class="row-no">{copy.issue(edition.number)}</span>{" "}
-                  <time class="row-date" datetime={edition.date}>
-                    {longDate(edition.date, lang)}
-                  </time>{" "}
-                  <span class="row-lead">{edition.stories[0].texts[lang]!.title}</span>{" "}
-                  <span class="row-count label">
-                    {copy.storyCount(edition.stories.length)} · {copy.sources(total)}
-                  </span>
-                </a>
-              </li>
-            );
-          })}
-        </ol>
-      </section>
-    ))
+    <div data-archive-list>
+      {months.map((month) => (
+        <section class="month">
+          <h2 class="month-name label caps">{month.name}</h2>
+          <ol class="list" role="list">
+            {month.editions.map((edition) => {
+              // Editions are already in reading order: the first story is the lead.
+              const total = edition.stories.reduce((sum, story) => sum + story.source_count, 0);
+              return (
+                <li>
+                  <a class="row" href={routes[lang].edition(edition.date)}>
+                    <span class="row-no">{copy.issue(edition.number)}</span>{" "}
+                    <time class="row-date" datetime={edition.date}>
+                      {longDate(edition.date, lang)}
+                    </time>{" "}
+                    <span class="row-lead">{edition.stories[0].texts[lang]!.title}</span>{" "}
+                    <span class="row-count label">
+                      {copy.storyCount(edition.stories.length)} · {copy.sources(total)}
+                    </span>
+                  </a>
+                </li>
+              );
+            })}
+          </ol>
+        </section>
+      ))}
+    </div>
   )
 }
+
+<script>
+  import "../scripts/search";
+</script>

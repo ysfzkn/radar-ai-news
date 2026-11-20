@@ -52,6 +52,23 @@ export interface Copy {
   weekdays: readonly string[];
   archiveTitle: string;
   issueCount(n: number): string;
+  /** The archive search: its region, input label, topic chips, month select, source toggle, count, clear button, failure line. */
+  search: {
+    region: string;
+    label: string;
+    topics: string;
+    allTopics: string;
+    month: string;
+    allMonths: string;
+    /** The toggle for stories with three or more sources. */
+    echo: string;
+    clear: string;
+    count(n: number): string;
+    failed: string;
+    /** The heat strip's name and one day's accessible name, for example "20 Kasım 2026, 6 haber". */
+    heat: string;
+    heatDay(date: string, n: number): string;
+  };
   topicTitle(category: string): string;
   topicEmpty: string;
   weekIndexTitle: string;
@@ -159,6 +176,20 @@ export const COPY: Record<Lang, Copy> = {
     weekdays: ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"],
     archiveTitle: "Arşiv",
     issueCount: (n) => `${n} sayı`,
+    search: {
+      region: "Arşivde ara",
+      label: "Haberlerde ara",
+      topics: "Konu",
+      allTopics: "Tümü",
+      month: "Ay",
+      allMonths: "Tüm aylar",
+      echo: "3+ kaynak",
+      clear: "Temizle",
+      count: (n) => (n === 0 ? "Sonuç yok." : `${n} sonuç`),
+      failed: "Arama şu an çalışmıyor; arşiv listesi aşağıda.",
+      heat: "Son 26 hafta: her kare bir gün",
+      heatDay: (date, n) => `${date}, ${n} haber`,
+    },
     topicTitle: (category) => `Konu: ${category}`,
     topicEmpty: "Bu konuda henüz haber yok.",
     weekIndexTitle: "Haftanın öne çıkanları",
@@ -331,6 +362,20 @@ export const COPY: Record<Lang, Copy> = {
     weekdays: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
     archiveTitle: "Archive",
     issueCount: (n) => (n === 1 ? "1 issue" : `${n} issues`),
+    search: {
+      region: "Search the archive",
+      label: "Search stories",
+      topics: "Topic",
+      allTopics: "All",
+      month: "Month",
+      allMonths: "All months",
+      echo: "3+ sources",
+      clear: "Clear",
+      count: (n) => (n === 0 ? "No results." : n === 1 ? "1 result" : `${n} results`),
+      failed: "Search is not working right now; the archive list is below.",
+      heat: "The last 26 weeks: each square is a day",
+      heatDay: (date, n) => `${date}, ${n === 1 ? "1 story" : `${n} stories`}`,
+    },
     topicTitle: (category) => `Topic: ${category}`,
     topicEmpty: "No stories on this topic yet.",
     weekIndexTitle: "Top stories of the week",

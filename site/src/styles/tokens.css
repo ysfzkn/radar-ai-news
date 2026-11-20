@@ -85,6 +85,13 @@
   --cat-policy: #8e2a8a;
   --cat-policy-soft: #f6e4f5;
 
+  /* The archive heat strip: the ink laid over the page colour at four strengths (25, 45, 70 and
+     100 per cent) by the number of stories of a day; a day without an edition is --line. */
+  --heat-1: #bfbfbe;
+  --heat-2: #929392;
+  --heat-3: #5a5b5b;
+  --heat-4: #17181a;
+
   --font-body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-display: "Bricolage Grotesque Variable", "Bricolage Fallback", var(--font-body);
   --font-label: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;

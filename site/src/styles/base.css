@@ -984,6 +984,180 @@ a.story-cat:hover {
   }
 }
 
+/* Archive search: revealed by script; without it the region keeps its `hidden` attribute and the list below stays. */
+.search {
+  padding-bottom: var(--space-5);
+}
+
+.search-field {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.search-input,
+.search-select {
+  border: 1px solid var(--control-border);
+  border-radius: 0;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+}
+
+.search-input {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  font-size: 1rem;
+}
+
+.search-select {
+  max-width: 100%;
+  padding: var(--space-1) var(--space-2);
+  font-size: 1rem;
+}
+
+.chips,
+.search-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.search-filters {
+  gap: var(--space-2) var(--space-4);
+}
+
+/* A topic chip: the category tag as a radio button, in its colour; the checked one is tinted and underlined. */
+.chip {
+  min-height: 2.5rem;
+  padding: 0.125rem 0.75rem;
+  border: 1px solid var(--cat, var(--ink));
+  background: transparent;
+  color: var(--cat, var(--ink));
+  cursor: pointer;
+}
+
+.chip[aria-checked="true"] {
+  background: var(--cat-soft, var(--chip));
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.25em;
+}
+
+.search-echo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2.5rem;
+}
+
+.search-clear {
+  min-height: 2.5rem;
+  margin-left: auto;
+  padding: 0.125rem 0.75rem;
+  border: 1px solid var(--ink);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.search-count {
+  min-height: 1.5em;
+  margin-top: var(--space-3);
+  color: var(--muted);
+}
+
+.result-meta {
+  color: var(--muted);
+}
+
+.result-title {
+  display: inline-block;
+  margin-top: var(--space-1);
+  text-decoration-color: var(--accent);
+}
+
+.result-summary {
+  margin-top: var(--space-1);
+  color: var(--muted);
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+/* The heat strip: 26 week columns of 7 day squares, newest at the right. The box scrolls
+   sideways on a narrow screen; `direction: rtl` starts it scrolled to the newest week,
+   and the weeks sit in the markup newest first, so `row-reverse` lays them out oldest to newest. */
+.heat {
+  margin-top: var(--space-5);
+  padding-bottom: var(--space-2);
+  overflow-x: auto;
+  direction: rtl;
+}
+
+.heat-weeks {
+  display: flex;
+  flex-direction: row-reverse;
+  gap: 2px;
+  width: max-content;
+  margin-right: auto;
+  padding-right: 1.75rem;
+  direction: ltr;
+}
+
+.heat-week {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.heat-month {
+  display: block;
+  width: 0;
+  height: 1rem;
+  overflow: visible;
+  color: var(--muted);
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  white-space: nowrap;
+}
+
+.heat-day {
+  display: block;
+  width: 0.875rem;
+  height: 0.875rem;
+  background: var(--line);
+}
+
+.heat-none {
+  background: transparent;
+}
+
+.heat-1 {
+  background: var(--heat-1);
+}
+
+.heat-2 {
+  background: var(--heat-2);
+}
+
+.heat-3 {
+  background: var(--heat-3);
+}
+
+.heat-4 {
+  background: var(--heat-4);
+}
+
+a.heat-day:hover {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 /* The Künye and subscribe pages: plain running text. */
 .prose h2 {
   margin-bottom: var(--space-3);
@@ -1169,6 +1343,11 @@ a.story-cat:hover {
 /* Print: the edition as one plain column of ink on white. Nothing relies on a background,
    which browsers drop by default; the echo meters are strokes and print as they are. */
 @media print {
+  .search,
+  .heat {
+    display: none;
+  }
+
   .top-nav,
   .demo,
   .index,

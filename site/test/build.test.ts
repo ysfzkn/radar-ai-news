@@ -702,14 +702,131 @@ describe("built site", () => {
     expect(end).toMatch(/<a class="pager-next" href="\/2026-11-20\/" rel="next">/);
   });
 
-  it("no page contains <script, <style or a style attribute", () => {
+  it("no page has an inline script, a style element, an on* attribute or a style attribute, and every script is a local file", () => {
     const files = [DEMO, HOSTILE, EMPTY, REAL].flatMap(htmlFiles);
     expect(files.length).toBeGreaterThan(8);
     for (const file of files) {
       const html = readFileSync(file, "utf8");
-      expect(html, file).not.toMatch(/<script/i);
+      for (const [, attrs, body] of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
+        expect(attrs, file).toMatch(/\ssrc="\/[^"/][^"]*"/);
+        expect(body, file).toBe("");
+      }
+      expect([...html.matchAll(/<script\b/gi)].length, file).toBe([...html.matchAll(/<script\b[^>]*\ssrc="\/[^/]/gi)].length);
       expect(html, file).not.toMatch(/<style/i);
       expect(html, file).not.toMatch(/<[^>]*\sstyle\s*=/i);
+      expect(html, file).not.toMatch(/<[^>]*\son[a-z]+\s*=/i);
+    }
+  });
+
+  it("every page loads /boot.js first in the head; only the archive pages load another script", () => {
+    expect(readFileSync(join(root, "public", "boot.js"), "utf8")).toContain("classList.add");
+    for (const dir of [DEMO, HOSTILE, EMPTY, REAL]) {
+      for (const file of htmlFiles(dir)) {
+        const html = readFileSync(file, "utf8");
+        const head = html.match(/<head>([\s\S]*?)<\/head>/)![1];
+        const srcs = [...html.matchAll(/<script\b[^>]*\ssrc="([^"]+)"/g)].map((m) => m[1]);
+        expect(srcs[0], file).toBe("/boot.js");
+        expect(head, file).toContain('<script src="/boot.js"></script>');
+        const archive = /[\\/](arsiv|archive)[\\/]index\.html$/.test(file);
+        expect(srcs.length, file).toBe(archive ? 2 : 1);
+        if (archive) expect(srcs[1], file).toMatch(/^\/_astro\/[^"]+\.js$/);
+      }
+    }
+  });
+
+  it("all the scripts of a build together are at most 30 000 bytes", () => {
+    for (const dir of [DEMO, HOSTILE, EMPTY, REAL]) {
+      const scripts = allFiles(dir).filter((name) => name.endsWith(".js"));
+      expect(scripts.length, dir).toBeGreaterThanOrEqual(2);
+      const total = scripts.reduce((sum, name) => sum + statSync(name).size, 0);
+      expect(total, dir).toBeLessThanOrEqual(30_000);
+    }
+  });
+
+  it("search-tr.json and search-en.json hold one doc per story of that language, each pointing at a real anchor", () => {
+    for (const dir of [DEMO, HOSTILE]) {
+      for (const lang of ["tr", "en"] as const) {
+        const json = JSON.parse(readFileSync(join(dir, `search-${lang}.json`), "utf8"));
+        expect(Object.keys(json).sort()).toEqual(["docs", "version"]);
+        expect(json.version).toBe(1);
+        expect(json.docs.length).toBeGreaterThan(0);
+        const prefix = lang === "tr" ? "" : "/en";
+        for (const entry of json.docs) {
+          expect(Object.keys(entry).sort()).toEqual(["c", "d", "n", "s", "t", "u"]);
+          expect(entry.d).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+          expect(CATEGORIES).toContain(entry.c);
+          expect(Number.isInteger(entry.n)).toBe(true);
+          expect(entry.u.startsWith(`${prefix}/${entry.d}/#s-`)).toBe(true);
+          const [path, hash] = entry.u.split("#");
+          expect(readFileSync(join(dir, path, "index.html"), "utf8"), entry.u).toContain(`id="${hash}"`);
+        }
+      }
+    }
+    const demo = JSON.parse(readFileSync(join(DEMO, "search-tr.json"), "utf8"));
+    const dates = demo.docs.map((d: { d: string }) => d.d);
+    expect(dates).toEqual([...dates].sort().reverse());
+    // The hostile build: markup is only JSON text, and a story in one language is only in that language's file.
+    const tr = JSON.parse(readFileSync(join(HOSTILE, "search-tr.json"), "utf8"));
+    const en = JSON.parse(readFileSync(join(HOSTILE, "search-en.json"), "utf8"));
+    expect(tr.docs.map((d: { t: string }) => d.t)).toContain("<script>alert(1)</script>\u000b");
+    expect([tr.docs.length, en.docs.length]).toEqual([1, 3]);
+    expect(JSON.parse(readFileSync(join(EMPTY, "search-tr.json"), "utf8")).docs).toEqual([]);
+  });
+
+  it("the archive has a search region that is hidden until script, with labelled controls in both languages", () => {
+    for (const [path, lang] of [["arsiv", "tr"], ["en/archive", "en"]] as const) {
+      const html = page(DEMO, path);
+      const copy = COPY[lang];
+      const region = html.match(/<section class="search"[^>]*>[\s\S]*?<\/section>/)![0];
+      expect(region, path).toMatch(/^<section class="search"[^>]* hidden/);
+      expect(region).toContain(`data-src="/search-${lang}.json"`);
+      expect(region).toMatch(/<label[^>]*for="search-q"[^>]*>/);
+      expect(region).toMatch(/<input[^>]*id="search-q"[^>]*>/);
+      expect(region.match(/<input[^>]*id="search-q"[^>]*>/)![0]).toContain('type="search"');
+      // Category chips: "all" plus the eight, radio behaviour, each in its colour class.
+      const chips = [...region.matchAll(/<button[^>]*role="radio"[^>]*>[\s\S]*?<\/button>/g)].map((m) => m[0]);
+      expect(chips).toHaveLength(9);
+      expect(chips[0]).toContain('aria-checked="true"');
+      for (const [i, category] of CATEGORIES.entries()) {
+        expect(chips[i + 1]).toContain(`cat-${category}`);
+        expect(chips[i + 1]).toContain(`data-category="${category}"`);
+        expect(chips[i + 1]).toContain(copy.categories[category]);
+        expect(chips[i + 1]).toContain('aria-checked="false"');
+      }
+      expect(region).toContain('role="radiogroup"');
+      // Month select: "all months" plus each month with editions.
+      const select = region.match(/<select[^>]*>([\s\S]*?)<\/select>/)![1];
+      expect([...select.matchAll(/<option value="([^"]*)"/g)].map((m) => m[1])).toEqual(["", "2026-11"]);
+      expect(select).toContain(lang === "tr" ? "Kasım 2026" : "November 2026");
+      expect(region).toMatch(/<input[^>]*type="checkbox"[^>]*>/);
+      expect(region).toContain("3+");
+      expect(region).toMatch(/<p[^>]*aria-live="polite"[^>]*>/);
+      expect(region).toMatch(/<ol[^>]*class="[^"]*search-results/);
+      expect(region).toMatch(/<button[^>]*data-clear[^>]*>[^<]*<\/button>/);
+      expect(html).toContain(`data-failed="${copy.search.failed}"`);
+      // The regular list stays in the markup, outside the search region.
+      expect(html.match(/<a class="row"/g)).toHaveLength(4);
+      expect(html).toMatch(/<[a-z]+ [^>]*data-archive-list/);
+    }
+    // No edition: no search region and no heat strip.
+    const empty = page(EMPTY, "arsiv");
+    expect(empty).not.toContain('class="search"');
+    expect(empty).not.toContain('class="heat"');
+  });
+
+  it("the heat strip is static: 26 weeks, a link with an accessible name for each edition's day", () => {
+    for (const [path, lang, name] of [
+      ["arsiv", "tr", "20 Kasım 2026, 5 haber"],
+      ["en/archive", "en", "20 November 2026, 5 stories"],
+    ] as const) {
+      const html = page(DEMO, path);
+      const strip = html.match(/<div class="heat"[\s\S]*?<!--\/heat-->/)![0];
+      expect(strip.match(/class="heat-week"/g)).toHaveLength(26);
+      const links = [...strip.matchAll(/<a class="heat-day heat-(\d)" href="([^"]+)" aria-label="([^"]+)"/g)];
+      expect(links.map((m) => m[2]).sort()).toEqual(DEMO_DATES.map((d) => (lang === "tr" ? `/${d}/` : `/en/${d}/`)).sort());
+      expect(links.map((m) => m[3])).toContain(name);
+      for (const [, level] of links) expect(Number(level)).toBeGreaterThanOrEqual(1);
+      expect(strip).toContain(lang === "tr" ? ">Kas<" : ">Nov<");
     }
   });
 
@@ -934,7 +1051,7 @@ describe("built site", () => {
     const headers = readFileSync(join(DEMO, "_headers"), "utf8");
     expect(headers).toMatch(/^\/\*$/m);
     expect(headers).toContain(
-      "Content-Security-Policy: default-src 'none'; style-src 'self'; font-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+      "Content-Security-Policy: default-src 'none'; style-src 'self'; script-src 'self'; connect-src 'self'; font-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
     );
     expect(headers).toContain("X-Content-Type-Options: nosniff");
     expect(headers).toContain("Referrer-Policy: strict-origin-when-cross-origin");
@@ -1213,9 +1330,11 @@ describe("built site", () => {
     // Exactly three consumers: the tag, the hanging number and the target bar.
     const users = decls.filter((d) => /var\(--cat(-soft)?[,)]/.test(d.value)).map((d) => d.selector);
     for (const selector of users) {
-      expect(selector).toMatch(/^(a\.story-cat, \.topic-tag|\.story-cat|\.story-no|\.story:target::before)$/);
+      expect(selector).toMatch(/^(a\.story-cat, \.topic-tag|\.story-cat|\.story-no|\.story:target::before|\.chip|\.chip\[aria-checked="true"\])$/);
     }
-    expect(new Set(users)).toEqual(new Set(["a.story-cat, .topic-tag", ".story-cat", ".story-no", ".story:target::before"]));
+    expect(new Set(users)).toEqual(
+      new Set(["a.story-cat, .topic-tag", ".story-cat", ".story-no", ".story:target::before", ".chip", '.chip[aria-checked="true"]']),
+    );
   });
 
   it("only the lead card, the subscribe button and the try button have a box-shadow, and none is blurred", () => {

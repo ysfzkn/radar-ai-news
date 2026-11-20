@@ -1,0 +1,76 @@
+---
+import { COPY } from "../lib/copy";
+import type { Edition } from "../lib/editions";
+import { plainDate } from "../lib/format";
+import { routes } from "../lib/routes";
+import type { Lang } from "../lib/schema";
+
+interface Props {
+  lang: Lang;
+  /** Newest first. */
+  editions: Edition[];
+}
+
+const WEEKS = 26;
+const DAY = 86_400_000;
+
+const { lang, editions } = Astro.props;
+const copy = COPY[lang];
+
+const pad = (n: number) => String(n).padStart(2, "0");
+const toDate = (ms: number) => {
+  const d = new Date(ms);
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+};
+const toMs = (date: string) => {
+  const [y, m, d] = date.split("-").map(Number);
+  return Date.UTC(y, m - 1, d);
+};
+
+/** Stories in an edition to one of four strengths. */
+const level = (n: number) => (n >= 6 ? 4 : n >= 4 ? 3 : n >= 2 ? 2 : 1);
+
+const counts = new Map(editions.map((edition) => [edition.date, edition.stories.length]));
+const last = editions[0].date;
+const lastMs = toMs(last);
+const newestMonday = lastMs - ((new Date(lastMs).getUTCDay() + 6) % 7) * DAY;
+
+// Newest week first in the markup, so a screen reader meets the latest days first; the
+// stylesheet lays the columns out oldest to newest with `row-reverse`.
+const weeks = Array.from({ length: WEEKS }, (_, w) => {
+  const monday = newestMonday - w * 7 * DAY;
+  const days = Array.from({ length: 7 }, (_, d) => {
+    const ms = monday + d * DAY;
+    const date = toDate(ms);
+    return { date, day: new Date(ms).getUTCDate(), month: new Date(ms).getUTCMonth(), future: ms > lastMs };
+  });
+  const first = days.find((day) => day.day === 1 && !day.future);
+  return { days, label: first ? copy.monthsShort[first.month] : null };
+});
+---
+
+<div class="heat" role="group" aria-label={copy.search.heat}>
+  <div class="heat-weeks">
+    {
+      weeks.map((week) => (
+        <div class="heat-week">
+          <span class="heat-month label" aria-hidden="true">{week.label}</span>
+          {week.days.map((day) => {
+            const n = counts.get(day.date);
+            if (n) {
+              return (
+                <a
+                  class={`heat-day heat-${level(n)}`}
+                  href={routes[lang].edition(day.date)}
+                  aria-label={copy.search.heatDay(plainDate(day.date, lang), n)}
+                />
+              );
+            }
+            return <span class={day.future ? "heat-day heat-none" : "heat-day heat-0"} />;
+          })}
+        </div>
+      ))
+    }
+  </div>
+</div>
+<!--/heat-->
