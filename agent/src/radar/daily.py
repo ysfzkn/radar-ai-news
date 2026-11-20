@@ -145,7 +145,7 @@ def run_daily(
     collected: dict = {}
     run_stats: dict | None = None
     push_stats: dict | None = None
-    review = published = 0
+    review = published = waiting = 0
     url = (env.get("RADAR_ADMIN_URL") or "").strip()
     token = env.get("RADAR_INGEST_TOKEN") or ""
     admin_url = origin(url) if url and allowed_url(url) else None
@@ -192,20 +192,21 @@ def run_daily(
             if not (failure and failure[0] == "collect"):
                 if not url or not token:
                     push_stats = {"skipped": True}
+                    waiting = len(store.unpushed_stories())
                 elif admin_url is None:
                     fail("push", StepError(BAD_ADMIN_URL))
                 else:
+                    # What this push delivers, whichever run wrote it: unsent before, sent after.
+                    before = {s.uid: s.status for s in store.unpushed_stories()}
                     try:
                         push_stats = _push_step(store, url, token, http)
                     except Exception as exc:
                         fail("push", exc)
-            sent = [
-                s
-                for s in store.stories_since(now)
-                if s.run_id == run_id and s.pushed_at is not None
-            ]
-            review = sum(1 for s in sent if s.status == "review")
-            published = sum(1 for s in sent if s.status == "published")
+                    else:
+                        left = {s.uid for s in store.unpushed_stories(include_refused=True)}
+                        sent = [status for uid, status in before.items() if uid not in left]
+                        review = sent.count("review")
+                        published = sent.count("published")
     finally:
         if store is not None:
             store.close()
@@ -219,6 +220,7 @@ def run_daily(
         failed_step=failure[0] if failure else None,
         error=failure[1] if failure else None,
         admin_url=admin_url,
+        waiting=waiting,
     )
     print(json.dumps(asdict(summary)), file=out)
     if needs_notice(summary):

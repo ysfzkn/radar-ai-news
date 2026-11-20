@@ -37,13 +37,13 @@ uv run radar daily --max-stories 2
 
 PowerShell is the same; set variables with `$env:NAME = "value"`.
 
-It prints one JSON line to standard output: `collected` (the collector's statistics), `run` (the agent's statistics, or `null` if that step did not happen), `push` (the push statistics, `{"skipped": true}` when it was skipped, or `null`), `review` and `published` (stories of this run that were pushed and are waiting for review or were published automatically), `cap_reached`, `failed_step` (`collect`, `run`, `push` or `null`), `error` (one line, or `null`) and `admin_url`, which is the admin service's scheme, host and port only (no path, no user name), or `null` when the address is missing or not allowed. Parked-story field names in `push` are filtered the same way as in the notice: only plain field names are kept.
+It prints one JSON line to standard output: `collected` (the collector's statistics), `run` (the agent's statistics, or `null` if that step did not happen), `push` (the push statistics, `{"skipped": true}` when it was skipped, or `null`), `review` and `published` (the stories this push delivered, whichever run wrote them, that are waiting for review or were published automatically; a story the service refused is not counted, and both are 0 when the push was skipped or failed), `cap_reached`, `failed_step` (`collect`, `run`, `push` or `null`), `error` (one line, or `null`), `waiting` (when the push was skipped, the number of stories still waiting to be sent; otherwise 0) and `admin_url`, which is the admin service's scheme, host and port only (no path, no user name), or `null` when the address is missing or not allowed. Parked-story field names in `push` are filtered the same way as in the notice: only plain field names are kept.
 
 **Exit codes:** 0 on a normal run; 1 when a step failed (the first failure is the one reported) or when no source could be read (`sources_ok` is 0; the chain still continues and pushes what earlier runs wrote, and `failed_step` stays `null`); 2 for a usage error such as `--max-stories 0`. A failed step does not stop the others from being tried where that is safe: a failed run still pushes what was already written, and a failed collection skips the run and the push. Reaching the daily cap is not a failure: stories already written are kept and the exit code is still 0. A failed notice is one line on standard error and does not change the exit code. An interruption (for example a cancelled job) still closes the run record. Failures are named by the step and the error's class; the text of an error is shown only for errors written for this purpose, with addresses and secrets removed.
 
 ## Notices
 
-A notice is sent when at least one story of the run is waiting for review, or when something needs attention: a step failed, the daily cap stopped the run, half or more of the sources failed, or the admin service refused a story. A quiet, healthy run sends nothing.
+A notice is sent when the push delivered at least one story that is waiting for review (a story an earlier run wrote but could not send counts too), or when something needs attention: a step failed, the daily cap stopped the run, half or more of the sources failed, the admin service refused a story, or the push was skipped because `RADAR_ADMIN_URL` or `RADAR_INGEST_TOKEN` is missing while stories are waiting to be sent (the exit code stays 0 in that case, so the notice is the only sign). A quiet, healthy run sends nothing.
 
 A notice is a few lines of Turkish text: the date, how many stories wait for review (with the address of the review screen, built from the admin origin), how many were published automatically, and one line for each kind of trouble. A refused story is described by the name of the field the service objected to (for example `texts.tr.title`). **A notice never contains story text.**
 
@@ -147,7 +147,7 @@ This part has not been tried on GitHub.
 | `RADAR_MAIL_FROM` | secret | Sender address of the notice | optional |
 | `RADAR_MAIL_TO` | secret | Recipient address of the notice | optional |
 
-Without the push settings the job still collects and writes stories, and the summary says the push was skipped; nothing reaches the review screen.
+Without the push settings the job still collects and writes stories, and the summary says the push was skipped; nothing reaches the review screen, and the notice (on a channel that is set) says how many stories are waiting to be sent.
 
 **The first manual run.** Open the Actions tab, pick the "Daily" workflow, choose "Run workflow" and enter `2` as `max_stories`. This writes at most two stories, which keeps the first paid run small. `RADAR_ENABLED` must already be `true` (step 2). Afterwards:
 

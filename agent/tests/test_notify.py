@@ -71,6 +71,33 @@ def test_each_condition_needs_a_notice(changes):
     assert needs_notice(healthy(**changes))
 
 
+def test_a_skipped_push_with_stories_waiting_needs_a_notice():
+    assert needs_notice(healthy(push={"skipped": True}, waiting=3))
+    assert not needs_notice(healthy(push={"skipped": True}, waiting=0))
+    assert not needs_notice(healthy(push={"skipped": True}))
+    # Only a push skipped for missing settings is meant; a pushed run has nothing waiting.
+    assert not needs_notice(healthy(waiting=3))
+
+
+def test_a_skipped_push_line_sits_after_the_cap_line_and_before_the_sources_line():
+    summary = healthy(
+        collected={"sources_ok": 1, "sources_failed": 1},
+        run={"written": 1, "budget_stopped": True},
+        push={"skipped": True},
+        cap_reached=True,
+        waiting=4,
+        admin_url=None,
+    )
+    assert render(summary, now=NOW).splitlines() == [
+        "Radar · 20 Kas",
+        "Günlük harcama sınırına ulaşıldı; kalan haberler yarına kaldı.",
+        "Yönetim servisi ayarlı değil; 4 haber gönderilmeyi bekliyor.",
+        "2 kaynaktan 1'i okunamadı.",
+    ]
+    assert subject(summary, now=NOW) == "Radar · 20 Kas · dikkat gerekiyor"
+    assert "gönderilmeyi" not in render(healthy(waiting=4), now=NOW)
+
+
 def test_render_lists_only_the_lines_that_apply_and_stays_under_1500_characters():
     assert render(healthy(review=2), now=NOW) == (
         "Radar · 20 Kas\n2 haber onayını bekliyor: https://admin.example.com/admin"

@@ -35,12 +35,13 @@ class Summary:
     collected: dict  # the collect statistics
     run: dict | None  # the run statistics, None if the step did not happen
     push: dict | None
-    review: int  # stories of this run that are waiting for review and were pushed
-    published: int  # stories of this run that were auto-published and were pushed
+    review: int  # review stories this push delivered, whichever run wrote them
+    published: int  # auto-published stories this push delivered, whichever run wrote them
     cap_reached: bool
     failed_step: str | None  # "collect" | "run" | "push"
     error: str | None  # one line, already cleaned of secrets
     admin_url: str | None
+    waiting: int = 0  # unsent stories, counted when the push was skipped for missing settings
 
 
 def _possessive(n: int) -> str:
@@ -61,8 +62,13 @@ def _rejected(s: Summary) -> list:
     return list((s.push or {}).get("rejected") or [])
 
 
+def _unsent(s: Summary) -> int:
+    """Stories left waiting because the push was skipped (the admin settings are missing)."""
+    return s.waiting if (s.push or {}).get("skipped") else 0
+
+
 def _trouble(s: Summary) -> bool:
-    return bool(s.failed_step or s.cap_reached or _sources_failing(s) or _rejected(s))
+    return bool(s.failed_step or s.cap_reached or _unsent(s) or _sources_failing(s) or _rejected(s))
 
 
 def needs_notice(s: Summary) -> bool:
@@ -112,6 +118,9 @@ def render(s: Summary, *, now: datetime | None = None) -> str:
         lines.append(f"{s.published} haber otomatik yayımlandı")
     if s.cap_reached:
         lines.append("Günlük harcama sınırına ulaşıldı; kalan haberler yarına kaldı.")
+    unsent = _unsent(s)
+    if unsent > 0:
+        lines.append(f"Yönetim servisi ayarlı değil; {unsent} haber gönderilmeyi bekliyor.")
     if _sources_failing(s):
         failed = s.collected.get("sources_failed", 0)
         total = s.collected.get("sources_ok", 0) + failed

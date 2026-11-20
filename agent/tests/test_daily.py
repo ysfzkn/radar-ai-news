@@ -191,7 +191,8 @@ def test_a_failed_run_step_still_pushes_earlier_stories_and_exits_1(tmp_path, no
     code, summary = daily(tmp_path, now, world, factory=broken)
     assert code == 1
     assert summary["failed_step"] == "run" and summary["error"] == "RuntimeError"
-    assert summary["push"]["pushed"] == 1 and summary["review"] == 0  # not of this run
+    # Delivered by this push, though written by an earlier run.
+    assert summary["push"]["pushed"] == 1 and summary["review"] == 1
     sent = json.loads(world.to("admin.example.com")[0].content)["stories"]
     assert [s["uid"] for s in sent] == [uid]
     (notice,) = world.notices()
@@ -201,6 +202,44 @@ def test_a_failed_run_step_still_pushes_earlier_stories_and_exits_1(tmp_path, no
         assert store.last_run()["stats"]["error"] == "RuntimeError"
     finally:
         store.close()
+
+
+def test_review_stories_of_an_earlier_run_delivered_now_are_counted_and_notified(tmp_path, now):
+    uid = earlier_story(tmp_path, now)
+    world = World(now)
+    code, summary = daily(tmp_path, now, world, factory=lambda meter: llm(risk=False))
+    assert code == 0
+    assert summary["run"]["review"] == 0 and summary["run"]["published"] == 2
+    assert summary["push"]["pushed"] == 3
+    assert summary["review"] == 1 and summary["published"] == 2
+    sent = json.loads(world.to("admin.example.com")[0].content)["stories"]
+    assert uid in [s["uid"] for s in sent]
+    assert world.notices() == [
+        "Radar · 19 Kas\n"
+        "1 haber onayını bekliyor: https://admin.example.com/admin\n"
+        "2 haber otomatik yayımlandı"
+    ]
+
+
+def test_stories_already_pushed_before_this_run_are_not_counted_again(tmp_path, now):
+    uid = earlier_story(tmp_path, now)
+    store = SqliteStore(str(tmp_path / "r.db"))
+    try:
+        store.mark_pushed([uid], now - timedelta(hours=20))
+    finally:
+        store.close()
+    world = World(now)
+    code, summary = daily(tmp_path, now, world, factory=lambda meter: llm(risk=False))
+    assert code == 0 and summary["review"] == 0 and summary["published"] == 2
+    assert world.to("api.telegram.org") == []
+
+
+def test_a_failed_push_counts_nothing_as_delivered(tmp_path, now):
+    earlier_story(tmp_path, now)
+    world = World(now, admin=lambda r: httpx.Response(500))
+    code, summary = daily(tmp_path, now, world)
+    assert code == 1 and summary["failed_step"] == "push"
+    assert summary["review"] == 0 and summary["published"] == 0
 
 
 def test_a_failed_notice_is_one_stderr_line_and_does_not_change_the_exit_code(
@@ -231,7 +270,34 @@ def test_without_admin_settings_push_is_skipped_and_reported(tmp_path, now):
     assert code == 0
     assert summary["push"] == {"skipped": True} and summary["admin_url"] is None
     assert summary["review"] == 0 and summary["run"]["review"] == 2
+    assert summary["waiting"] == 2
     assert world.to("admin.example.com") == [] and "admin" not in world.kinds
+    assert world.notices() == [
+        "Radar · 19 Kas\nYönetim servisi ayarlı değil; 2 haber gönderilmeyi bekliyor."
+    ]
+
+
+@pytest.mark.parametrize("missing", ["RADAR_ADMIN_URL", "RADAR_INGEST_TOKEN"])
+def test_a_skipped_push_counts_stories_of_earlier_runs_as_waiting(tmp_path, now, missing):
+    earlier_story(tmp_path, now)
+    world = World(now)
+    world.sources_down = True  # nothing new is written today
+    env = {k: v for k, v in ENV.items() if k != missing}
+    code, summary = daily(tmp_path, now, world, env=env)
+    assert code == 1  # no source could be read; the skipped push does not change that
+    assert summary["push"] == {"skipped": True} and summary["waiting"] == 1
+    (notice,) = world.notices()
+    assert "Yönetim servisi ayarlı değil; 1 haber gönderilmeyi bekliyor." in notice
+
+
+def test_a_skipped_push_with_nothing_waiting_stays_quiet(tmp_path, now):
+    daily(tmp_path, now, World(now), factory=lambda meter: llm(risk=False))  # all sent
+    world = World(now)  # the same items again: nothing new is written
+    env = {k: v for k, v in ENV.items() if k != "RADAR_INGEST_TOKEN"}
+    code, summary = daily(tmp_path, now, world, env=env)
+    assert code == 0 and summary["push"] == {"skipped": True}
+    assert summary["run"]["written"] == 0 and summary["waiting"] == 0
+    assert world.to("api.telegram.org") == []
 
 
 def test_a_refused_story_is_reported_and_exits_0(tmp_path, now):
