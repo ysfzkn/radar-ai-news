@@ -1,0 +1,24 @@
+{
+  "name": "radar-site",
+  "version": "0.4.0",
+  "scripts": {
+    "test": "vitest run",
+    "dev": "astro dev",
+    "build": "astro build",
+    "fetch": "node scripts/fetch-stories.mjs",
+    "build:live": "node scripts/fetch-stories.mjs && astro build",
+    "check": "astro check"
+  },
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@astrojs/sitemap": "^3.7.6",
+    "astro": "^7.3.8",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.12",
+    "typescript": "^6.0.3",
+    "vitest": "^5.1.1"
+  }
+}

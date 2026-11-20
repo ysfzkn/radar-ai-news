@@ -1,0 +1,382 @@
+{
+  "stories": [
+    {
+      "uid": "a1f03c5e7b2d4896a0c1e5f7d3b94a21",
+      "category": "protocol",
+      "publish_mode": "auto",
+      "edited": false,
+      "source_count": 4,
+      "source_url": "https://blog.example.com/bulutkapi-arac-protokolu-0-9",
+      "sources": [
+        { "name": "Bulutkapı Blog", "url": "https://blog.example.com/bulutkapi-arac-protokolu-0-9" },
+        { "name": "Ajan Günlüğü", "url": "https://ajangunlugu.example.org/protokol-0-9" }
+      ],
+      "try_url": "https://github.example.com/bulutkapi/arac-protokolu",
+      "created_at": "2026-11-17T05:10:00.000Z",
+      "published_at": "2026-11-17T05:10:00.000Z",
+      "texts": {
+        "tr": {
+          "title": "Bulutkapı, araç protokolünün 0.9 sürümünü yayımladı",
+          "summary": "Bulutkapı'nın açık araç protokolü 0.9 sürümüyle birlikte oturum sürekliliği ve akış halinde sonuç dönme özelliği kazandı. Eski istemciler için geriye dönük uyumluluk katmanı korunuyor.",
+          "dev_line": "Araç çağrılarını uzun süren işlerde kullanıyorsan, sonuçları akış olarak almak için istemcini güncelle."
+        },
+        "en": {
+          "title": "Bulutkapı ships version 0.9 of its tool protocol",
+          "summary": "Bulutkapı's open tool protocol gains session continuity and streamed results in version 0.9. A compatibility layer stays in place for older clients.",
+          "dev_line": "If your agents run long tool calls, update your client to receive results as a stream."
+        }
+      }
+    },
+    {
+      "uid": "b27d4e6f8c3e5907b1d2f608e4ca5b32",
+      "category": "model",
+      "publish_mode": "human",
+      "edited": false,
+      "source_count": 6,
+      "source_url": "https://research.example.com/kuzeyruzgar-8b",
+      "sources": [
+        { "name": "Kuzeyrüzgar Araştırma", "url": "https://research.example.com/kuzeyruzgar-8b" },
+        { "name": "Model Bülteni", "url": "https://modelbulteni.example.org/kuzeyruzgar-8b" },
+        { "name": "Tensor Notları", "url": "https://tensornotlari.example.com/8b-kucuk-model" }
+      ],
+      "try_url": null,
+      "created_at": "2026-11-17T09:40:00.000Z",
+      "published_at": "2026-11-17T09:40:00.000Z",
+      "texts": {
+        "tr": {
+          "title": "Kuzeyrüzgar-8B, uzun bağlamda kendinden büyük modellerle yarışıyor",
+          "summary": "Kuzeyrüzgar'ın 8 milyar parametreli yeni modeli, 128 bin belirteçlik bağlamda kod ve belge sorularında kendinden iki kat büyük modellere yakın sonuç veriyor. Ağırlıklar kısıtlı bir lisansla paylaşıldı.",
+          "dev_line": "Tek GPU'da çalışan bir ajan arıyorsan değerlendirmeye değer; lisans şartlarını ticari kullanımdan önce oku."
+        },
+        "en": {
+          "title": "Kuzeyrüzgar-8B holds its own against larger models on long context",
+          "summary": "Kuzeyrüzgar's new 8-billion-parameter model comes close to models twice its size on code and document questions at a 128k-token context. The weights are released under a restricted licence.",
+          "dev_line": "Worth evaluating if you want an agent on a single GPU; read the licence before any commercial use."
+        }
+      }
+    },
+    {
+      "uid": "c38e5f7a9d4f6a18c2e3a719f5db6c43",
+      "category": "security",
+      "publish_mode": "auto",
+      "edited": false,
+      "source_count": 2,
+      "source_url": "https://guvenlik.example.org/arac-zehirleme",
+      "sources": [
+        { "name": "Siperlik Güvenlik", "url": "https://guvenlik.example.org/arac-zehirleme" },
+        { "name": "Açık Kapı Haber", "url": "https://acikkapi.example.com/arac-aciklamasi" }
+      ],
+      "try_url": null,
+      "created_at": "2026-11-17T14:05:00.000Z",
+      "published_at": "2026-11-17T14:05:00.000Z",
+      "texts": {
+        "tr": {
+          "title": "Araç açıklamalarına gizlenen komutlar ajanları yanlış yönlendiriyor",
+          "summary": "Siperlik'in araştırmacıları, bir aracın açıklama metnine eklenen gizli talimatların ajanın sonraki çağrılarını değiştirebildiğini gösterdi. Saldırı, üçüncü taraf araç sunucularını kullanan kurulumları hedefliyor.",
+          "dev_line": "Üçüncü taraf araç açıklamalarını modele vermeden önce temizle ve araç çağrılarını izin listesiyle sınırla."
+        },
+        "en": {
+          "title": "Instructions hidden in tool descriptions can steer agents off course",
+          "summary": "Siperlik researchers showed that hidden instructions added to a tool's description can change an agent's later calls. The attack targets setups that rely on third-party tool servers.",
+          "dev_line": "Sanitise third-party tool descriptions before they reach the model and limit tool calls with an allow-list."
+        }
+      }
+    },
+    {
+      "uid": "d49f6a8b0e5a7b29d3f4b82a06ec7d54",
+      "category": "framework",
+      "publish_mode": "auto",
+      "edited": true,
+      "source_count": 3,
+      "source_url": "https://orgu.example.com/surum-2-0",
+      "sources": [
+        { "name": "Örgü Projesi", "url": "https://orgu.example.com/surum-2-0" },
+        { "name": "Yazılımcı Defteri", "url": "https://yazilimcidefteri.example.org/orgu-2" }
+      ],
+      "try_url": "https://orgu.example.com/baslangic",
+      "created_at": "2026-11-18T05:00:00.000Z",
+      "published_at": "2026-11-18T05:00:00.000Z",
+      "texts": {
+        "tr": {
+          "title": "Örgü 2.0 çok ajanlı iş akışlarını tek bir grafikte topluyor",
+          "summary": "Açık kaynaklı Örgü çerçevesinin 2.0 sürümü, birden çok ajanı tek bir durum grafiğinde yönetiyor. Kesintiye uğrayan akışlar kaldığı yerden devam edebiliyor.",
+          "dev_line": "Elle yazdığın yeniden deneme mantığını, yerleşik devam etme özelliğiyle değiştirmeyi düşünebilirsin."
+        },
+        "en": {
+          "title": "Örgü 2.0 brings multi-agent workflows together in one graph",
+          "summary": "Version 2.0 of the open-source Örgü framework manages several agents inside a single state graph. Interrupted runs can pick up where they stopped.",
+          "dev_line": "You may be able to replace hand-written retry logic with the built-in resume feature."
+        }
+      }
+    },
+    {
+      "uid": "e5a07b9c1f6b8c3ae4a5c93b17fd8e65",
+      "category": "tooling",
+      "publish_mode": "human",
+      "edited": false,
+      "source_count": 1,
+      "source_url": "https://izci.example.org/duyuru/iz-surucu",
+      "sources": [
+        { "name": "İzci Aracı", "url": "https://izci.example.org/duyuru/iz-surucu" }
+      ],
+      "try_url": "https://izci.example.org/deneme",
+      "created_at": "2026-11-18T08:20:00.000Z",
+      "published_at": "2026-11-18T08:20:00.000Z",
+      "texts": {
+        "tr": {
+          "title": "İzci, ajan çalıştırmalarını adım adım geri oynatan bir hata ayıklayıcı ekledi",
+          "summary": "İzci, kayıtlı ajan oturumlarını araç çağrısı düzeyinde geri oynatabilen bir hata ayıklayıcı sundu. Aynı girdiyle yeniden çalıştırıp çıktıları yan yana karşılaştırmak mümkün.",
+          "dev_line": "Tekrarlanması zor ajan hatalarında, oturum kaydını alıp yerelde geri oynatarak başla."
+        },
+        "en": {
+          "title": "İzci adds a debugger that replays agent runs step by step",
+          "summary": "İzci introduced a debugger that replays recorded agent sessions at the level of individual tool calls. You can rerun with the same input and compare outputs side by side.",
+          "dev_line": "For agent bugs that are hard to reproduce, start by capturing the session and replaying it locally."
+        }
+      }
+    },
+    {
+      "uid": "f6b18c0d2a7c9d4bf5b6da4c280a9f76",
+      "category": "research",
+      "publish_mode": "auto",
+      "edited": false,
+      "source_count": 5,
+      "source_url": "https://arastirma.example.com/uzun-ufuklu-planlama",
+      "sources": [
+        { "name": "Arıtaş Laboratuvarı", "url": "https://arastirma.example.com/uzun-ufuklu-planlama" },
+        { "name": "Makale Özeti", "url": "https://makaleozeti.example.org/uzun-ufuk" },
+        { "name": "Ajan Günlüğü", "url": "https://ajangunlugu.example.org/planlama-makalesi" }
+      ],
+      "try_url": null,
+      "created_at": "2026-11-18T11:45:00.000Z",
+      "published_at": "2026-11-18T11:45:00.000Z",
+      "texts": {
+        "tr": {
+          "title": "Yeni makale: ajanlar uzun görevlerde neden yolunu kaybediyor",
+          "summary": "Arıtaş Laboratuvarı'nın makalesi, uzun görevlerdeki hataların çoğunun ilk beş adımda yapılan küçük planlama sapmalarından kaynaklandığını gösteriyor. Yazarlar, ara hedefleri doğrulayan hafif bir kontrol önerisini de paylaşıyor.",
+          "dev_line": "Uzun ajan görevlerinde, ilk adımlardan sonra planı bağımsız bir kontrolden geçirmek hata oranını düşürebilir."
+        },
+        "en": {
+          "title": "New paper: why agents lose their way on long tasks",
+          "summary": "A paper from Arıtaş Laboratuvarı finds that most long-task failures trace back to small planning drifts in the first five steps. The authors also propose a lightweight check that validates intermediate goals.",
+          "dev_line": "On long agent tasks, putting the plan through an independent check after the first few steps may lower your failure rate."
+        }
+      }
+    },
+    {
+      "uid": "07c29d1e3b8dae5c06c7eb5d391bb087",
+      "category": "industry",
+      "publish_mode": "auto",
+      "edited": false,
+      "source_count": 7,
+      "source_url": "https://ekonomi.example.com/tasimaci-yatirim",
+      "sources": [
+        { "name": "Pazar Notları", "url": "https://ekonomi.example.com/tasimaci-yatirim" },
+        { "name": "Girişim Günlüğü", "url": "https://girisimgunlugu.example.org/tasimaci" },
+        { "name": "Kuyruk Haber", "url": "https://kuyruk.example.com/tasimaci-turu" }
+      ],
+      "try_url": null,
+      "created_at": "2026-11-18T16:30:00.000Z",
+      "published_at": "2026-11-18T16:30:00.000Z",
+      "texts": {
+        "tr": {
+          "title": "Taşımacı, ajan altyapısı için 40 milyon dolarlık yatırım aldı",
+          "summary": "Kurumsal ajan dağıtımı için yönetilen bir çalışma ortamı sunan Taşımacı, A serisi turunda 40 milyon dolar topladı. Şirket yatırımı ekibi büyütmek ve ikinci bir bölgede hizmet vermek için kullanacak.",
+          "dev_line": "Kendi ajan altyapını yönetmek yerine barındırılan seçenekleri karşılaştırma zamanı gelmiş olabilir."
+        },
+        "en": {
+          "title": "Taşımacı raises $40 million for agent infrastructure",
+          "summary": "Taşımacı, which offers a managed runtime for deploying agents in enterprises, raised $40 million in a Series A round. The company plans to grow its team and open a second region.",
+          "dev_line": "It may be time to compare hosted options against running your own agent infrastructure."
+        }
+      }
+    },
+    {
+      "uid": "18d3ae2f4c9ebf6d17d8fc6e4a2cc198",
+      "category": "policy",
+      "publish_mode": "human",
+      "edited": false,
+      "source_count": 3,
+      "source_url": "https://politika.example.org/seffaflik-taslagi",
+      "sources": [
+        { "name": "Dijital Hukuk Masası", "url": "https://politika.example.org/seffaflik-taslagi" },
+        { "name": "Düzenleme Takibi", "url": "https://duzenlemetakibi.example.com/taslak-ozeti" }
+      ],
+      "try_url": null,
+      "created_at": "2026-11-19T06:15:00.000Z",
+      "published_at": "2026-11-19T06:15:00.000Z",
+      "texts": {
+        "tr": {
+          "title": "Yeni taslak, otonom ajanlar için eylem kaydı tutmayı zorunlu kılabilir",
+          "summary": "Tartışmaya açılan bir düzenleme taslağı, kullanıcı adına işlem yapan yapay zekâ ajanlarının yaptığı eylemleri kayıt altına almasını öngörüyor. Taslak henüz yasalaşmadı ve görüş aşamasında.",
+          "dev_line": "Ajanın tüm araç çağrılarını yapılandırılmış biçimde kaydetmek, ileride zorunlu olsa da olmasa da işine yarar."
+        },
+        "en": {
+          "title": "A new draft could require action logs for autonomous agents",
+          "summary": "A draft regulation open for comment would require AI agents that act on a user's behalf to keep a record of their actions. The draft is not law yet and is in its consultation phase.",
+          "dev_line": "Logging every tool call in a structured form is useful for you whether or not it becomes mandatory."
+        }
+      }
+    },
+    {
+      "uid": "29e4bf305dafc07e28e9a07f5b3dd2a9",
+      "category": "protocol",
+      "publish_mode": "auto",
+      "edited": false,
+      "source_count": 2,
+      "source_url": "https://kopru.example.com/kimlik-uzantisi",
+      "sources": [
+        { "name": "Köprü Çalışma Grubu", "url": "https://kopru.example.com/kimlik-uzantisi" }
+      ],
+      "try_url": "https://kopru.example.com/ornekler",
+      "created_at": "2026-11-19T12:00:00.000Z",
+      "published_at": "2026-11-19T12:00:00.000Z",
+      "texts": {
+        "tr": {
+          "title": "Köprü grubu, ajanlar arası kimlik doğrulama için uzantı önerdi",
+          "summary": "Köprü çalışma grubu, bir ajanın başka bir ajana çağrı yaparken kimliğini kısa ömürlü imzalı belirteçlerle kanıtlamasını sağlayan bir uzantı taslağı yayımladı. Öneri şimdilik yalnızca yorum için açık.",
+          "dev_line": "Ajanlarını birbirine bağlıyorsan, paylaşılan statik anahtarların yerine kısa ömürlü belirteçleri şimdiden planla."
+        },
+        "en": {
+          "title": "Köprü group proposes an extension for agent-to-agent authentication",
+          "summary": "The Köprü working group published a draft extension that lets an agent prove its identity to another agent with short-lived signed tokens. The proposal is open for comments only, for now.",
+          "dev_line": "If you connect agents to each other, start planning for short-lived tokens in place of shared static keys."
+        }
+      }
+    },
+    {
+      "uid": "3af5c0416eb0d1893afab18a6c4ee3ba",
+      "category": "model",
+      "publish_mode": "auto",
+      "edited": false,
+      "source_count": 4,
+      "source_url": "https://modeller.example.org/yildiz-gorsel-1",
+      "sources": [
+        { "name": "Yıldız Laboratuvarı", "url": "https://modeller.example.org/yildiz-gorsel-1" },
+        { "name": "Model Bülteni", "url": "https://modelbulteni.example.org/yildiz-gorsel" }
+      ],
+      "try_url": null,
+      "created_at": "2026-11-19T21:30:00.000Z",
+      "published_at": "2026-11-19T21:30:00.000Z",
+      "texts": {
+        "tr": {
+          "title": "Yıldız Görsel-1 ekran görüntülerinden arayüz eylemlerini çıkarıyor",
+          "summary": "Yıldız Laboratuvarı, ekran görüntüsünü okuyup tıklanacak öğeyi ve yapılacak eylemi tahmin eden bir model duyurdu. Model, masaüstü ve web arayüzlerinde yayımlanan bir sınama setinde önceki sürümünü geride bıraktı.",
+          "dev_line": "Arayüz otomasyonu yapıyorsan, erişilebilirlik ağacına ek olarak görsel girdiyi de denemek yedek bir yol sunabilir."
+        },
+        "en": {
+          "title": "Yıldız Görsel-1 reads screenshots to work out interface actions",
+          "summary": "Yıldız Laboratuvarı announced a model that reads a screenshot and predicts which element to click and what action to take. It beat its predecessor on a published benchmark covering desktop and web interfaces.",
+          "dev_line": "If you automate interfaces, trying visual input alongside the accessibility tree can give you a fallback path."
+        }
+      }
+    },
+    {
+      "uid": "4b06d1527fc1e29a4b0bc29b7d5ff4cb",
+      "category": "security",
+      "publish_mode": "human",
+      "edited": false,
+      "source_count": 5,
+      "source_url": "https://guvenlik.example.com/sandbox-kacisi",
+      "sources": [
+        { "name": "Siperlik Güvenlik", "url": "https://guvenlik.example.com/sandbox-kacisi" },
+        { "name": "Açık Kapı Haber", "url": "https://acikkapi.example.com/sandbox-yamasi" }
+      ],
+      "try_url": null,
+      "created_at": "2026-11-20T05:00:00.000Z",
+      "published_at": "2026-11-20T05:00:00.000Z",
+      "texts": {
+        "tr": {
+          "title": "Kod çalıştıran ajan ortamında kum havuzu kaçışı yamalandı",
+          "summary": "Taşımacı'nın kod yürütme ortamında, özel hazırlanmış bir dosya yoluyla kum havuzundan çıkılabilen bir açık bulundu ve yama yayımlandı. Şirket, açığın kötüye kullanıldığına dair bir iz görmediğini söylüyor.",
+          "dev_line": "Kod çalıştıran ajan ortamlarını en son sürüme güncelle ve dosya sistemi erişimini en dar kapsamla ver."
+        },
+        "en": {
+          "title": "Sandbox escape patched in a code-executing agent runtime",
+          "summary": "A flaw that let a specially crafted file path escape the sandbox in Taşımacı's code-execution runtime was found and patched. The company says it has seen no sign of it being exploited.",
+          "dev_line": "Update any agent runtime that executes code to the latest version and grant file-system access with the narrowest scope."
+        }
+      }
+    },
+    {
+      "uid": "5c17e2638ad2f3ab5c1cd3ac8e6a05dc",
+      "category": "framework",
+      "publish_mode": "auto",
+      "edited": false,
+      "source_count": 2,
+      "source_url": "https://dokuma.example.org/deger-0-14",
+      "sources": [
+        { "name": "Dokuma", "url": "https://dokuma.example.org/deger-0-14" }
+      ],
+      "try_url": "https://dokuma.example.org/ornek-ajan",
+      "created_at": "2026-11-20T07:30:00.000Z",
+      "published_at": "2026-11-20T07:30:00.000Z",
+      "texts": {
+        "tr": {
+          "title": "Dokuma 0.14, tür güvenli araç tanımları getiriyor",
+          "summary": "Dokuma'nın yeni sürümünde araçlar, girdi ve çıktı şemalarıyla birlikte tek bir tür tanımından üretiliyor. Şemayla uyuşmayan model çıktıları artık çalışma zamanında net bir hatayla reddediliyor.",
+          "dev_line": "Araç şemalarını elle yazıp senkron tutmaya çalışıyorsan, tür tanımından üretmek bu sürtünmeyi azaltır."
+        },
+        "en": {
+          "title": "Dokuma 0.14 brings type-safe tool definitions",
+          "summary": "In Dokuma's new release, tools are generated from a single type definition together with their input and output schemas. Model outputs that do not match the schema are now rejected at runtime with a clear error.",
+          "dev_line": "If you hand-write tool schemas and try to keep them in sync, generating them from a type removes that friction."
+        }
+      }
+    },
+    {
+      "uid": "6d28f3749be3a4bc6d2de4bd9f7b16ed",
+      "category": "tooling",
+      "publish_mode": "auto",
+      "edited": false,
+      "source_count": 3,
+      "source_url": "https://olcek.example.com/degerlendirme-paketi",
+      "sources": [
+        { "name": "Ölçek Araçları", "url": "https://olcek.example.com/degerlendirme-paketi" },
+        { "name": "Yazılımcı Defteri", "url": "https://yazilimcidefteri.example.org/olcek-paketi" }
+      ],
+      "try_url": "https://olcek.example.com/hizli-baslangic",
+      "created_at": "2026-11-20T10:10:00.000Z",
+      "published_at": "2026-11-20T10:10:00.000Z",
+      "texts": {
+        "tr": {
+          "title": "Ölçek, ajan değerlendirmelerini CI içinde çalıştıran bir paket çıkardı",
+          "summary": "Ölçek'in açık kaynaklı paketi, ajan senaryolarını her değişiklikte otomatik çalıştırıp başarı oranını önceki sürümle karşılaştırıyor. Sonuçlar bir çekme isteği yorumu olarak yayımlanabiliyor.",
+          "dev_line": "Ajan davranışını hâlâ elle denetliyorsan, birkaç temel senaryoyu CI'a taşımak iyi bir ilk adım olur."
+        },
+        "en": {
+          "title": "Ölçek releases a package that runs agent evaluations in CI",
+          "summary": "Ölçek's open-source package runs agent scenarios automatically on every change and compares the success rate with the previous version. Results can be posted as a pull request comment.",
+          "dev_line": "If you still check agent behaviour by hand, moving a few core scenarios into CI is a good first step."
+        }
+      }
+    },
+    {
+      "uid": "7e39048a5cf4b5cd7e3ef5ce0a8c27fe",
+      "category": "industry",
+      "publish_mode": "auto",
+      "edited": false,
+      "source_count": 4,
+      "source_url": "https://haber.example.org/ortaklik-duyurusu",
+      "sources": [
+        { "name": "Kuyruk Haber", "url": "https://haber.example.org/ortaklik-duyurusu" },
+        { "name": "Pazar Notları", "url": "https://ekonomi.example.com/ortaklik" }
+      ],
+      "try_url": null,
+      "created_at": "2026-11-20T13:20:00.000Z",
+      "published_at": "2026-11-20T13:20:00.000Z",
+      "texts": {
+        "tr": {
+          "title": "Bulutkapı ve Taşımacı, ajan dağıtımında ortak çalışacak",
+          "summary": "İki şirket, Bulutkapı'nın araç protokolünü Taşımacı'nın yönetilen çalışma ortamına yerleşik olarak getirmek için ortaklık kurdu. İlk entegrasyonun gelecek çeyrekte kullanıma açılması planlanıyor.",
+          "dev_line": "Bu protokolü kullanıyorsan, barındırılan dağıtımın bir sonraki çeyrekte kurulumu kolaylaştırması beklenebilir."
+        },
+        "en": {
+          "title": "Bulutkapı and Taşımacı to work together on agent deployment",
+          "summary": "The two companies have formed a partnership to build Bulutkapı's tool protocol into Taşımacı's managed runtime. The first integration is planned to open up next quarter.",
+          "dev_line": "If you use this protocol, hosted deployment may make setup easier from next quarter."
+        }
+      }
+    }
+  ]
+}

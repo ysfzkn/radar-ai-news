@@ -1,0 +1,17 @@
+---
+import { loadData } from "../lib/data";
+
+const { stories } = loadData();
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Radar</title>
+  </head>
+  <body>
+    <ul>
+      {stories.map((story) => <li>{(story.texts.en ?? story.texts.tr)?.title}</li>)}
+    </ul>
+  </body>
+</html>
