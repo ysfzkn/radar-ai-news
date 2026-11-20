@@ -25,6 +25,8 @@ export interface Copy {
     caption: string;
     idle: string;
   };
+  /** The pause for looping motion (the sweep, the horizon): the button reads what a press does. */
+  motion: { pause: string; play: string };
   /** The end of an edition: the closing line, and its reading time under it. */
   closed: string;
   readTime(minutes: number): string;
@@ -163,6 +165,7 @@ export const COPY: Record<Lang, Copy> = {
       caption: "Merkeze yakın: daha çok kaynak",
       idle: "Her nokta bir haber.",
     },
+    motion: { pause: "Hareketi durdur", play: "Hareketi başlat" },
     closed: "Bugünlük bu kadar.",
     readTime: (n) => `${n} dk okuma`,
     previous: "Önceki sayı",
@@ -325,8 +328,9 @@ export const COPY: Record<Lang, Copy> = {
           heading: "Gizlilik",
           paragraphs: [
             "Bu site çerez kullanmaz, seni izlemez ve üçüncü taraflardan hiçbir şey yüklemez: analitik, reklam ya da dış yazı tipi yok. Her sayfa statik bir HTML dosyasıdır ve betik olmadan da eksiksiz çalışır.",
-            "Sitenin kendi küçük betiği yalnızca bir kolaylık ekler: arşivde arama (arama verisi bu siteden gelir), radar ekranının eğimi ve okunan haberlerin işareti, “Neden önemli” satırının belirişi ve günün ilk sayfasındaki kısa açılış. Hareketi azaltmayı seçtiysen hareketlerin hiçbiri oynamaz.",
-            "Açılışın bir kez gösterildiğini hatırlamak için tarayıcının oturum belleğine tek bir anahtar yazılır: radar:intro. Sekme kapanınca silinir. Başka hiçbir şey saklanmaz ve hiçbir yere gönderilmez.",
+            "Sitenin kendi küçük betiği yalnızca bir kolaylık ekler: arşivde arama (arama verisi bu siteden gelir), radar ekranının eğimi ve okunan haberlerin işareti, “Neden önemli” satırının belirişi, günün ilk sayfasındaki kısa açılış ve dönen hareketi durduran düğme. Hareketi azaltmayı seçtiysen hareketlerin hiçbiri oynamaz.",
+            "Arşivde aradığın sözcükler tarayıcında ve sayfanın adresinde kalır; adres de tarayıcı geçmişine yazılır. Sayfayı yenilediğinde ya da bir sonuca tıkladığında adres yalnızca bu siteye gider; başka kimseye gönderilmez.",
+            "Tarayıcının oturum belleğine en çok iki anahtar yazılır: açılışın bir kez gösterildiğini hatırlayan radar:intro ve hareketi durdurduysan bunu hatırlayan radar:still. İkisi de sekme kapanınca silinir. Başka hiçbir şey saklanmaz.",
           ],
         },
       ],
@@ -369,6 +373,7 @@ export const COPY: Record<Lang, Copy> = {
       caption: "Nearer the centre: more sources",
       idle: "Each blip is a story.",
     },
+    motion: { pause: "Pause motion", play: "Play motion" },
     closed: "That's all for today.",
     readTime: (n) => `${n} min read`,
     previous: "Previous issue",
@@ -531,8 +536,9 @@ export const COPY: Record<Lang, Copy> = {
           heading: "Privacy",
           paragraphs: [
             "This site sets no cookies, does not track you and loads nothing from third parties: no analytics, no ads, no outside fonts. Every page is a static HTML file and is complete without scripts.",
-            "The site's own small script only adds conveniences: the archive search (its data comes from this site), the radar's tilt and the marks on stories you have read, the way the “Why it matters” line appears, and a short opening on the day's first page. If you have asked for less motion, none of it moves.",
-            "To remember that the opening has been shown, one key is written to the browser's session storage: radar:intro. It is gone when the tab closes. Nothing else is stored, and nothing is sent anywhere.",
+            "The site's own small script only adds conveniences: the archive search (its data comes from this site), the radar's tilt and the marks on stories you have read, the way the “Why it matters” line appears, a short opening on the day's first page, and the button that pauses the looping motion. If you have asked for less motion, none of it moves.",
+            "What you type in the archive search stays in your browser and in the page's address, so it is also in your browser history. When you reload the page or click a result, that address goes to this site only; it is sent to no one else.",
+            "At most two keys are written to the browser's session storage: radar:intro, which remembers that the opening has been shown, and radar:still, which remembers that you paused the motion. Both are gone when the tab closes. Nothing else is stored.",
           ],
         },
       ],

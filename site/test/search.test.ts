@@ -139,6 +139,51 @@ describe("safeHref", () => {
       expect(safeHref(bad), bad).toBeNull();
     }
   });
+  it("refuses a backslash anywhere, any character below U+0021 and a second leading slash", () => {
+    // The URL parser drops tabs and newlines, so "/\t/host" would be a protocol-relative address.
+    const bad = [
+      "/\t/evil.example/x",
+      "/\n/evil.example",
+      "/\r/evil.example",
+      "/ /evil.example",
+      "/a b",
+      "/a\u0000b",
+      "/a\u001fb",
+      "/2026-11-20/\\x",
+      "/2026-11-20/#s-1\\",
+      "\t//evil.example",
+    ];
+    for (const u of bad) expect(safeHref(u), JSON.stringify(u)).toBeNull();
+    // What it lets through stays on the site, however the browser parses it.
+    const base = "https://radar.example";
+    for (const u of ["/2026-11-20/#s-1a2b3c4d", "/en/archive/?q=a%20b", "/a!b"]) {
+      expect(safeHref(u), u).toBe(u);
+      expect(new URL(u, base).origin).toBe(base);
+    }
+  });
+});
+
+describe("a query's terms", () => {
+  it("counts at most ten terms; the rest are ignored", () => {
+    const docs = [doc({ u: "a", t: "one two three four five six seven eight nine ten" })];
+    const ten = "one two three four five six seven eight nine ten";
+    expect(search(docs, { ...none, q: ten }).map((d) => d.u)).toEqual(["a"]);
+    // An eleventh term that matches nothing does not matter.
+    expect(search(docs, { ...none, q: `${ten} nowhere` }).map((d) => d.u)).toEqual(["a"]);
+    // And it is not marked either.
+    const parts = highlight("one nowhere", `${ten} nowhere`);
+    expect(parts.filter((p) => p.hit).map((p) => p.text)).toEqual(["one"]);
+  });
+  it("highlights without Array.prototype.at (missing before Safari 15.4 and Chrome 92)", () => {
+    const at = Array.prototype.at;
+    try {
+      // @ts-expect-error: removed for the length of this test, as in those browsers.
+      delete Array.prototype.at;
+      expect(highlight("İstanbul şifre", "sifre").filter((p) => p.hit).map((p) => p.text)).toEqual(["şifre"]);
+    } finally {
+      Array.prototype.at = at;
+    }
+  });
 });
 
 describe("arrowStep", () => {

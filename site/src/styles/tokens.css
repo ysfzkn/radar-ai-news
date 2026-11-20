@@ -85,10 +85,12 @@
   --cat-policy: #8e2a8a;
   --cat-policy-soft: #f6e4f5;
 
-  /* The archive heat strip: the ink laid over the page colour at four strengths (25, 45, 70 and
-     100 per cent) by the number of stories of a day; a day without an edition is --line. */
-  --heat-1: #bfbfbe;
-  --heat-2: #929392;
+  /* The archive heat strip: the ink laid over the page colour at four strengths (about 49, 60, 70
+     and 100 per cent) by the number of stories of a day; a day without an edition is --line.
+     Each square is a link, so even the faintest is a control colour: 3.2, 4.6, 6.4 and 16.6 to 1
+     on --bg, each step at least 1.39 to 1 from the next. */
+  --heat-1: #8a8b8a;
+  --heat-2: #707170;
   --heat-3: #5a5b5b;
   --heat-4: #17181a;
 

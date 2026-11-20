@@ -87,10 +87,15 @@ function idle(scope: HTMLElement): void {
   new IntersectionObserver(([entry]) => scope.classList.toggle("is-away", !entry.isIntersecting)).observe(scope);
 }
 
-const scope = document.querySelector<HTMLElement>(".scope");
-const dish = scope?.querySelector<HTMLElement>("[data-scope-dish]");
-if (scope && dish && "IntersectionObserver" in window) {
-  tilt(scope, dish);
-  reading(scope);
-  idle(scope);
+// Its own failure stays its own: the opening and the reading details in the same bundle go on.
+try {
+  const scope = document.querySelector<HTMLElement>(".scope");
+  const dish = scope?.querySelector<HTMLElement>("[data-scope-dish]");
+  if (scope && dish && "IntersectionObserver" in window) {
+    tilt(scope, dish);
+    reading(scope);
+    idle(scope);
+  }
+} catch {
+  // The scope is still its markup and stylesheet: links, rings and readout.
 }

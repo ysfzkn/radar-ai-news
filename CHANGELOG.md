@@ -14,10 +14,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Site: a small first-party script (at most 30 000 bytes for all of it, no library, no tracking) that only adds to pages which are complete without it. Archive search over titles, summaries and category names with Turkish folding, topic, month and 3+ source filters kept in the address, matched words marked, an empty state; and a heat strip of the last 26 weeks.
 - Site: the scope, a radar of the day's stories on every edition page, and an opening of at most 1.2 seconds, once per browser session (session storage key `radar:intro`), never with reduced motion.
 - Site: category emblems (paper cut-outs) on the lead story and the topic pages; the "Neden önemli" line inks in word by word; the end of an edition says "Bugünlük bu kadar." with its reading time; a horizon drawing above every page's footer.
+- Site: a pause button for looping motion ("Hareketi durdur" / "Pause motion") on the scope and in the footer, remembered for the browser session (key `radar:still`); without script nothing loops.
+- Site: `Strict-Transport-Security` and `Permissions-Policy` headers.
 
 ### Changed
 
-- Site: the Künye / About page says what the script does and the one key it keeps, instead of saying the site has no script.
+- Site: the Künye / About page says what the script does, that search words stay in the browser and the page address (and so in its history) and go to no one else, and the two session keys it keeps, instead of saying the site has no script.
+
+### Fixed
+
+- Site: the click, tap or key that skips the opening no longer follows a link under it.
+- Site: the scope's blips are in story order for Tab and screen readers, and their targets are at least 32 px on a phone.
+- Site: the archive heat strip is one tab stop (arrow keys move between days) and its lightest squares have 3:1 contrast.
+- Site: the "Neden önemli" line is readable before it inks in; a failing scope script no longer stops the opening; the search keeps the archive list when something fails, waits for a pause in typing and links only plain same-site paths.
 
 ## [0.5.0] - 2026-11-20
 

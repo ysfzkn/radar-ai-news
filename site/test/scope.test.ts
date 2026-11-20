@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   BLIP_HIT,
   MIN_GAP,
+  RING_CAPACITY,
   RING_RADIUS,
   SCOPE_HALF,
   baseAngle,
@@ -110,6 +111,39 @@ describe("blipPoint", () => {
         expect(Math.abs(y) + BLIP_HIT).toBeLessThanOrEqual(SCOPE_HALF);
       }
     }
+  });
+
+  it("gives a blip a tap target of at least 32 px on a phone", () => {
+    // On a phone the card is capped at 17.5rem (280 px) with 0.5rem padding and a 1.5 px border
+    // (base.css, pinned by the build tests): the drawing is 261 px across its 200 units.
+    const drawing = 280 - 2 * 8 - 2 * 1.5;
+    expect(((2 * BLIP_HIT) / (2 * SCOPE_HALF)) * drawing).toBeGreaterThanOrEqual(32);
+  });
+
+  it("keeps hit areas apart by geometry: rings a whole target apart, and each ring's least gap a whole target wide", () => {
+    const radii = [RING_RADIUS[1], RING_RADIUS[2], RING_RADIUS[3]];
+    for (let i = 1; i < radii.length; i++) expect(radii[i] - radii[i - 1]).toBeGreaterThanOrEqual(2 * BLIP_HIT);
+    for (const ring of [1, 2, 3] as const) {
+      const chord = 2 * RING_RADIUS[ring] * Math.sin(((MIN_GAP[ring] / 2) * Math.PI) / 180);
+      expect(chord, `ring ${ring}`).toBeGreaterThanOrEqual(2 * BLIP_HIT);
+      expect(MIN_GAP[ring]).toBeGreaterThanOrEqual(22);
+    }
+    expect(RING_RADIUS[3] + BLIP_HIT).toBeLessThanOrEqual(SCOPE_HALF);
+  });
+
+  it("holds at most RING_CAPACITY blips apart; past that the rest stack on the outermost ring", () => {
+    expect(RING_CAPACITY).toBe([1, 2, 3].reduce((n, r) => n + Math.floor(360 / MIN_GAP[r as 1 | 2 | 3]), 0));
+    const many = Array.from({ length: 45 }, (_, i) => ({ uid: uid(((i * 0x1357) & 0xffff).toString(16).padStart(4, "0"), i), source_count: 1 }));
+    const placed = placeBlips(many);
+    expect(placed).toHaveLength(45);
+    // Count the blips that keep their ring's gap from every blip placed before them.
+    let apartCount = 0;
+    placed.forEach((b, i) => {
+      const before = placed.slice(0, i).filter((x) => x.ring === b.ring);
+      if (before.every((x) => apart(x.angle, b.angle) >= MIN_GAP[b.ring])) apartCount++;
+    });
+    expect(apartCount).toBeLessThanOrEqual(RING_CAPACITY);
+    expect(placed.filter((b) => b.ring === 3).length).toBeGreaterThan(Math.floor(360 / MIN_GAP[3]));
   });
 
   it("never lets two hit areas of twelve stories overlap", () => {

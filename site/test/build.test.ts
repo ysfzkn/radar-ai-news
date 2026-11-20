@@ -635,7 +635,8 @@ describe("built site", () => {
         `${COPY[lang].scope.label}${COPY[lang].storyCount(articles(html).length)}`,
       );
       expect(inner).toContain(`<p class="scope-caption label">${COPY[lang].scope.caption}</p>`);
-      // The links in story order (they sit in their ring's layer, so order by number).
+      // The links in story order, as the document has them: Tab and a screen reader follow the
+      // edition, whatever ring and bearing a blip is drawn at.
       const blips = [
         ...inner.matchAll(/<a class="blip b-(\d+) cat-([a-z]+) sw-(\d+)" href="#([^"]+)" aria-labelledby="scope-t-(\d+)"><g transform="translate\(([-\d.]+) ([-\d.]+)\)">/g),
       ].map(([, n, cat, step, id, named, x, y]) => ({ n: +n, cat, step: +step, id, named: +named, x: +x, y: +y }));
@@ -648,8 +649,8 @@ describe("built site", () => {
           },
         ),
       );
-      blips.sort((a, b) => a.n - b.n);
       const list = articles(html);
+      expect(blips.map((b) => b.n), path).toEqual(list.map((_, i) => i + 1));
       expect(blips.map((b) => b.id), path).toEqual(list.map((a) => a.match(/<article id="([^"]+)"/)![1]));
       blips.forEach((blip, i) => {
         const article = list[i];
@@ -670,7 +671,11 @@ describe("built site", () => {
       expect(inner).toMatch(/<p class="scope-readout" aria-hidden="true"><span class="readout-idle">/);
       // The rings and the plate are drawings, hidden from assistive tech.
       expect(inner).toMatch(/<svg class="scope-plate" viewBox="-100 -100 200 200" aria-hidden="true">/);
-      expect(inner.match(/<g aria-hidden="true"><circle class="ring" r="(32|56|80)"><\/circle><text class="ring-label"/g)).toHaveLength(3);
+      const radii = Object.values(RING_RADIUS).join("|");
+      const ringTag = new RegExp(`<g aria-hidden="true"><circle class="ring" r="(${radii})"></circle><text class="ring-label"`, "g");
+      expect(inner.match(ringTag)).toHaveLength(3);
+      // Each blip is a layer of its own at its ring's depth, so the links can follow the edition.
+      expect(inner.match(/<svg class="scope-layer layer-[123]" viewBox="-100 -100 200 200"><a class="blip /g)).toHaveLength(blips.length);
     }
     // Hostile text stays text in the scope too.
     const hostile = scopeOf(page(HOSTILE, "2026-11-20"))![1];
@@ -703,25 +708,9 @@ describe("built site", () => {
   });
 
   it("the opening is decided by boot.js and never written into the markup", () => {
-    const boot = readFileSync(join(root, "public", "boot.js"), "utf8");
-    // Once per session, only where the page asks for it, skipped for reduced motion, back/forward,
-    // a hidden tab, and when storage fails; ended by a click, a key or 1500 ms.
-    for (const part of [
-      'd.hasAttribute("data-opening")',
-      'matchMedia("(prefers-reduced-motion: reduce)").matches',
-      'document.visibilityState === "hidden"',
-      'nav.type === "back_forward"',
-      'sessionStorage.getItem("radar:intro")',
-      'sessionStorage.setItem("radar:intro", "1")',
-      "} catch (e) {\n    return;\n  }",
-      'd.classList.add("intro")',
-      'addEventListener("pointerdown", end, true)',
-      'addEventListener("keydown", end, true)',
-      "setTimeout(end, 1500)",
-    ]) {
-      expect(boot.replace(/\r\n/g, "\n")).toContain(part);
-    }
-    expect(boot).not.toMatch(/localStorage|cookie/);
+    // What boot.js decides (once per session, only where the page asks for it, skipped for reduced
+    // motion, back/forward, a hidden tab and failing storage; ended by a press, a key or 1500 ms,
+    // the skipping press consumed) is run and checked in boot.test.ts. Here: the markup.
     for (const dir of [DEMO, HOSTILE, EMPTY, REAL]) {
       for (const file of htmlFiles(dir)) {
         const html = readFileSync(file, "utf8");
@@ -747,11 +736,12 @@ describe("built site", () => {
     expect(cssRule(css(), "html:not(.intro) .intro-canvas")).toContain("display: none;");
   });
 
-  it("the scripts write story text with textContent only and keep no storage but the opening's key", () => {
+  it("the bundled scripts write story text with textContent only and keep no storage at all", () => {
     const dir = join(root, "src", "scripts");
     for (const name of readdirSync(dir)) {
       const source = readFileSync(join(dir, name), "utf8");
-      expect(source, name).not.toMatch(/innerHTML|outerHTML|insertAdjacentHTML|document\.write|localStorage|document\.cookie|\beval\(/);
+      // Storage belongs to boot.js alone (its two session keys).
+      expect(source, name).not.toMatch(/innerHTML|outerHTML|insertAdjacentHTML|document\.write|localStorage|sessionStorage|document\.cookie|\beval\(/);
       // CSSOM custom properties only, never a style attribute.
       expect(source, name).not.toMatch(/setAttribute\(\s*["']style|\.style\.(?!setProperty)/);
     }
@@ -814,11 +804,14 @@ describe("built site", () => {
     let marks = 0;
     let meters = 0;
     let scopes = 0;
+    let blipLayers = 0;
+    let blips = 0;
     let emblems = 0;
     let horizons = 0;
     const files = [DEMO, REAL].flatMap(htmlFiles);
     for (const file of files) {
       const html = readFileSync(file, "utf8");
+      blips += (html.match(/<a class="blip b-/g) ?? []).length;
       for (const [svg] of html.matchAll(/<svg[\s\S]*?<\/svg>/g)) {
         expect(svg, file).not.toMatch(/\s(fill|stroke|color|stop-color)="/);
         expect(svg, file).not.toMatch(/#[0-9a-f]{3,8}\b|rgb\(/i);
@@ -826,8 +819,10 @@ describe("built site", () => {
           const inner = svg.slice(svg.indexOf(">") + 1, -"</svg>".length);
           expect(inner, file).toBe(markArcs);
           marks++;
-        } else if (/^<svg class="scope-(plate|layer layer-[123])" viewBox="-100 -100 200 200"/.test(svg)) {
+        } else if (/^<svg class="scope-(plate|layer layer-[123])" viewBox="-100 -100 200 200"( aria-hidden="true")?><(circle|g) /.test(svg)) {
           scopes++;
+        } else if (/^<svg class="scope-layer layer-[123]" viewBox="-100 -100 200 200"><a class="blip b-\d+ /.test(svg)) {
+          blipLayers++;
         } else if (/^<svg class="emblem cat-[a-z]+" viewBox="0 0 48 48" width="(56|96)" height="\1" aria-hidden="true">/.test(svg)) {
           emblems++;
         } else if (svg.startsWith('<svg class="horizon" viewBox="0 0 640 96" preserveAspectRatio="xMidYMax slice" aria-hidden="true">')) {
@@ -843,6 +838,9 @@ describe("built site", () => {
     expect(meters).toBeGreaterThan(50);
     // Four drawings per edition page (plate and three ring layers): 4 dates in two languages, plus two homes.
     expect(scopes).toBe(2 * (4 * 2 + 2) * 4);
+    // And one layer per blip, each holding exactly that blip.
+    expect(blips).toBeGreaterThan(40);
+    expect(blipLayers).toBe(blips);
     // One emblem on each edition page (the lead's) and on each topic page; one horizon on every page.
     expect(emblems).toBe(2 * ((4 * 2 + 2) + 8 * 2));
     expect(horizons).toBe(files.length);
@@ -922,7 +920,8 @@ describe("built site", () => {
   it("every page ends with the horizon above the signature, hidden from assistive tech and from print", () => {
     for (const file of [DEMO, EMPTY].flatMap(htmlFiles)) {
       const foot = readFileSync(file, "utf8").match(/<footer class="foot label">([\s\S]*?)<\/footer>/)![1];
-      expect(foot, file).toMatch(/^\s*<svg class="horizon" [^>]*aria-hidden="true">[\s\S]*?<\/svg>\s*<p class="sig">/);
+      // The horizon, the pause beside it, then the signature.
+      expect(foot, file).toMatch(/^\s*<svg class="horizon" [^>]*aria-hidden="true">[\s\S]*?<\/svg>\s*<p class="foot-still">\s*<button [^>]*data-still[\s\S]*?<\/button>\s*<\/p>\s*<p class="sig">/);
       const horizon = foot.match(/<svg class="horizon"[\s\S]*?<\/svg>/)![0];
       expect(horizon).not.toMatch(/<a\s|<text|tabindex/);
       expect(horizon).toContain('class="hz-turn"');
@@ -936,13 +935,49 @@ describe("built site", () => {
     expect(line).toContain("vector-effect: non-scaling-stroke;");
   });
 
+  it("a pause button sits on the scope and in the footer, hidden without script, sharing one state", () => {
+    for (const [dir, lang] of [
+      [DEMO, "tr"],
+      [EMPTY, "tr"],
+    ] as const) {
+      for (const file of htmlFiles(dir)) {
+        const html = readFileSync(file, "utf8");
+        const l = html.includes('<html lang="en"') ? "en" : lang;
+        const motion = COPY[l].motion;
+        const button = `<button class="still-toggle label" type="button" data-still aria-pressed="false" hidden><span class="still-pause">${motion.pause}</span><span class="still-play">${motion.play}</span></button>`;
+        const all = html.match(/<button class="still-toggle[\s\S]*?<\/button>/g) ?? [];
+        const scope = html.match(/<section class="scope"[\s\S]*?<\/section>/)?.[0];
+        expect(all.length, file).toBe(scope ? 2 : 1);
+        for (const b of all) expect(b, file).toBe(button);
+        if (scope) expect(scope, file).toContain(button);
+        const foot = html.match(/<footer class="foot label">[\s\S]*?<\/footer>/)![0];
+        expect(foot, file).toContain(button);
+      }
+    }
+    expect(COPY.tr.motion).toEqual({ pause: "Hareketi durdur", play: "Hareketi başlat" });
+    expect(COPY.en.motion).toEqual({ pause: "Pause motion", play: "Play motion" });
+    const decls = declarations(css());
+    // Shown only with script and with motion to stop; it reads what a press does.
+    const shown = decls.filter((d) => d.selector === "html.js .still-toggle" && d.prop === "display");
+    expect(shown.map((d) => `${d.stack[0]} ${d.value}`)).toEqual(["@media (prefers-reduced-motion: no-preference) inline-flex"]);
+    expect(cssRule(css(), ".still-play")).toContain("display: none;");
+    expect(cssRule(css(), "html.still .still-pause")).toContain("display: none;");
+    expect(cssRule(css(), "html.still .still-play")).toContain("display: inline;");
+  });
+
   it("the why-it-matters line inks in only by script, only with motion, and prints in ink", () => {
     const decls = declarations(css());
     const wait = decls.filter((d) => d.selector === ".ink-wait .ink-w");
+    // While it waits it is already readable (--muted: 6.1:1 on the page, 6.5:1 on the lead's white);
+    // the ink-in only darkens it.
     expect(wait.map((d) => `${d.stack[0]} ${d.prop}: ${d.value}`)).toEqual([
-      "@media (prefers-reduced-motion: no-preference) color: var(--line)",
+      "@media (prefers-reduced-motion: no-preference) color: var(--muted)",
       "@media print color: inherit",
     ]);
+    const token = (name: string) => sheets().match(new RegExp(`--${name}: (#[0-9a-f]{6});`))![1];
+    for (const ground of ["bg", "surface"]) expect(contrast(token("muted"), token(ground))).toBeGreaterThanOrEqual(4.5);
+    const inkIn = decls.filter((d) => d.stack[0] === "@keyframes ink-in");
+    expect(inkIn.map((d) => `${d.selector} ${d.prop}: ${d.value}`)).toEqual(["from color: var(--muted)"]);
     // No page carries the classes in its markup: only reading.ts adds them.
     for (const file of htmlFiles(DEMO)) {
       const html = readFileSync(file, "utf8");
@@ -951,8 +986,15 @@ describe("built site", () => {
     const reading = readFileSync(join(root, "src", "scripts", "reading.ts"), "utf8");
     expect(reading).toContain('matchMedia("(prefers-reduced-motion: reduce)")');
     expect(reading).toContain("textContent = token.text");
-    // The script comes with the scope's bundle, so an edition page still loads two scripts.
-    expect(readFileSync(join(root, "src", "components", "Scope.astro"), "utf8")).toContain('import "../scripts/reading";');
+    // The script comes with the scope's bundle, so an edition page still loads two scripts. The
+    // opening comes first in it, and the scope's and the reading details' set-up each catch their
+    // own failure, so neither can keep the opening from finishing.
+    const bundle = readFileSync(join(root, "src", "components", "Scope.astro"), "utf8").match(/<script>([\s\S]*?)<\/script>/)![1];
+    expect(bundle.trim().split(/\s*\n\s*/)).toEqual(['import "../scripts/intro";', 'import "../scripts/scope";', 'import "../scripts/reading";']);
+    for (const name of ["scope.ts", "reading.ts"]) {
+      const source = readFileSync(join(root, "src", "scripts", name), "utf8");
+      expect(source, name).toMatch(/\ntry \{\n[\s\S]*\n\} catch \{\n[\s\S]*\n\}\n$/);
+    }
   });
 
   it("the opening ends on the mark and the issue, and all its beats fit in 1200 ms", () => {
@@ -1020,11 +1062,20 @@ describe("built site", () => {
     expect(narrow(".story-lead", "padding")).toBe("1rem");
   });
 
-  it("the Künye page says what the site's own script does and the one key it keeps", () => {
+  it("the Künye page says what the site's own script does, where the search words go and the two keys it keeps", () => {
     for (const [path, lang] of [["kunye", "tr"], ["en/about", "en"]] as const) {
       const body = text(page(DEMO, path));
       expect(body, path).not.toMatch(/betik yok|no outside fonts or scripts/);
+      // The search words are in the address, so in the history; that address reaches this site only.
+      expect(body, path).not.toMatch(/hiçbir yere gönderilmez|nothing is sent anywhere/);
+      expect(body).toContain(
+        lang === "tr"
+          ? "Arşivde aradığın sözcükler tarayıcında ve sayfanın adresinde kalır; adres de tarayıcı geçmişine yazılır."
+          : "What you type in the archive search stays in your browser and in the page's address, so it is also in your browser history.",
+      );
+      expect(body).toContain(lang === "tr" ? "başka kimseye gönderilmez" : "it is sent to no one else");
       expect(body).toContain("radar:intro");
+      expect(body).toContain("radar:still");
       expect(body).toContain(lang === "tr" ? "betik olmadan da eksiksiz çalışır" : "complete without scripts");
       expect(body).toContain(lang === "tr" ? "seni izlemez" : "does not track you");
     }
@@ -1144,7 +1195,7 @@ describe("built site", () => {
     expect(empty).not.toContain('class="heat"');
   });
 
-  it("the heat strip is static: 26 weeks, a link with an accessible name for each edition's day", () => {
+  it("the heat strip: 26 weeks, a link with an accessible name for each edition's day, and one tab stop", () => {
     for (const [path, lang, name] of [
       ["arsiv", "tr", "20 Kasım 2026, 5 haber"],
       ["en/archive", "en", "20 November 2026, 5 stories"],
@@ -1152,12 +1203,28 @@ describe("built site", () => {
       const html = page(DEMO, path);
       const strip = html.match(/<div class="heat"[\s\S]*?<!--\/heat-->/)![0];
       expect(strip.match(/class="heat-week"/g)).toHaveLength(26);
-      const links = [...strip.matchAll(/<a class="heat-day heat-(\d)" href="([^"]+)" aria-label="([^"]+)"/g)];
+      const links = [...strip.matchAll(/<a class="heat-day heat-(\d)" href="([^"]+)" data-day="([^"]+)" tabindex="(0|-1)" aria-label="([^"]+)"/g)];
+      expect(links.length).toBe((strip.match(/<a\s/g) ?? []).length);
       expect(links.map((m) => m[2]).sort()).toEqual(DEMO_DATES.map((d) => (lang === "tr" ? `/${d}/` : `/en/${d}/`)).sort());
-      expect(links.map((m) => m[3])).toContain(name);
+      for (const m of links) expect(m[2]).toBe(lang === "tr" ? `/${m[3]}/` : `/en/${m[3]}/`);
+      expect(links.map((m) => m[5])).toContain(name);
       for (const [, level] of links) expect(Number(level)).toBeGreaterThanOrEqual(1);
       expect(strip).toContain(lang === "tr" ? ">Kas<" : ">Nov<");
+      // One tab stop: only the newest edition's day is in the tab order (arrow keys reach the
+      // rest with script; every edition is also a row of the archive list below).
+      const stops = links.filter((m) => m[4] === "0").map((m) => m[3]);
+      expect(stops).toEqual([DEMO_DATES.at(-1)]);
+      const list = html.match(/<div data-archive-list>[\s\S]*$/)![0];
+      for (const m of links) expect(list, m[2]).toContain(`href="${m[2]}"`);
     }
+    // The script moves between the days with the arrow keys.
+    const archive = readFileSync(join(root, "src", "components", "ArchiveView.astro"), "utf8");
+    expect(archive).toContain('import "../scripts/heat";');
+    // Every strength is a control colour: 3:1 or more on the page, and apart from the next one.
+    const token = (name: string) => sheets().match(new RegExp(`--${name}: (#[0-9a-f]{6});`))![1];
+    const steps = ["heat-1", "heat-2", "heat-3", "heat-4"].map(token);
+    for (const step of steps) expect(contrast(step, token("bg")), step).toBeGreaterThanOrEqual(3);
+    for (let i = 1; i < steps.length; i++) expect(contrast(steps[i], steps[i - 1]), steps[i]).toBeGreaterThanOrEqual(1.35);
   });
 
   it("the demo banner is on every demo page and on no page built from a real file", () => {
@@ -1386,6 +1453,10 @@ describe("built site", () => {
     expect(headers).toContain("X-Content-Type-Options: nosniff");
     expect(headers).toContain("Referrer-Policy: strict-origin-when-cross-origin");
     expect(headers).toContain("X-Frame-Options: DENY");
+    expect(headers).toContain("Strict-Transport-Security: max-age=31536000");
+    const permissions = headers.match(/^ {2}Permissions-Policy: (.+)$/m)![1].split(", ");
+    for (const feature of ["camera", "microphone", "geolocation", "payment", "usb"]) expect(permissions).toContain(`${feature}=()`);
+    expect(permissions.every((p) => /^[a-z-]+=\(\)$/.test(p))).toBe(true);
     expect(readFileSync(join(DEMO, "sitemap-0.xml"), "utf8")).toContain(`<loc>${SITE}/</loc>`);
     const robots = readFileSync(join(DEMO, "robots.txt"), "utf8");
     expect(robots).toContain(`Sitemap: ${SITE}/sitemap-index.xml`);
@@ -1758,14 +1829,28 @@ describe("built site", () => {
       if (d.prop === "animation-timeline") expect(context).toMatch(/@supports \(animation-timeline: scroll\(\)\)/);
       if (d.prop.startsWith("transition")) expect(d.value).toMatch(/120ms/);
     }
-    // Nothing loops but the scope's one 6 s clock (the sweep, each blip's echo and the readout) and
-    // the horizon's slow dish and birds, at 20 s or slower.
+    // Looping motion can be stopped (WCAG 2.2.2). Only five things loop: the scope's one 6 s clock
+    // (the sweep, each blip's echo and the readout) and the horizon's slow dish and birds, at 20 s
+    // or slower. Each loops only with motion allowed, only with script (html.js: where the pause
+    // button exists; without script the scope and the horizon stand still), and never once the
+    // reader has paused (html.still). Stopped, each rests on its plain frame: no animation at all.
+    const LOOPED = [".blip-echo", ".hz-bird", ".hz-turn", ".readout-line", ".scope-sweep"];
+    const GATE = "html.js:not(.still) ";
     expect(sheets()).not.toMatch(/alternate/);
     const loops = decls.filter((d) => /infinite/.test(d.value));
-    expect(loops.map((d) => d.selector).sort()).toEqual([".blip-echo", ".hz-bird", ".hz-turn", ".readout-line", ".scope-sweep"]);
-    for (const d of loops.filter((x) => !x.selector.startsWith(".hz-"))) expect(d.value, d.selector).toMatch(/^[a-z-]+ 6s .*infinite$/);
-    for (const d of decls.filter((x) => x.selector.startsWith(".hz-") && /^animation(-duration)?$/.test(x.prop))) {
-      expect(Number(d.value.match(/(\d+)s\b/)![1]), `${d.selector} ${d.value}`).toBeGreaterThanOrEqual(20);
+    expect(loops.map((d) => d.selector).sort()).toEqual(LOOPED.map((s) => GATE + s));
+    for (const d of loops) {
+      expect(d.stack, d.selector).toEqual(["@media (prefers-reduced-motion: no-preference)", d.selector]);
+      expect(d.prop).toBe("animation");
+    }
+    for (const d of loops.filter((x) => !x.selector.startsWith(`${GATE}.hz-`))) expect(d.value, d.selector).toMatch(/^[a-z-]+ 6s .*infinite$/);
+    const hz = decls.filter((x) => x.selector.startsWith(`${GATE}.hz-`) && /^animation(-duration)?$/.test(x.prop));
+    expect(hz.length).toBe(4);
+    for (const d of hz) expect(Number(d.value.match(/(\d+)s\b/)![1]), `${d.selector} ${d.value}`).toBeGreaterThanOrEqual(20);
+    // No other rule sets these animations going: anything else on them only pauses or cancels.
+    const looped = new RegExp(`(${LOOPED.map((s) => s.replace(".", "\\.")).join("|")})\\b`);
+    for (const d of decls.filter((x) => /^animation/.test(x.prop) && looped.test(x.selector) && !x.selector.startsWith(GATE))) {
+      expect(d.stack[0] === "@media print" ? d.value : `${d.prop}: ${d.value}`, d.selector).toMatch(/^none$|^animation-play-state: paused$/);
     }
     // The progress bar is invisible by default; only the edition view renders it.
     const bar = cssRule(css(), ".progress");

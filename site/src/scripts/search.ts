@@ -29,6 +29,8 @@ interface Labels {
 
 /** Most results written to the page at once. */
 const LIMIT = 100;
+/** How long typing must pause before the search runs. */
+const TYPING = 150;
 
 function start(root: HTMLElement): void {
   const lang = document.documentElement.lang === "en" ? "en" : "tr";
@@ -130,21 +132,39 @@ function start(root: HTMLElement): void {
     return li;
   }
 
+  /** The archive list back, no results: the state without a search, or after a failure. */
+  function plain(): void {
+    list.hidden = false;
+    results.hidden = true;
+    more.hidden = true;
+    empty.hidden = true;
+    results.replaceChildren();
+    count.textContent = failed ? (root.dataset.failed ?? "") : "";
+  }
+
   function render(): void {
+    try {
+      show();
+    } catch {
+      // Whatever went wrong (malformed data, an old browser), the reader keeps the archive list
+      // and the line that says the search is not working.
+      failed = true;
+      plain();
+    }
+  }
+
+  function show(): void {
     if (isEmptyQuery(state) || failed || docs === null) {
-      list.hidden = false;
-      results.hidden = true;
-      more.hidden = true;
-      empty.hidden = true;
-      results.replaceChildren();
-      count.textContent = failed ? (root.dataset.failed ?? "") : "";
+      plain();
       return;
     }
     const found = search(docs, state, names);
+    // The rows are built before the list is hidden, so a failure leaves the list in place.
+    const rows = found.slice(0, LIMIT).map(row);
     list.hidden = true;
     results.hidden = found.length === 0;
     empty.hidden = found.length > 0;
-    results.replaceChildren(...found.slice(0, LIMIT).map(row));
+    results.replaceChildren(...rows);
     // The count is the true total; when more were found than are shown, the line under the list says so.
     more.hidden = found.length <= LIMIT;
     more.textContent = found.length > LIMIT ? fill(labels.more, LIMIT) : "";
@@ -158,15 +178,26 @@ function start(root: HTMLElement): void {
 
   /** The state changed: mirror it to the address bar and show it. */
   function change(): void {
-    history.replaceState(null, "", location.pathname + writeQuery(state, lang) + location.hash);
+    clearTimeout(typing);
+    typing = 0;
+    try {
+      // Safari allows only so many calls in a short time and throws past that; the address then
+      // lags behind, the results do not.
+      history.replaceState(null, "", location.pathname + writeQuery(state, lang) + location.hash);
+    } catch {
+      // The search goes on without updating the address.
+    }
     load();
     render();
   }
 
+  // Typing waits for a pause of TYPING ms before it searches; the other controls act at once.
+  let typing = 0;
   input.addEventListener("focus", load);
   input.addEventListener("input", () => {
     state = { ...state, q: input.value };
-    change();
+    clearTimeout(typing);
+    typing = window.setTimeout(change, TYPING);
   });
   month.addEventListener("change", () => {
     state = { ...state, month: month.value || null };

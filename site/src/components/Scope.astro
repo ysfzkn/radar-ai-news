@@ -2,6 +2,7 @@
 import { COPY } from "../lib/copy";
 import { anchorId, type Edition } from "../lib/editions";
 import { categoryClass } from "../lib/format";
+import StillToggle from "./StillToggle.astro";
 import {
   BLIP_DOT,
   BLIP_HIT,
@@ -88,19 +89,24 @@ const rings: Ring[] = [3, 2, 1];
                 {RING_SOURCES[ring]}
               </text>
             </g>
-            {blips
-              .filter((blip) => blip.ring === ring)
-              .map((blip) => (
-                <a class={`blip b-${blip.n} ${blip.cat} ${blip.step}`} href={blip.href} aria-labelledby={`scope-t-${blip.n}`}>
-                  <g transform={blip.transform}>
-                    <circle class="blip-hit" r={BLIP_HIT}></circle>
-                    <circle class="blip-echo" r={BLIP_DOT}></circle>
-                    <circle class="blip-dot" r={BLIP_DOT}></circle>
-                    <text class="blip-no">{blip.no}</text>
-                  </g>
-                </a>
-              ))}
           </svg>
+        ))
+      }
+      {/*
+        The blips in story order, each a layer of its own at its ring's depth: the document (and
+        so Tab and a screen reader) follows the edition, 01, 02, 03 …; ring and bearing are only
+        where a blip is drawn.
+      */}
+      {
+        blips.map((blip) => (
+          <svg class={`scope-layer layer-${blip.ring}`} viewBox="-100 -100 200 200"><a class={`blip b-${blip.n} ${blip.cat} ${blip.step}`} href={blip.href} aria-labelledby={`scope-t-${blip.n}`}>
+              <g transform={blip.transform}>
+                <circle class="blip-hit" r={BLIP_HIT}></circle>
+                <circle class="blip-echo" r={BLIP_DOT}></circle>
+                <circle class="blip-dot" r={BLIP_DOT}></circle>
+                <text class="blip-no">{blip.no}</text>
+              </g>
+            </a></svg>
         ))
       }
     </div>
@@ -122,10 +128,11 @@ const rings: Ring[] = [3, 2, 1];
     }
   </p>
   <p class="scope-caption label">{copy.scope.caption}</p>
+  <p class="scope-still"><StillToggle lang={lang} /></p>
 </section>
 
 <script>
-  import "../scripts/scope";
   import "../scripts/intro";
+  import "../scripts/scope";
   import "../scripts/reading";
 </script>

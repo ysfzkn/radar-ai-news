@@ -16,20 +16,30 @@ export interface Placed {
 /** Half the drawing's width: the box runs from -SCOPE_HALF to SCOPE_HALF. */
 export const SCOPE_HALF = 100;
 
-/** Ring radii, innermost first. 24 units apart, more than one hit area (2 × BLIP_HIT). */
-export const RING_RADIUS: Record<Ring, number> = { 1: 32, 2: 56, 3: 80 };
+/** Ring radii, innermost first. 25 units apart: one whole hit area (2 × BLIP_HIT), so blips on
+ *  neighbouring rings never share a target. */
+export const RING_RADIUS: Record<Ring, number> = { 1: 30, 2: 55, 3: 80 };
 
-/** A blip's tap target radius: 10.5 units are 33px where the drawing is 316px wide (a 375px phone). */
-export const BLIP_HIT = 10.5;
+/**
+ * A blip's tap target radius. On a phone the card is capped at 280px and the drawing is 261px
+ * across its 200 units, so a target of 25 units is 32.6px; on a wider screen it is larger.
+ */
+export const BLIP_HIT = 12.5;
 
 /** The dot drawn inside the hit area. */
 export const BLIP_DOT = 7;
 
 /**
- * Least bearing between two blips of one ring. Never under 22°; on the small inner ring
- * 22° would let two hit areas overlap, so it keeps the chord at least 2 × BLIP_HIT there.
+ * Least bearing between two blips of one ring. Never under 22°; on the two inner rings 22° would
+ * let two hit areas overlap, so each ring keeps the chord between neighbours at least 2 × BLIP_HIT.
  */
-export const MIN_GAP: Record<Ring, number> = { 1: 40, 2: 22, 3: 22 };
+export const MIN_GAP: Record<Ring, number> = { 1: 50, 2: 27, 3: 22 };
+
+/**
+ * The most blips the rings can hold at their least gap: 7 + 13 + 16 = 36. Nudged bearings leave
+ * gaps, so a crowded edition may fill the rings with fewer; editions have 5 to 8 stories.
+ */
+export const RING_CAPACITY = ([1, 2, 3] as Ring[]).reduce((n, ring) => n + Math.floor(360 / MIN_GAP[ring]), 0);
 
 /** Sources per ring: the louder a story, the nearer the centre. */
 export const RING_SOURCES: Record<Ring, string> = { 1: "5+", 2: "3–4", 3: "1–2" };
@@ -81,7 +91,8 @@ export function placeBlips(stories: { uid: string; source_count: number }[]): Pl
         return { uid, ring, angle };
       }
     }
-    // Every ring is full (over 40 stories): stack on the outermost at the uid's own bearing.
+    // No ring has room (at most RING_CAPACITY blips fit, fewer once nudged bearings leave gaps):
+    // stack on the outermost ring at the uid's own bearing.
     return { uid, ring: 3 as Ring, angle: want };
   });
 }

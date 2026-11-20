@@ -36,7 +36,9 @@ const lastMs = toMs(last);
 const newestMonday = lastMs - ((new Date(lastMs).getUTCDay() + 6) % 7) * DAY;
 
 // Newest week first in the markup, so a screen reader meets the latest days first; the
-// stylesheet lays the columns out oldest to newest with `row-reverse`.
+// stylesheet lays the columns out oldest to newest with `row-reverse`. The strip is one tab stop:
+// only the newest edition's day is in the tab order, and scripts/heat.ts moves between the days
+// with the arrow keys. Every edition is also a row of the archive list under the strip.
 const weeks = Array.from({ length: WEEKS }, (_, w) => {
   const monday = newestMonday - w * 7 * DAY;
   const days = Array.from({ length: 7 }, (_, d) => {
@@ -62,6 +64,8 @@ const weeks = Array.from({ length: WEEKS }, (_, w) => {
                 <a
                   class={`heat-day heat-${level(n)}`}
                   href={routes[lang].edition(day.date)}
+                  data-day={day.date}
+                  tabindex={day.date === last ? "0" : "-1"}
                   aria-label={copy.search.heatDay(plainDate(day.date, lang), n)}
                 />
               );

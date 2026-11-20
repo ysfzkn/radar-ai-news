@@ -68,9 +68,13 @@ export function categoryOf(value: unknown): Category | null {
   return CATEGORY_LIST.find((category) => category === value) ?? null;
 }
 
-/** The address a result links to: only a same-site path, "/" followed by anything but "/" or "\\". */
+/**
+ * The address a result links to: only a plain same-site path. It starts with one "/" and holds
+ * no backslash and no character below U+0021 anywhere: the URL parser drops tabs and newlines
+ * and reads "\\" as "/", so either could turn "/…/host" into another site's address.
+ */
 export function safeHref(u: string): string | null {
-  return /^\/[^/\\]/.test(u) ? u : null;
+  return /^\/(?!\/)[^\\\u0000- ]+$/.test(u) ? u : null;
 }
 
 /** A copy template with the number put where `{n}` stands. */
@@ -97,8 +101,11 @@ function foldedDoc(doc: SearchDoc): { t: string; s: string } {
   return entry;
 }
 
-/** The whitespace-separated terms of a query, folded. */
-const termsOf = (q: string) => fold(q).split(/\s+/).filter(Boolean);
+/** Most terms a query counts: an address with a thousand terms costs no more than one with ten. */
+export const MAX_TERMS = 10;
+
+/** The whitespace-separated terms of a query, folded: the first MAX_TERMS of them. */
+const termsOf = (q: string) => fold(q).split(/\s+/).filter(Boolean).slice(0, MAX_TERMS);
 
 /**
  * The text cut into plain and matched parts, joined they give the text back unchanged. Matching
@@ -129,7 +136,7 @@ export function highlight(text: string, q: string): { text: string; hit: boolean
   }
   const parts: { text: string; hit: boolean }[] = [];
   chars.forEach((ch, i) => {
-    const last = parts.at(-1);
+    const last = parts[parts.length - 1];
     if (last && last.hit === hit[i]) last.text += ch;
     else parts.push({ text: ch, hit: hit[i] });
   });

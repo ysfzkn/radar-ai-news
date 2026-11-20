@@ -45,4 +45,8 @@ function start(): void {
   if (end) seen.observe(end);
 }
 
-start();
+try {
+  start();
+} catch {
+  // The lines stand as they are (a line already wrapped but never seen keeps its readable colour).
+}

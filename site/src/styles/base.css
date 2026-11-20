@@ -469,8 +469,9 @@ a.lang-part:focus-visible {
 
 /* The scope: the edition's stories as blips on a radar, seen slightly from above. A card in the
    lead's language (ink outline, white, hard shadow) holding a plate, three range rings and a
-   sweep. Each ring is a layer of its own, the inner ones nearer the reader; every blip is a link
-   to its story in its category's colour, nearer the centre the more sources it has.
+   sweep. Each ring is a layer of its own, the inner ones nearer the reader, and so is each blip,
+   at its ring's depth and in story order in the document; every blip is a link to its story in
+   its category's colour, nearer the centre the more sources it has.
    The markup carries `hidden`, so a page without its stylesheet shows the plain list instead;
    `display` here overrides it. */
 .scope {
@@ -620,7 +621,7 @@ a.lang-part:focus-visible {
   letter-spacing: 0.04em;
 }
 
-/* A blip: a 33px target (at phone width) around a dot with the story's number. Once its story
+/* A blip: a target of at least 32px (at phone width) around a dot with the story's number. Once its story
    has been read for two seconds the dot turns hollow. */
 .blip {
   cursor: pointer;
@@ -841,14 +842,14 @@ a.lang-part:focus-visible {
   --sweep-at: 5750ms;
 }
 
-/* The opening's canvas (scripts/intro.ts) shows only while <html> carries `intro`. */
+/* The opening's canvas (scripts/intro.ts) shows only while <html> carries `intro`. It takes the
+   pointer while it is up, so the press that skips it (boot.js consumes it) reaches no link. */
 .intro-canvas {
   position: fixed;
   inset: 0;
   z-index: 101;
   width: 100%;
   height: 100%;
-  pointer-events: none;
 }
 
 html:not(.intro) .intro-canvas {
@@ -1849,6 +1850,45 @@ a.heat-day:hover {
   transform-origin: 392px 0;
 }
 
+/* The pause for looping motion (StillToggle.astro), on the scope and in the footer beside the
+   horizon. It shows only with script and with motion to stop (in the motion rules below), and
+   reads what a press does. */
+.still-toggle {
+  min-height: 2rem;
+  padding: 0.125rem 0.625rem;
+  border: 1px solid var(--control-border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.still-toggle:hover {
+  border-color: var(--ink);
+}
+
+.still-play {
+  display: none;
+}
+
+html.still .still-pause {
+  display: none;
+}
+
+html.still .still-play {
+  display: inline;
+}
+
+.scope-still {
+  display: none;
+  margin-top: var(--space-2);
+}
+
+.foot-still {
+  display: none;
+}
+
 /* Footer: the owner's signature, then the site's own links. */
 .foot {
   display: flex;
@@ -1892,8 +1932,20 @@ a.heat-day:hover {
   pointer-events: none;
 }
 
-/* Motion: only for readers who have not asked for less, and nothing loops. */
+/* Motion: only for readers who have not asked for less. Five things loop (the scope's sweep, its
+   blip echoes and readout, the horizon's dish and birds); they run only with script, which brings
+   the pause button, and stop on their plain frame once the reader pauses (html.still). Without
+   script, or with less motion asked for, nothing loops. */
 @media (prefers-reduced-motion: no-preference) {
+  html.js .still-toggle {
+    display: inline-flex;
+  }
+
+  html.js .scope-still,
+  html.js .foot-still {
+    display: block;
+  }
+
   a,
   .pager-issue,
   .row-date {
@@ -1938,17 +1990,18 @@ a.heat-day:hover {
   }
 
   /* The scope keeps turning while it is in view: the sweep, the echo of each blip it passes
-     and the readout's title follow one 6 s clock. Off screen it stands still. */
-  .scope-sweep {
+     and the readout's title follow one 6 s clock. Off screen it stands still; paused, the sweep
+     points up, no echo shows and the readout rests on its own line. */
+  html.js:not(.still) .scope-sweep {
     animation: scope-sweep 6s linear infinite;
   }
 
-  .blip-echo {
+  html.js:not(.still) .blip-echo {
     animation: blip-ping 6s ease-out infinite;
     animation-delay: var(--sweep-at, 0ms);
   }
 
-  .readout-line {
+  html.js:not(.still) .readout-line {
     animation: scope-readout 6s steps(24, end) infinite;
     animation-delay: var(--sweep-at, 0ms);
   }
@@ -1975,7 +2028,7 @@ a.heat-day:hover {
   /* The "why it matters" line inks in word by word when first seen (reading.ts wraps the words
      and sets --i, their order; it adds ink-wait at once and ink-go when the line is seen). */
   .ink-wait .ink-w {
-    color: var(--line);
+    color: var(--muted);
   }
 
   .ink-go .ink-w {
@@ -1989,21 +2042,22 @@ a.heat-day:hover {
     animation: screen-off 650ms cubic-bezier(0.7, 0, 0.3, 1) forwards;
   }
 
-  /* The horizon's dish turns once a minute's third, its birds glide on their own slow courses. */
-  .hz-turn {
+  /* The horizon's dish turns once a minute's third, its birds glide on their own slow courses.
+     Paused, the dish faces the reader and the birds hold their places. */
+  html.js:not(.still) .hz-turn {
     animation: dish-turn 20s ease-in-out infinite;
   }
 
-  .hz-bird {
+  html.js:not(.still) .hz-bird {
     animation: bird-drift 36s ease-in-out infinite;
   }
 
-  .hz-bird-2 {
+  html.js:not(.still) .hz-bird-2 {
     animation-duration: 44s;
     animation-delay: -12s;
   }
 
-  .hz-bird-3 {
+  html.js:not(.still) .hz-bird-3 {
     animation-duration: 52s;
     animation-delay: -30s;
   }
@@ -2108,10 +2162,10 @@ a.heat-day:hover {
   }
 }
 
-/* From the page's faint line colour to the line's own ink. */
+/* From the muted text colour, already readable, to the line's own ink. */
 @keyframes ink-in {
   from {
-    color: var(--line);
+    color: var(--muted);
   }
 }
 
@@ -2205,14 +2259,14 @@ a.heat-day:hover {
   .story:target::before,
   .progress,
   .story:not(.story-lead),
-  .scope-sweep,
-  .blip-echo,
-  .readout-line,
+  html.js:not(.still) .scope-sweep,
+  html.js:not(.still) .blip-echo,
+  html.js:not(.still) .readout-line,
   html.intro body::before,
   .ink-go .ink-w,
   .is-off .screen-off,
-  .hz-turn,
-  .hz-bird,
+  html.js:not(.still) .hz-turn,
+  html.js:not(.still) .hz-bird,
   .em-mid .em-face,
   .em-top .em-face {
     animation: none;
