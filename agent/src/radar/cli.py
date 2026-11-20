@@ -176,8 +176,33 @@ def _run_dry(args: argparse.Namespace, cap: float) -> int:
     return 0 if stats["sources_ok"] > 0 else 1
 
 
+def _agent_in_run(
+    store: SqliteStore,
+    candidates: list[Candidate],
+    client: httpx.Client,
+    now: datetime,
+    run_id: int,
+    cap: float,
+    max_stories: int,
+    make_llm,
+) -> dict:
+    """The model steps of a run, metered under `cap`; returns the run's statistics."""
+    from radar.agent import run_agent
+    from radar.budget import DAILY_TOKEN_TARGET, Meter
+
+    meter = Meter(store, run_id, cap, clock=lambda: datetime.now(UTC))
+    agent = run_agent(store, candidates, make_llm(meter), client, now, run_id, max_stories)
+    agent["stories_failed"] = agent.pop("failed")
+    tokens = meter.tokens_today()
+    agent["llm_calls"] = meter.calls
+    agent["tokens_today"] = tokens
+    agent["cost_today_usd"] = round(meter.spent_today(), 4)
+    agent["over_token_target"] = tokens > DAILY_TOKEN_TARGET
+    return agent
+
+
 def _run_agent_command(args: argparse.Namespace) -> int:
-    from radar.budget import DAILY_TOKEN_TARGET, Meter, cap_from_env
+    from radar.budget import cap_from_env
     from radar.score import MAX_EDITION
 
     args.max_stories = args.max_stories or MAX_EDITION
@@ -191,8 +216,6 @@ def _run_agent_command(args: argparse.Namespace) -> int:
     if not _has_credential():
         print(NO_CREDENTIAL, file=sys.stderr)
         return 2
-    from radar.agent import run_agent
-
     sources = load_sources(str(resolve(args.sources)))
     store = _open_store(args)
     client = make_client()
@@ -202,17 +225,9 @@ def _run_agent_command(args: argparse.Namespace) -> int:
         run_id = store.start_run("run", now)
         try:
             stats, candidates = _collect_in_run(store, sources, client, now)
-            meter = Meter(store, run_id, cap, clock=lambda: datetime.now(UTC))
-            agent = run_agent(
-                store, candidates, _make_llm(meter), client, now, run_id, args.max_stories
+            stats |= _agent_in_run(
+                store, candidates, client, now, run_id, cap, args.max_stories, _make_llm
             )
-            agent["stories_failed"] = agent.pop("failed")
-            stats |= agent
-            tokens = meter.tokens_today()
-            stats["llm_calls"] = meter.calls
-            stats["tokens_today"] = tokens
-            stats["cost_today_usd"] = round(meter.spent_today(), 4)
-            stats["over_token_target"] = tokens > DAILY_TOKEN_TARGET
         except BaseException as exc:
             store.finish_run(run_id, datetime.now(UTC), {**stats, "error": type(exc).__name__})
             raise
@@ -363,6 +378,37 @@ def _run_state(args: argparse.Namespace) -> int:
     return 0
 
 
+def _daily_client(kind: str) -> httpx.Client:
+    """The source fetcher's client, or one that never follows a redirect (admin, Telegram)."""
+    if kind == "sources":
+        return make_client()
+    return httpx.Client(timeout=30, follow_redirects=False)
+
+
+def _daily_llm(meter):
+    if not _has_credential():
+        from radar.daily import StepError
+
+        raise StepError(NO_CREDENTIAL)
+    return _make_llm(meter)
+
+
+def _run_daily(args: argparse.Namespace) -> int:
+    from radar import daily
+    from radar.score import MAX_EDITION
+
+    return daily.run_daily(
+        db_path=resolve(args.db),
+        sources_path=resolve(args.sources),
+        max_stories=args.max_stories or MAX_EDITION,
+        env=os.environ,
+        now=datetime.now(UTC),
+        http=_daily_client,
+        llm_factory=_daily_llm,
+        out=sys.stdout,
+    )
+
+
 def _positive_int(text: str) -> int:
     value = int(text)
     if value < 1:
@@ -409,6 +455,12 @@ def main(argv: list[str] | None = None) -> int:
         "--list-refused", action="store_true", help="list refused stories and send nothing"
     )
     p_push.set_defaults(run=_run_push)
+
+    p_daily = commands.add_parser("daily", help="collect, run and push, then send a notice")
+    p_daily.add_argument("--db", default=os.environ.get("RADAR_DB_PATH") or DEFAULT_DB)
+    p_daily.add_argument("--sources", default=DEFAULT_SOURCES)
+    p_daily.add_argument("--max-stories", type=_positive_int, default=None, metavar="N")
+    p_daily.set_defaults(run=_run_daily)
 
     p_state = commands.add_parser("state", help="keep the database as one encrypted file")
     state_commands = p_state.add_subparsers(dest="state_command", required=True)
