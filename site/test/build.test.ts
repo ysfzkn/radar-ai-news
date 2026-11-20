@@ -944,7 +944,7 @@ describe("built site", () => {
         const html = readFileSync(file, "utf8");
         const l = html.includes('<html lang="en"') ? "en" : lang;
         const motion = COPY[l].motion;
-        const button = `<button class="still-toggle label" type="button" data-still aria-pressed="false" hidden><span class="still-pause">${motion.pause}</span><span class="still-play">${motion.play}</span></button>`;
+        const button = `<button class="still-toggle label" type="button" data-still hidden><span class="still-pause">${motion.pause}</span><span class="still-play">${motion.play}</span></button>`;
         const all = html.match(/<button class="still-toggle[\s\S]*?<\/button>/g) ?? [];
         const scope = html.match(/<section class="scope"[\s\S]*?<\/section>/)?.[0];
         expect(all.length, file).toBe(scope ? 2 : 1);

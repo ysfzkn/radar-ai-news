@@ -16,4 +16,4 @@ const motion = COPY[Astro.props.lang].motion;
   with script and with motion to stop. It reads what a press does: "durdur" while the motion runs,
   "başlat" once it is stopped (the stylesheet swaps the two words by the class).
 */}
-<button class="still-toggle label" type="button" data-still aria-pressed="false" hidden><span class="still-pause">{motion.pause}</span><span class="still-play">{motion.play}</span></button>
+<button class="still-toggle label" type="button" data-still hidden><span class="still-pause">{motion.pause}</span><span class="still-play">{motion.play}</span></button>

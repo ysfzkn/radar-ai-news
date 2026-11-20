@@ -194,22 +194,14 @@ describe("boot.js: the reader's pause", () => {
     expect(broken.classes.has("js")).toBe(true);
   });
 
-  it("marks every pause button with the state once the page is parsed", () => {
-    const page = boot({ stored: { "radar:still": "1" } });
-    page.fire("DOMContentLoaded");
-    for (const b of page.buttons) expect(b.attrs.get("aria-pressed")).toBe("true");
-  });
-
-  it("toggles the pause from either button, remembers it for the session, and updates both buttons", () => {
+  it("toggles the pause from either button, and remembers it for the session", () => {
     const page = boot();
     page.fire("click", page.buttons[0]);
     expect(page.classes.has("still")).toBe(true);
     expect(page.store.get("radar:still")).toBe("1");
-    for (const b of page.buttons) expect(b.attrs.get("aria-pressed")).toBe("true");
     page.fire("click", page.buttons[0]);
     expect(page.classes.has("still")).toBe(false);
     expect(page.store.has("radar:still")).toBe(false);
-    for (const b of page.buttons) expect(b.attrs.get("aria-pressed")).toBe("false");
     // Any other click changes nothing.
     page.fire("click");
     expect(page.classes.has("still")).toBe(false);

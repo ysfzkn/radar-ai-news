@@ -17,12 +17,6 @@
   try {
     if (sessionStorage.getItem(STILL)) d.classList.add("still");
   } catch (e) {}
-  function mark() {
-    var on = d.classList.contains("still") ? "true" : "false";
-    var buttons = document.querySelectorAll("[data-still]");
-    for (var i = 0; i < buttons.length; i++) buttons[i].setAttribute("aria-pressed", on);
-  }
-  document.addEventListener("DOMContentLoaded", mark);
   document.addEventListener("click", function (event) {
     var t = event.target;
     if (!t || !t.closest || !t.closest("[data-still]")) return;
@@ -31,7 +25,6 @@
       if (on) sessionStorage.setItem(STILL, "1");
       else sessionStorage.removeItem(STILL);
     } catch (e) {}
-    mark();
   });
 
   try {
