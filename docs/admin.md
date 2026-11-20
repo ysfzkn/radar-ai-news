@@ -154,7 +154,7 @@ After pulling a change that adds a file under `admin/migrations/` (for example `
 
 These steps were written from Cloudflare's documentation and have not been run. Nothing in this project has been deployed. Expect to adjust them.
 
-1. Create the D1 database: `npx wrangler d1 create radar`. Put the id it prints in `database_id` in `admin/wrangler.jsonc`.
+1. Create the D1 database: `npx wrangler d1 create radar`. Put the id it prints in `database_id` in `admin/wrangler.jsonc` (the file holds the project owner's id; a fork needs its own). The id is not a secret. `preview_database_id` in the same file is the id local development uses, so `npm run dev` keeps its own local database whatever the production id is.
 2. Create the tables: `npx wrangler d1 migrations apply radar --remote`.
 3. Set the ingest secret: `npx wrangler secret put INGEST_TOKEN`. Use a long random value, and use the same one as `RADAR_INGEST_TOKEN` for `radar push`.
 4. In Cloudflare Zero Trust, create an Access application that covers `/admin*` on the Worker's hostname and allow only the people who may review. Then add a `vars` block to `admin/wrangler.jsonc` with the team domain (for example `myteam.cloudflareaccess.com`) and the application's audience tag. Neither is a secret:

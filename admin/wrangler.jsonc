@@ -7,8 +7,10 @@
     {
       "binding": "DB",
       "database_name": "radar",
-      // Placeholder: replace with the id printed by `wrangler d1 create radar`.
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      // The production database (`wrangler d1 create radar`). Not a secret.
+      "database_id": "f7781091-ffc4-4ec2-bec5-f8a8bd990f36",
+      // Local development keeps its own database under this id (see docs/admin.md).
+      "preview_database_id": "00000000-0000-0000-0000-000000000000",
       "migrations_dir": "migrations"
     }
   ],
