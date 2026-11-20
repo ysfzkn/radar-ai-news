@@ -142,7 +142,7 @@ export const COPY: Record<Lang, Copy> = {
         {
           heading: "Radar nedir?",
           paragraphs: [
-            "Radar, geliştiriciler için her gün çıkan kısa ve numaralı bir yapay zekâ haberleri baskısıdır. Bir baskıda en fazla sekiz haber olur; her haber, bir geliştirici olarak senin için ne anlama geldiğini söyleyen tek bir satırla biter. Sonra baskı kapanır.",
+            "Radar, geliştiriciler için her gün çıkan kısa ve numaralı bir yapay zekâ haberleri baskısıdır. Bir baskıda genellikle beş ile sekiz haber olur; her haber, bir geliştirici olarak senin için ne anlama geldiğini söyleyen tek bir satırla biter. Sonra baskı kapanır.",
             "Türkçe ve İngilizce yayımlanır. İki dil aynı olgu kartından yazılır, bu yüzden aynı şeyi söyler.",
           ],
         },
@@ -278,7 +278,7 @@ export const COPY: Record<Lang, Copy> = {
         {
           heading: "What Radar is",
           paragraphs: [
-            "Radar is a short, numbered daily edition of AI news for developers. An edition holds at most eight stories, and each one ends with a single line on what it means for you as a developer. Then the edition closes.",
+            "Radar is a short, numbered daily edition of AI news for developers. An edition usually has five to eight stories, and each one ends with a single line on what it means for you as a developer. Then the edition closes.",
             "It is published in Turkish and English. Both are written from the same fact card, so they say the same thing.",
           ],
         },

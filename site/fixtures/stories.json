@@ -166,7 +166,7 @@
     {
       "uid": "07c29d1e3b8dae5c06c7eb5d391bb087",
       "category": "industry",
-      "publish_mode": "auto",
+      "publish_mode": "human",
       "edited": false,
       "source_count": 7,
       "source_url": "https://ekonomi.example.com/tasimaci-yatirim",

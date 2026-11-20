@@ -160,6 +160,10 @@ describe("built site", () => {
     expect(text(human[0])).toContain("AI yazdı · insan onayladı");
     const auto = home.filter((a) => a.includes('id="s-5c17e263"'));
     expect(text(auto[0])).toContain("AI yazdı · otomatik yayımlandı");
+    // A funding figure always goes to a person, so the demo funding story is human-approved.
+    const funding = articles(page(DEMO, "2026-11-18")).filter((a) => a.includes('id="s-07c29d1e"'));
+    expect(funding).toHaveLength(1);
+    expect(text(funding[0])).toContain("AI yazdı · insan onayladı");
   });
 
   it("no page contains <script, <style or a style attribute", () => {
@@ -370,6 +374,11 @@ describe("built site", () => {
     expect(en).toMatch(/<html lang="en"/);
     expect(text(tr)).toContain("72 saat");
     expect(text(en)).toContain("72 hours");
+    // The site never caps an edition, so the page does not claim a maximum.
+    expect(text(tr)).toContain("Bir baskıda genellikle beş ile sekiz haber olur");
+    expect(text(en)).toContain("An edition usually has five to eight stories");
+    expect(text(tr)).not.toContain("en fazla sekiz");
+    expect(text(en)).not.toContain("at most eight");
     for (const html of [tr, en]) {
       expect(html).toContain('href="https://github.com/ysfzkn/radar-ai-news/issues"');
     }
