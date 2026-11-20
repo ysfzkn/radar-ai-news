@@ -53,7 +53,49 @@ def test_job_is_off_unless_enabled_and_bounded():
     assert j["timeout-minutes"] == 20
     assert j["runs-on"] == "ubuntu-latest"
     assert j["defaults"]["run"]["working-directory"] == "agent"
-    assert "runner.temp" in j["env"]["RADAR_DB_PATH"]
+    assert "env" not in j  # the runner context is not available at job level
+
+
+def test_database_path_is_set_before_restore():
+    steps_ = steps()
+    first = next(i for i, s in enumerate(steps_) if "RADAR_DB_PATH" in s.get("run", ""))
+    assert first < step_index("restore")
+    assert '"RADAR_DB_PATH=$RUNNER_TEMP/radar.db" >> "$GITHUB_ENV"' in steps_[first]["run"]
+
+
+def test_runner_and_secrets_expressions_only_in_step_env():
+    data = load("daily.yml")
+    assert "runner." not in str({k: v for k, v in data.items() if k != "jobs"})
+    j = {k: v for k, v in job().items() if k != "steps"}
+    assert "runner." not in str(j) and "secrets." not in str(j)
+    for s in steps():
+        rest = {k: v for k, v in s.items() if k != "env"}
+        assert "runner." not in str(rest) and "secrets." not in str(rest), s
+
+
+def test_trigger_keys_and_checkout_credentials():
+    assert set(triggers(load("daily.yml"))) == {"schedule", "workflow_dispatch"}
+    checkout = steps()[0]
+    assert checkout["uses"].startswith("actions/checkout@")
+    assert checkout["with"]["persist-credentials"] is True
+
+
+def test_missing_key_stops_restore_before_anything_else():
+    script = steps()[step_index("restore")]["run"]
+    check = script.index("-lt 16")
+    assert check < script.index("ls-remote") < script.index("radar state load")
+    assert not [x for x in script.splitlines() if "echo" in x and "${#" in x]
+
+
+def test_one_push_to_the_state_branch_only():
+    pushes = [
+        line.strip()
+        for s in steps()
+        for line in s.get("run", "").splitlines()
+        if "git push" in line
+    ]
+    assert len(pushes) == 1 and pushes[0].endswith(':refs/heads/radar-state"')
+    assert "--no-filters" in steps()[step_index("save")]["run"]
 
 
 def test_steps_run_restore_then_daily_then_save():

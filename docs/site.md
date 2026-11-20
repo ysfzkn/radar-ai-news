@@ -76,7 +76,7 @@ The site reads every page with `limit=200`, follows `next` until it is `null`, a
 | Turkish | English | What it shows |
 | --- | --- | --- |
 | `/` | `/en/` | The newest edition |
-| `/YYYY-MM-DD/` | `/en/YYYY-MM-DD/` | One edition |
+| `/YYYY-MM-DD/` | `/en/YYYY-MM-DD/` | One edition: a masthead, an index of the day's stories and the lead story first |
 | `/arsiv/` | `/en/archive/` | All editions |
 | `/konu/<category>/` | `/en/topic/<category>/` | A category's newest 30 stories |
 | `/hafta/` | `/en/week/` | The weekly digests |
