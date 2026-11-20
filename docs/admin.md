@@ -6,7 +6,7 @@ The Worker stores stories, lets you review them, and serves the published ones t
 
 ## What it stores, and what it does not
 
-It stores, per story: the category, status, the reasons the agent gave for sending it to review, the score and risk flags, the fact card, the source links, the Turkish and English title, summary and developer line, and a small history of decisions (who did what, when, with an optional note).
+It stores, per story: the category, status, the reasons the agent gave for sending it to review, the score and risk flags, the fact card, the source links, the Turkish and English title, summary and story line (stored as `dev_line`; the screen calls it "Neden önemli", why it matters), and a small history of decisions (who did what, when, with an optional note).
 
 It does not store: the fetched source articles, the agent's prompts or model output, the spend ledger, or any API key. Those stay in the agent's local SQLite file.
 
@@ -22,7 +22,7 @@ It does not store: the fetched source articles, the agent's prompts or model out
 
 The 72 hours run from the moment the agent wrote the story, not from its arrival here, so a story that was pushed late arrives with less time left for review.
 
-`rejected` and `expired` are final. Publish limits: title 90, summary 320, developer line 200 characters. The agent may send longer text (up to 300, 1000 and 600); a story over the publish limits must be shortened by hand before it can be approved.
+`rejected` and `expired` are final. Publish limits: title 90, summary 320, story line ("Neden önemli") 200 characters. The agent may send longer text (up to 300, 1000 and 600); a story over the publish limits must be shortened by hand before it can be approved.
 
 Save and approve is two guarded steps: first the edit is saved (and the story marked as edited), then the story is approved. If the second step is refused, for example because a text is over the publish limit, the edit stays saved and the story stays in review; the screen says so, and you can shorten the text and try again. If the form has not changed anything, nothing is saved and the stored text is approved. Approve never saves anything on a story that is not in review. Human edits are not re-checked by the fact check: the verifier ran on the agent's text only.
 
@@ -32,6 +32,11 @@ Save and approve is two guarded steps: first the edit is saved (and the story ma
 - **The source link.** The link to the story's main source sits in the action bar next to the buttons, so you can open it while deciding.
 - **Unsaved changes.** When you have typed something that is not saved, the screen says so ("Kaydedilmemiş değişiklik var") until you save or leave.
 - **When the story changed elsewhere.** If someone else saved the story first, the save is refused. For a story that is still open to the action you were taking, the text you typed stays in the form, the form takes the story's current version, and the message says that saving now will overwrite the other change. Nothing is overwritten until you save again.
+- **Confirmations.** After a save, an approval, a rejection or a take-down the next page says what happened ("Kaydedildi.", "Haber yayınlandı.", "Haber reddedildi.", "Haber yayından kaldırıldı."). The redirect carries a `done` hint in the address; only those four known values show a message, and anything else shows nothing. With scripts on, the hint is then removed from the address, so a refresh does not repeat the message.
+- **"Sitede görünüm" (how it looks on the site).** On a story that can still be edited, a preview shows the Turkish and English title, summary and "Neden önemli" line roughly as the site draws them. It follows the form while you type.
+- **Save key.** Ctrl+S (Cmd+S on a Mac) saves the form, like the "Kaydet" button. It sends the form once; pressing it again while the save is on its way does nothing.
+- **Tab title.** The browser tab's title starts with the number of stories waiting for review, for example `(2) Bekleyen · Radar · Onay`, and has no number when none is waiting.
+- **Empty queue.** When nothing is waiting, the review queue shows the Radar mark above "Bekleyen haber yok." (no stories waiting).
 - **When an automatically published story goes live.** `published_at` of a story the agent published is the moment the admin service received it, not the moment the agent created it, so editions on the site follow arrival.
 
 ## Sign-in
@@ -42,7 +47,7 @@ It fails closed. If sign-in is not configured, the answer is 503, not an open pa
 
 Every `POST` must also carry an `Origin` header equal to the request's own origin, otherwise it is refused with 403. Admin pages are sent with `Referrer-Policy: same-origin`: with `no-referrer`, browsers send `Origin: null` on form posts and every click would be refused. A `POST` with `Origin: null` is still refused.
 
-The screen is light only: there is no dark theme and no theme switch. Lists show 50 stories per page, with "Sonraki sayfa" (next page) and "Önceki sayfa" (previous page) links; the address takes `?page=N`.
+The screen is light only: there is no dark theme and no theme switch. It works with scripts off; the script only adds the live counters, the unsaved-changes notice, the live preview and the save key. Lists show 50 stories per page, with "Sonraki sayfa" (next page) and "Önceki sayfa" (previous page) links; the address takes `?page=N`.
 
 ## Public read endpoint
 

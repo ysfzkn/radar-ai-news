@@ -13,7 +13,10 @@ Status: the site builds and runs on your machine, with demo data or against a lo
 - A story carries **no label** saying whether a person read it. The Künye page (About in English; see [Pages](#pages)) explains that every story is written by a language model, and which kinds of story a person reads before they are published.
 - It has no page for a single story, no search, no e-mail newsletter and no images. "Subscribe free" means the RSS feed: the subscribe page shows the feed address and asks for nothing. A story's permanent link is an anchor on its edition page, for example `/2026-11-20/#s-1a2b3c4d` (the anchor is `s-` plus the first 8 characters of the story's uid).
 - It is light only. There is no dark theme and no theme switch.
-- Each category has its own colour, used only for the story's category tag, its number and the bar beside a story opened from a link; the brand red stays for the mark, the issue label, the echo meter and link underlines. The lead story of an edition sits in a card with a hard shadow, and so do the two buttons (subscribe, try it).
+- Each category has its own colour, used for the story's category tag, its number, the bar beside a story opened from a link, the heading of its topic page and the category text in a topic page's list; the brand red stays for the mark, the issue label, the echo meter and link underlines. Security uses a wine red, so it does not read as the brand red. The lead story of an edition sits in a card with a hard shadow, and so do the two buttons (subscribe, try it); inside the lead card the try button is flat.
+- Every page has a TR / EN control in the top strip: the current language is marked, and the other links to the same page in that language, or to that language's home page when the page has no counterpart.
+- Each story's number is its permanent link: it points at the story's anchor on its edition page, and a story opened from such a link is marked with a bar in its category colour.
+- When printed, a page is one plain column of ink on white: the navigation, banner, index, pager and footer are left out, every animation is off, and the address of each source and try link is printed after it.
 - Motion is CSS only and small: the echo meter's arcs light up in turn on load, buttons press, a thin reading-progress line fills at the top of an edition page, and later stories rise slightly as they scroll in. Nothing loops. All of it is off when the reader's system asks for reduced motion, and the scroll-driven parts only run in browsers that support them; without them every story is simply shown.
 
 ## Where the data comes from
@@ -67,7 +70,7 @@ The site reads every page with `limit=200`, follows `next` until it is `null`, a
 
 - An **edition** is the set of stories whose `published_at` falls on one calendar day in Istanbul (UTC+3, all year). A day with no stories has no edition.
 - **Numbers** count the days that have an edition, oldest first: the oldest edition is number 1. A page's address uses the date, never the number. If a story is taken down and its day becomes empty, the later numbers shift down by one, but no link breaks.
-- An edition page opens with a **masthead**: the issue number, the date in large type, the number of stories, the total number of sources and the reading time. When there is more than one story it is followed by an **index** of the day's stories (a sticky rail beside the stories on wide screens). The first story is the **lead**.
+- An edition page opens with a **masthead**: the issue number, the date in large type, the number of stories, the total number of sources and the reading time. When there is more than one story it is followed by an **index** of the day's stories (a sticky rail beside the stories on wide screens); each index row ends with that story's echo arcs. The first story is the **lead**.
 - Each story ends with one line under the label **Neden önemli** / **Why it matters**: why the news matters to a reader.
 - Inside an edition **every published story of the day is shown**, ordered by number of sources (most first), then by publish time. The site never hides a published story.
 - The **weekly digest** is the ten stories of one ISO week (Monday to Sunday, Istanbul days) with the most sources, ordered the same way. No model is involved.
@@ -80,7 +83,7 @@ The site reads every page with `limit=200`, follows `next` until it is `null`, a
 | --- | --- | --- |
 | `/` | `/en/` | The newest edition |
 | `/YYYY-MM-DD/` | `/en/YYYY-MM-DD/` | One edition: a masthead, an index of the day's stories and the lead story first |
-| `/arsiv/` | `/en/archive/` | All editions |
+| `/arsiv/` | `/en/archive/` | All editions; each row shows the date, the lead story's headline, the number of stories and the total number of sources |
 | `/konu/<category>/` | `/en/topic/<category>/` | A category's newest 30 stories |
 | `/hafta/` | `/en/week/` | The weekly digests |
 | `/hafta/YYYY-Www/` | `/en/week/YYYY-Www/` | One weekly digest |
@@ -128,18 +131,18 @@ npx astro preview
 Things to know:
 
 - A plain `npm run build` or `npm run dev` also uses `site/.data/stories.json` if it exists. To go back to demo data, delete the `site/.data/` folder.
-- `RADAR_DEMO=1` forces the demo data, ahead of `RADAR_STORIES_FILE` and `site/.data/stories.json`; the site's build tests set it for their demo build, so they never build real data by accident.
+- `RADAR_DEMO=1` forces the demo data, ahead of `RADAR_STORIES_FILE` and `site/.data/stories.json`; the site's build tests set it for their demo build, so they never build real data by accident. `npm run fetch` (and so `build:live`) refuses to run while it is set.
 - `RADAR_STORIES_FILE` can point at any file in the same shape (`{"stories": [...]}`); it takes priority over the other two sources.
 - If the API cannot be reached or answers something invalid, the fetch exits with an error and the build does not start. The site never builds from half the data. The fetch deletes any older `site/.data/stories.json` before it starts, so after a failed fetch a later plain build falls back to the demo data and shows its banner instead of quietly using stale stories.
 
-Checks: `npm run check` (types), `npm test` and `npm run build` in `site/`.
+Checks: `npm run check` (types), `npm test` and `npm run build` in `site/`. The tests build into their own git-ignored folders (`site/dist-demo/`, `site/dist-hostile/`, `site/dist-empty/`, `site/dist-real/`) and never write `site/dist/`, so a preview of `site/dist/` is left alone.
 
 ## Deploy
 
 These steps were written from documentation and have not been run. The Worker and the site have never been deployed. Expect to adjust them.
 
 1. Deploy the admin service first ([admin.md](admin.md#deploy)) so that `https://<worker-host>/api/stories` answers.
-2. Pick any static host that can run a Node build. In `site/`, the build command is `npm ci && npm run build:live` and the output folder is `dist`. Set two build variables: `RADAR_API_URL` (the Worker's origin, `https://...`) and `SITE_URL` (the address the site will have, for example `https://radar.example.com`). `SITE_URL` is used for the sitemap and the feed links; without it the build uses the project owner's address, `https://radar.ozkanyusuf.com`.
+2. Pick any static host that can run a Node build. In `site/`, the build command is `npm ci && npm run build:live` and the output folder is `dist`. Set two build variables: `RADAR_API_URL` (the Worker's origin, `https://...`) and `SITE_URL` (the address the site will have, for example `https://radar.example.com`). `SITE_URL` is used for the sitemap and the feed links; without it the build uses the project owner's address, `https://radar.ozkanyusuf.com`. Do not set `RADAR_DEMO` there: with `RADAR_DEMO=1` the fetch stops with an error instead of building the demo data.
 3. `site/public/_headers` sets the security headers (a strict Content-Security-Policy, `nosniff`, `X-Frame-Options: DENY` and a referrer policy). The file uses Cloudflare Pages syntax. Other hosts ignore it and need the same headers set in their own configuration. It has not been checked on a real host.
 4. `site/public/robots.txt` names the sitemap at the project owner's address. Edit it if the site lives elsewhere.
 5. Optional: let the Worker rebuild the site when the published set changes. Create a deploy hook at your host (a URL that starts a build when it receives a `POST`), then give it to the Worker as a secret: `npx wrangler secret put SITE_DEPLOY_HOOK`. The Worker then posts to it after a story is approved, unpublished, edited while published, or ingested as already published. It only uses an `https://` URL, never logs it, and ignores a failed call. This has never been run against a real hook.
