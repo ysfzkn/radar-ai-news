@@ -15,9 +15,10 @@ const { tr, en } = COPY;
   alternate={null}
 >
   <h1 class="kunye label">
-    <span class="kunye-no">404</span>{" · "}{tr.notFoundText}{" · "}<span lang="en">{en.notFoundText}</span>
+    <span class="kunye-no">404</span>{" · "}{tr.notFoundTitle}{" · "}<span lang="en">{en.notFoundTitle}</span>
   </h1>
   <p class="empty">
-    <a href={routes.tr.home}>{tr.notFoundHome}</a>{" · "}<a href={routes.en.home} hreflang="en" lang="en">{en.notFoundHome}</a>
+    {tr.notFoundText} <a href={routes.tr.home}>{tr.notFoundHome}</a><br />
+    <span lang="en">{en.notFoundText} <a href={routes.en.home} hreflang="en">{en.notFoundHome}</a></span>
   </p>
 </Base>

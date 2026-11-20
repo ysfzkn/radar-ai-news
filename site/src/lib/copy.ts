@@ -146,7 +146,7 @@ export const COPY: Record<Lang, Copy> = {
         {
           heading: "Bir haber nasıl hazırlanır?",
           paragraphs: [
-            "Haberleri yedi adımlı bir hat hazırlar. Bu adımlardan yalnızca ikisi bir dil modeli çağırır; diğer beşi sıradan koddur.",
+            "Haberleri yedi adımlı bir işlem hattı hazırlar. Bu adımlardan yalnızca ikisi bir dil modeli çağırır; diğer beşi sıradan koddur.",
           ],
           steps: [
             { name: "Toplama", text: "Kaynak listesindeki her kaynağı çeker." },
@@ -158,7 +158,7 @@ export const COPY: Record<Lang, Copy> = {
             },
             {
               name: "Yazım",
-              text: "Orta boy bir model önce kaynaktan bir olgu kartı çıkarır, Türkçe ve İngilizce metni sonra bu karttan yazar.",
+              text: "Orta boyutlu bir model önce kaynaktan bir olgu kartı çıkarır, ardından Türkçe ve İngilizce metni bu karttan yazar.",
             },
             { name: "Doğrulama", text: "Kod, metindeki her sayının, sürümün ve adın kaynakta geçtiğini denetler." },
             { name: "Yönlendirme", text: "Haber ya otomatik yayımlanır ya da bir insanın incelemesine gönderilir." },
@@ -170,7 +170,7 @@ export const COPY: Record<Lang, Copy> = {
         {
           heading: "Yankı ölçer",
           paragraphs: [
-            "Her haberin yanındaki beş yay, haberi kaç bağımsız kaynağın verdiğini gösterir: her kaynak için bir yay yanar, en fazla beş. Tam sayı hemen yanında yazar. Böylece gerçekten ses getiren bir haberi tek bir blogun heyecanından ayırabilirsin.",
+            "Her haberin yanındaki beş yay, haberi kaç bağımsız kaynağın verdiğini gösterir: her kaynak için bir yay yanar, en fazla beş. Kaynak sayısı hemen yanında yazar. Böylece gerçekten ses getiren bir haberi tek bir blogun heyecanından ayırabilirsin.",
           ],
         },
         {
@@ -198,7 +198,7 @@ export const COPY: Record<Lang, Copy> = {
         {
           heading: "Gizlilik",
           paragraphs: [
-            "Bu site çerez bırakmaz ve üçüncü taraflardan hiçbir şey yüklemez: analitik, reklam, dış yazı tipi ya da betik yok. Her sayfa statik bir HTML dosyasıdır.",
+            "Bu site çerez kullanmaz ve üçüncü taraflardan hiçbir şey yüklemez: analitik, reklam, dış yazı tipi ya da betik yok. Her sayfa statik bir HTML dosyasıdır.",
           ],
         },
       ],
@@ -305,7 +305,7 @@ export const COPY: Record<Lang, Copy> = {
         {
           heading: "The echo meter",
           paragraphs: [
-            "The five arcs beside each story show how many independent sources covered it: one arc lights up per source, up to five, with the exact count next to them. It tells a story that is making waves from one that a single blog is excited about.",
+            "The five arcs beside each story show how many independent sources covered it: one arc lights up per source, up to five, with the exact count next to them. It separates a story that is making waves from one that a single blog is excited about.",
           ],
         },
         {
@@ -319,7 +319,7 @@ export const COPY: Record<Lang, Copy> = {
         {
           heading: "Risky stories wait for a person",
           paragraphs: [
-            "Some stories never publish themselves: security incidents, accusations, funding figures, third-party benchmark claims and regulation. So do stories that fail the check or have no primary source.",
+            "Some stories never publish themselves: security incidents, accusations, funding figures, third-party benchmark claims and regulation. The same goes for stories that fail the check or have no primary source.",
             "They wait in a review queue. A story nobody reviews within 72 hours expires; nothing is published by default.",
           ],
         },

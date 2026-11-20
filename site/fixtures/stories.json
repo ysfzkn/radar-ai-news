@@ -17,7 +17,7 @@
       "texts": {
         "tr": {
           "title": "Bulutkapı, araç protokolünün 0.9 sürümünü yayımladı",
-          "summary": "Bulutkapı'nın açık araç protokolü 0.9 sürümüyle birlikte oturum sürekliliği ve akış halinde sonuç dönme özelliği kazandı. Eski istemciler için geriye dönük uyumluluk katmanı korunuyor.",
+          "summary": "Bulutkapı'nın açık araç protokolü 0.9 sürümüyle birlikte oturum sürekliliği ve sonuçları akış olarak döndürme özelliği kazandı. Eski istemciler için geriye dönük uyumluluk katmanı korunuyor.",
           "dev_line": "Araç çağrılarını uzun süren işlerde kullanıyorsan, sonuçları akış olarak almak için istemcini güncelle."
         },
         "en": {
@@ -287,8 +287,8 @@
       "published_at": "2026-11-20T05:00:00.000Z",
       "texts": {
         "tr": {
-          "title": "Kod çalıştıran ajan ortamında kum havuzu kaçışı yamalandı",
-          "summary": "Taşımacı'nın kod yürütme ortamında, özel hazırlanmış bir dosya yoluyla kum havuzundan çıkılabilen bir açık bulundu ve yama yayımlandı. Şirket, açığın kötüye kullanıldığına dair bir iz görmediğini söylüyor.",
+          "title": "Kod çalıştıran ajan ortamında korumalı alandan kaçış açığı yamalandı",
+          "summary": "Taşımacı'nın kod yürütme ortamında, özel hazırlanmış bir dosya yoluyla korumalı alandan çıkılabilen bir açık bulundu ve yama yayımlandı. Şirket, açığın kötüye kullanıldığına dair bir iz görmediğini söylüyor.",
           "dev_line": "Kod çalıştıran ajan ortamlarını en son sürüme güncelle ve dosya sistemi erişimini en dar kapsamla ver."
         },
         "en": {
@@ -313,7 +313,7 @@
       "published_at": "2026-11-20T07:30:00.000Z",
       "texts": {
         "tr": {
-          "title": "Dokuma 0.14, tür güvenli araç tanımları getiriyor",
+          "title": "Dokuma 0.14, tip güvenli araç tanımları getiriyor",
           "summary": "Dokuma'nın yeni sürümünde araçlar, girdi ve çıktı şemalarıyla birlikte tek bir tür tanımından üretiliyor. Şemayla uyuşmayan model çıktıları artık çalışma zamanında net bir hatayla reddediliyor.",
           "dev_line": "Araç şemalarını elle yazıp senkron tutmaya çalışıyorsan, tür tanımından üretmek bu sürtünmeyi azaltır."
         },
@@ -342,7 +342,7 @@
         "tr": {
           "title": "Ölçek, ajan değerlendirmelerini CI içinde çalıştıran bir paket çıkardı",
           "summary": "Ölçek'in açık kaynaklı paketi, ajan senaryolarını her değişiklikte otomatik çalıştırıp başarı oranını önceki sürümle karşılaştırıyor. Sonuçlar bir çekme isteği yorumu olarak yayımlanabiliyor.",
-          "dev_line": "Ajan davranışını hâlâ elle denetliyorsan, birkaç temel senaryoyu CI'a taşımak iyi bir ilk adım olur."
+          "dev_line": "Ajan davranışını hâlâ elle denetliyorsan, birkaç temel senaryoyu CI'ya taşımak iyi bir ilk adım olur."
         },
         "en": {
           "title": "Ölçek releases a package that runs agent evaluations in CI",

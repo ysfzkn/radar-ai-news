@@ -50,10 +50,12 @@ function htmlFiles(dir: string): string[] {
 
 /**
  * A small well-formedness check, enough for a generated feed: one XML declaration,
- * tags that nest and close, no stray `<` or `&` in text or attributes.
+ * tags that nest and close, no stray `<` or `&` in text or attributes, and no
+ * character that XML 1.0 forbids (C0 controls other than tab, LF, CR; U+FFFE, U+FFFF).
  */
 function wellFormed(xml: string): boolean {
   if (!xml.startsWith('<?xml version="1.0" encoding="UTF-8"?>')) return false;
+  if (/[\u0000-\u0008\u000B\u000C\u000E-\u001F￾￿]/.test(xml)) return false;
   const body = xml.slice(xml.indexOf("?>") + 2);
   const stack: string[] = [];
   const token = /<(\/?)([A-Za-z_][\w:.-]*)((?:\s+[\w:.-]+="[^"<]*")*)\s*(\/?)>|([^<]+)|(<)/g;
@@ -285,6 +287,7 @@ describe("built site", () => {
         const target = readFileSync(join(DEMO, pathname, "index.html"), "utf8");
         expect(target, link).toContain(`id="${hash.slice(1)}"`);
         expect(item).toMatch(/<guid isPermaLink="false">[0-9a-f]{32}<\/guid>/);
+        expect(item.match(/<guid/g)).toHaveLength(1);
         expect(item).toMatch(/<pubDate>[A-Z][a-z]{2}, \d{2} [A-Z][a-z]{2} \d{4} \d{2}:\d{2}:\d{2} GMT<\/pubDate>/);
         expect(item).toContain(`\n\n${COPY[lang].forDevelopers} `);
       }

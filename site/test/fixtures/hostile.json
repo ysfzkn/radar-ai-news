@@ -13,13 +13,13 @@
       "published_at": "2026-11-20T05:00:00.000Z",
       "texts": {
         "tr": {
-          "title": "<script>alert(1)</script>",
-          "summary": "</p><img src=x onerror=alert(1)>",
+          "title": "<script>alert(1)</script>\u000b",
+          "summary": "</p><img src=x onerror=alert(1)>\u001b[31m",
           "dev_line": "Her şeyi kaçışla."
         },
         "en": {
-          "title": "<script>alert(1)</script>",
-          "summary": "</p><img src=x onerror=alert(1)>",
+          "title": "<script>alert(1)</script>\u000b",
+          "summary": "</p><img src=x onerror=alert(1)>\u001b[31m",
           "dev_line": "Escape everything."
         }
       }
