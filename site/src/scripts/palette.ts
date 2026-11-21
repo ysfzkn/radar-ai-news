@@ -6,6 +6,7 @@
 //   week, ? opens the list of shortcuts. These are ignored while typing in a field and with Ctrl,
 //   ⌘ or Alt held.
 // - A command on the page (data-copy) and each story's link get a copy button.
+// - "ping" and Enter in the palette make the scope, or the brand mark, pulse once.
 // Story text reaches the page as text only.
 import { categoryOf, fold, safeHref, search, type SearchDoc } from "../lib/search";
 import type { Category } from "../lib/schema";
@@ -141,6 +142,17 @@ function setup(dialog: HTMLDialogElement, keys: HTMLDialogElement): void {
     input.focus();
   }
 
+  /** "ping" + Enter: the palette closes and the scope (else the brand mark) pulses once. */
+  function ping(): void {
+    dialog.close();
+    const target = document.querySelector(".scope-dish") ?? document.querySelector(".wordmark .mark");
+    if (!target) return;
+    target.classList.remove("ping");
+    void target.getBoundingClientRect();
+    target.classList.add("ping");
+    target.addEventListener("animationend", () => target.classList.remove("ping"), { once: true });
+  }
+
   input.addEventListener("input", filter);
   input.addEventListener("keydown", (event) => {
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
@@ -148,6 +160,7 @@ function setup(dialog: HTMLDialogElement, keys: HTMLDialogElement): void {
       mark(active + (event.key === "ArrowDown" ? 1 : -1));
     } else if (event.key === "Enter") {
       event.preventDefault();
+      if (input.value.trim().toLowerCase() === "ping") return ping();
       shown()[active]?.querySelector("a")?.click();
     }
   });
