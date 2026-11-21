@@ -1,5 +1,6 @@
 ---
-// What Radar is, said once at the top of the home page, for a reader who has just arrived.
+// What Radar is, said once at the top of the home page, for a reader who has just arrived: an ink
+// plate with the statement, and three facts as instrument cells.
 import { COPY } from "../lib/copy";
 import { routes } from "../lib/routes";
 import type { Lang } from "../lib/schema";
@@ -9,10 +10,22 @@ interface Props {
 }
 const { lang } = Astro.props;
 const { pitch } = COPY[lang];
+const [before, marked, after] = pitch.lead;
 ---
 
-<p class="pitch">
-  <strong class="pitch-label">{pitch.label}</strong>
-  <span class="pitch-text">{pitch.text}</span>
+<section class="pitch" aria-label={pitch.label}>
+  <p class="pitch-label">{pitch.label}</p>
+  <p class="pitch-lead">{before}<em>{marked}</em>{after}</p>
+  <p class="pitch-sub">{pitch.sub}</p>
+  <ul class="pitch-specs">
+    {
+      pitch.specs.map((s) => (
+        <li>
+          <b>{s.k}</b>
+          {s.v}
+        </li>
+      ))
+    }
+  </ul>
   <a class="pitch-more" href={routes[lang].about}>{pitch.more} →</a>
-</p>
+</section>

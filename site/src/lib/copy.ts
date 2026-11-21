@@ -6,7 +6,14 @@ export interface Copy {
   siteName: string;
   tagline: string;
   /** What Radar is, in two sentences, at the top of the home page. */
-  pitch: { label: string; text: string; more: string };
+  pitch: {
+    label: string;
+    /** The statement, in three parts: the middle one is underlined in the accent. */
+    lead: [string, string, string];
+    sub: string;
+    specs: { k: string; v: string }[];
+    more: string;
+  };
   nav: { today: string; archive: string; week: string; about: string };
   /** The name of the dial that holds those four links. */
   navLabel: string;
@@ -195,7 +202,13 @@ export const COPY: Record<Lang, Copy> = {
     tagline: "Günün teknoloji ve yapay zekâ haberleri. Beş dakika, gürültü yok.",
     pitch: {
       label: "Radar nedir?",
-      text: "Her sabah teknoloji ve yapay zekâ dünyasının en önemli birkaç haberini tek sayfada toplar: kaynağıyla, kısa özetiyle ve “neden önemli” notuyla. Beş dakikada okunur; reklam, izleme ve gürültü yok.",
+      lead: ["Teknoloji ve yapay zekâda bugün ", "gerçekten önemli", " olan birkaç haber."],
+      sub: "Tek sayfa, beş dakika.",
+      specs: [
+        { k: "Her sabah", v: "yeni, numaralı bir baskı" },
+        { k: "Kaynağıyla", v: "her haberde kaynak ve “neden önemli”" },
+        { k: "Gürültüsüz", v: "reklam, izleme ve çerez yok" },
+      ],
       more: "Nasıl çalışır",
     },
     nav: { today: "Bugün", archive: "Arşiv", week: "Hafta", about: "Künye" },
@@ -452,7 +465,13 @@ export const COPY: Record<Lang, Copy> = {
     tagline: "The day's tech and AI news. Five minutes, no noise.",
     pitch: {
       label: "What is Radar?",
-      text: "Each morning it gathers the few tech and AI stories that matter on one page: with the source, a short summary and a “why it matters” note. A five-minute read; no ads, no tracking, no noise.",
+      lead: ["The few tech and AI stories that ", "really matter", " today."],
+      sub: "One page, five minutes.",
+      specs: [
+        { k: "Every morning", v: "a new, numbered edition" },
+        { k: "Sourced", v: "a source and a “why it matters” on every story" },
+        { k: "No noise", v: "no ads, no tracking, no cookies" },
+      ],
       more: "How it works",
     },
     nav: { today: "Today", archive: "Archive", week: "Week", about: "About" },

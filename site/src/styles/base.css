@@ -341,6 +341,13 @@ a:hover {
     font-size: 0.75rem;
   }
 
+  /* The header is a layer of its own (it has a view-transition-name), so the dial fixed inside it
+     is only as high as the header: lift the header above the page's own layers (the scope). */
+  .top {
+    position: relative;
+    z-index: 40;
+  }
+
   .dial {
     position: fixed;
     right: 0;
@@ -467,32 +474,142 @@ a.lang-part:focus-visible {
 }
 
 /* An empty state: a dashed frame and a comment's slashes, in the label face. */
-/* What Radar is, once, at the top of the home page (Pitch.astro): a short paragraph hung on an
-   accent rule, with its question as a mono label. */
+/* What Radar is, once, at the top of the home page (Pitch.astro): an ink plate like the scope's
+   readout, with the statement in the display face and three facts as instrument cells. */
 .pitch {
-  margin: 0 0 var(--space-5);
-  padding: var(--space-1) 0 var(--space-1) var(--space-4);
-  border-left: 3px solid var(--accent);
-  max-width: 40rem;
-  font-size: 1rem;
-  line-height: 1.5;
+  position: relative;
+  margin: var(--space-4) 0 var(--space-6);
+  padding: var(--space-5) var(--space-5) var(--space-4);
+  background: var(--ink);
+  color: var(--bg);
+}
+
+/* Corner ticks, as on a gauge plate. */
+.pitch::before,
+.pitch::after {
+  content: "";
+  position: absolute;
+  top: 0.5rem;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-top: 1.5px solid var(--accent);
+}
+
+.pitch::before {
+  left: 0.5rem;
+  border-left: 1.5px solid var(--accent);
+}
+
+.pitch::after {
+  right: 0.5rem;
+  border-right: 1.5px solid var(--accent);
 }
 
 .pitch-label {
-  display: block;
-  margin-bottom: var(--space-1);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 var(--space-3);
+  color: var(--line);
+  font-family: var(--font-label);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.pitch-label::before {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.pitch-lead {
+  margin: 0;
+  max-width: 22em;
+  font-family: var(--font-display);
+  font-size: clamp(1.375rem, 5.2vw, 2rem);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.pitch-lead em {
+  font-style: normal;
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 0.14em;
+  text-underline-offset: 0.16em;
+}
+
+.pitch-sub {
+  margin: var(--space-2) 0 0;
+  color: var(--line);
+  font-family: var(--font-label);
+  font-size: 0.875rem;
+}
+
+.pitch-specs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  border-top: 1px solid var(--control-border);
+  list-style: none;
+}
+
+.pitch-specs li {
+  padding: var(--space-3) var(--space-3) var(--space-1) 0;
   font-family: var(--font-label);
   font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  line-height: 1.4;
+  color: var(--line);
+}
+
+.pitch-specs li + li {
+  padding-left: var(--space-3);
+  border-left: 1px solid var(--control-border);
+}
+
+.pitch-specs b {
+  display: block;
+  margin-bottom: 0.125rem;
+  color: var(--bg);
+  font-size: 0.8125rem;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
 .pitch-more {
-  margin-left: var(--space-2);
+  display: inline-block;
+  margin-top: var(--space-3);
+  color: var(--bg);
   font-family: var(--font-label);
   font-size: 0.8125rem;
-  white-space: nowrap;
+  text-decoration-color: var(--accent);
+}
+
+@media (max-width: 39.99em) {
+  .pitch {
+    padding: var(--space-4);
+  }
+
+  .pitch-specs {
+    grid-template-columns: 1fr;
+  }
+
+  .pitch-specs li,
+  .pitch-specs li + li {
+    padding: var(--space-2) 0;
+    border-left: 0;
+  }
+
+  .pitch-specs li + li {
+    border-top: 1px solid var(--control-border);
+  }
 }
 
 .empty {
