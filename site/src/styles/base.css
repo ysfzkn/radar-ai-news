@@ -20,6 +20,9 @@ body {
   font-size: 1.0625rem;
   line-height: 1.6;
   overflow-wrap: break-word;
+  /* A container, so the home page's hero can reach the window's edges by 100cqw: the width
+     inside any scrollbar, which 100vw would count. */
+  container-type: inline-size;
 }
 
 @media (min-width: 40em) {
@@ -473,254 +476,336 @@ a.lang-part:focus-visible {
   font-weight: 600;
 }
 
-/* An empty state: a dashed frame and a comment's slashes, in the label face. */
-/* What Radar is, once, at the top of the home page (Pitch.astro): the statement, and beside it a
-   small radar table in three dimensions. The rig is one plane tipped back and turned
-   (preserve-3d); the dish is a slab (six ink discs under a white one), its ground shadow lies
-   well below it, and three plates stand over it on poles, turned back to face the reader. The
-   pointer tips the rig a little (scripts/scope.ts, --tilt-x / --tilt-y). */
-.pitch {
-  display: grid;
-  gap: var(--space-4);
-  align-items: center;
-  margin: var(--space-5) 0 var(--space-6);
-}
-
-/* On a phone the table is two thirds the size, so the day's edition is not pushed off the screen. */
-@media (max-width: 47.99rem) {
-  .pitch {
-    --pitch-scale: 0.66;
-  }
-}
-
-@media (min-width: 48rem) {
-  .pitch {
-    grid-template-columns: minmax(0, 1fr) 21rem;
-    gap: var(--space-5);
-  }
-}
-
-.pitch-label {
-  margin: 0 0 var(--space-3);
-  color: var(--accent);
-  font-family: var(--font-label);
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.pitch-lead {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: clamp(1.625rem, 6.4vw, 2.25rem);
-  font-weight: 800;
-  line-height: 1.12;
-  letter-spacing: -0.015em;
-  text-wrap: balance;
-}
-
-.pitch-mark {
-  font-style: normal;
-  text-decoration: underline;
-  text-decoration-color: var(--accent);
-  text-decoration-thickness: 0.12em;
-  text-underline-offset: 0.14em;
-}
-
-.pitch-sub {
-  margin: var(--space-3) 0 0;
-  color: var(--muted);
-  font-family: var(--font-label);
-  font-size: 0.8125rem;
-  line-height: 1.7;
-}
-
-.pitch-sub b {
-  color: var(--ink);
-}
-
-.pitch-more {
-  white-space: nowrap;
-}
-
-.pitch-stage {
-  display: grid;
-  place-items: end center;
-  height: calc(18.5rem * var(--pitch-scale, 1));
-  padding-bottom: calc(4.5rem * var(--pitch-scale, 1));
-  perspective: 60rem;
-}
-
-.pitch-rig {
-  --rx: 60deg;
-  --rz: -24deg;
+/* The home page's first screen (Hero.astro, scripts/hero.ts): what Radar is, set large over a radar
+   globe that fills the screen. The one place the site lets light in: a warm ground with gradients,
+   soft shadows and a veil of light behind the words; everywhere else stays flat ink on paper.
+   The section breaks out of the reading column to the window's edges (100cqw of the body) and is a screen tall less the top strip (on a phone, less the dial too).
+   The globe's box (.hero-globe) is BOX = 3.6 radii square: the build's SVG fills it, and the
+   script reads its place and size to draw the same globe on the canvas, which covers the section.
+   Desktop: the words on the left, the globe on the right, its edge running off the window. */
+.hero {
+  --hero-h: max(36rem, calc(100svh - 7.75rem));
+  --hero-pad: max(var(--gutter), calc(50cqw - 37rem));
+  --hero-veil: 247 244 236;
   position: relative;
-  width: calc(15rem * var(--pitch-scale, 1));
-  height: calc(15rem * var(--pitch-scale, 1));
-  margin-bottom: calc(-3.75rem * var(--pitch-scale, 1));
-  transform: rotateX(calc(var(--rx) + var(--tilt-x, 0deg))) rotateZ(calc(var(--rz) + var(--tilt-y, 0deg)));
-  transform-style: preserve-3d;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: var(--hero-h);
+  margin: 0 calc(50% - 50cqw) var(--space-6);
+  padding: var(--space-6) var(--hero-pad) var(--space-7);
+  overflow: clip;
+  border-bottom: 1px solid #d8cfbf;
+  background:
+    radial-gradient(ellipse 55% 70% at 76% 44%, #fffdf7 0%, rgb(255 253 247 / 0) 72%),
+    linear-gradient(180deg, var(--bg) 0%, #f2ede3 58%, #e8e0d1 100%);
 }
 
-.pitch-shadow,
-.pitch-edge,
-.pitch-disc {
+.hero-stage {
   position: absolute;
   inset: 0;
-  border-radius: 50%;
+  z-index: -1;
+  pointer-events: none;
 }
 
-.pitch-shadow {
-  background: var(--line);
-  transform: translateZ(calc(-2.75rem * var(--pitch-scale, 1)));
-}
-
-.pitch-edge {
-  background: var(--ink);
-}
-
-.pitch-edge-1 {
-  transform: translateZ(-2px);
-}
-
-.pitch-edge-2 {
-  transform: translateZ(-4px);
-}
-
-.pitch-edge-3 {
-  transform: translateZ(-6px);
-}
-
-.pitch-edge-4 {
-  transform: translateZ(-8px);
-}
-
-.pitch-edge-5 {
-  transform: translateZ(-10px);
-}
-
-.pitch-edge-6 {
-  transform: translateZ(-12px);
-}
-
-.pitch-disc {
-  border: 2px solid var(--ink);
-  background: var(--surface);
-}
-
-.pitch-ring,
-.pitch-hub {
+.hero-globe {
+  --g: min(calc(var(--hero-h) * 1.62), 130cqw);
   position: absolute;
-  border-radius: 50%;
+  top: calc(47% - var(--g) / 2);
+  left: calc(100% - var(--g) * 0.76);
+  width: var(--g);
+  height: var(--g);
 }
 
-.pitch-ring {
-  border: 1.5px solid var(--control-border);
-}
-
-.pitch-ring-1 {
-  inset: 17%;
-}
-
-.pitch-ring-2 {
-  inset: 34%;
-  border-color: var(--ink);
-}
-
-.pitch-hub {
-  inset: calc(50% - 0.25rem);
-  background: var(--ink);
-}
-
-.pitch-beam {
-  position: absolute;
-  top: calc(50% - 1px);
-  left: 50%;
-  width: 50%;
-  height: 2px;
-  background: var(--accent);
-  transform-origin: 0 50%;
-  rotate: -50deg;
-}
-
-.pitch-specs {
+.hero-layer {
   position: absolute;
   inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.hero-bearings {
+  font-family: var(--font-label);
+  font-size: 3.8px;
+  font-weight: 600;
+  fill: #5a5e66;
+}
+
+.hero-pin text {
+  font-family: var(--font-label);
+  font-size: 3.6px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  fill: var(--ink);
+}
+
+/* With the script the canvas takes the still frame's place, and the labels follow the pins. */
+.hero-canvas,
+.hero-tags,
+.hero.is-live .hero-still {
+  display: none;
+}
+
+.hero.is-live .hero-canvas,
+.hero.is-live .hero-tags {
+  display: block;
+}
+
+.hero-tags {
   margin: 0;
   padding: 0;
   list-style: none;
-  transform-style: preserve-3d;
 }
 
-/* A pin: a point on the dish, with its blip; the plate stands --h above it. */
-.pitch-pin {
-  position: absolute;
-  width: 0;
-  height: 0;
-  transform-style: preserve-3d;
-}
-
-.pitch-pin::before {
-  content: "";
-  position: absolute;
-  top: -0.3125rem;
-  left: -0.3125rem;
-  width: 0.625rem;
-  height: 0.625rem;
-  border-radius: 50%;
-  background: var(--accent);
-}
-
-.pitch-pin-1 {
-  --h: calc(6rem * var(--pitch-scale, 1));
-  top: 30%;
-  left: 20%;
-}
-
-.pitch-pin-2 {
-  --h: calc(4rem * var(--pitch-scale, 1));
-  top: 32%;
-  left: 82%;
-}
-
-.pitch-pin-3 {
-  --h: calc(0.875rem * var(--pitch-scale, 1));
-  top: 90%;
-  left: 42%;
-}
-
-/* The plate undoes the rig's turn, so it faces the reader; its pole is the plate's own, drawn
-   straight down for the height as the tipped rig shows it. */
-.pitch-plate {
+/* Each label stands where hero.ts puts its pin's head (--at) and shows as strongly as it says
+   (--on: by the side of the globe the pin is on and how lately the sweep passed it). */
+.hero-tag {
   position: absolute;
   top: 0;
   left: 0;
+  opacity: var(--on, 0);
+  translate: var(--at, 0 0);
+  will-change: translate, opacity;
+}
+
+/* A label: a small white plate above and to the right of its pin's head (left of it near the
+   window's right edge), the number in the accent, the category, and on wide screens the title. */
+.hero-tag-in {
   display: block;
   width: max-content;
-  padding: 0.25rem 0.5rem;
-  border: 1.5px solid var(--ink);
-  background: var(--surface);
+  max-width: 17rem;
+  padding: 0.3rem 0.5rem 0.35rem;
+  border: 1px solid var(--ink);
+  border-radius: 2px;
+  background: rgb(255 255 255 / 0.92);
+  box-shadow: 0 6px 18px -6px rgb(40 30 20 / 0.35);
+  color: var(--ink);
   font-family: var(--font-label);
   font-size: 0.6875rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   line-height: 1.35;
   text-transform: uppercase;
-  transform: translateZ(var(--h)) rotateZ(calc(0deg - var(--rz) - var(--tilt-y, 0deg)))
-    rotateX(calc(0deg - var(--rx) - var(--tilt-x, 0deg))) translate(-50%, -100%) translateY(calc(var(--h) * -0.02));
+  translate: 0.7rem calc(-100% - 0.45rem);
 }
 
-.pitch-plate::after {
+.hero-tag.is-left .hero-tag-in {
+  translate: calc(-100% - 0.7rem) calc(-100% - 0.45rem);
+}
+
+.hero-tag-in b {
+  color: var(--accent);
+}
+
+.hero-tag-title {
+  display: none;
+}
+
+@media (min-width: 64rem) {
+  .hero-tag-title {
+    display: block;
+    overflow: hidden;
+    margin-top: 0.125rem;
+    font-family: var(--font-body);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-overflow: ellipsis;
+    text-transform: none;
+    white-space: nowrap;
+  }
+}
+
+/* The words, over a veil of the ground's light so they read whatever the globe does behind. */
+.hero-copy {
+  position: relative;
+  max-width: min(37rem, 50cqw);
+}
+
+.hero-copy::before {
   content: "";
   position: absolute;
-  top: 100%;
-  left: calc(50% - 0.75px);
-  width: 1.5px;
-  height: calc(var(--h) * 0.86);
-  background: var(--ink);
+  inset: -4rem -6rem -4rem -10rem;
+  z-index: -1;
+  background: radial-gradient(closest-side, rgb(var(--hero-veil) / 0.94) 55%, rgb(var(--hero-veil) / 0));
 }
 
+.hero-label {
+  margin: 0 0 var(--space-4);
+  color: var(--accent);
+  font-family: var(--font-label);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.hero-lead {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(2.375rem, 5.4vw, 4.25rem);
+  font-weight: 800;
+  line-height: 1.02;
+  letter-spacing: -0.032em;
+  text-wrap: balance;
+}
+
+.hero-mark {
+  font-style: normal;
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 0.09em;
+  text-underline-offset: 0.1em;
+  text-decoration-skip-ink: none;
+}
+
+.hero-promise {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+  margin: var(--space-5) 0 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.125rem, 1.9vw, 1.4rem);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.hero-dot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.hero-act {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-5);
+  margin: var(--space-6) 0 0;
+}
+
+.hero-jump {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 3rem;
+  padding: 0.75rem 1.4rem;
+  border-radius: 999px;
+  background: var(--ink);
+  box-shadow:
+    0 14px 28px -12px rgb(23 24 26 / 0.55),
+    inset 0 1px 0 rgb(255 255 255 / 0.14);
+  color: var(--surface);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.hero-jump:hover,
+.hero-jump:focus-visible {
+  background: var(--accent);
+}
+
+.hero-more {
+  padding-block: 0.6rem;
+  font-weight: 600;
+}
+
+/* The instrument's readout along the foot, and the pause for the globe's motion at the right. */
+.hero-foot {
+  position: absolute;
+  right: var(--hero-pad);
+  bottom: var(--space-4);
+  left: var(--hero-pad);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-5);
+  color: var(--muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hero-still-toggle {
+  position: absolute;
+  right: var(--hero-pad);
+  bottom: 0.625rem;
+}
+
+.hero-next {
+  scroll-margin-top: var(--space-4);
+}
+
+/* A phone, or a screen taller than wide: the globe above, running off the top and the sides, the
+   words under it, everything clear of the dial at the window's foot. */
+@media (max-width: 47.99rem), (orientation: portrait) and (max-width: 64rem) {
+  .hero {
+    --hero-h: max(26rem, calc(100svh - 10rem - env(safe-area-inset-bottom)));
+    justify-content: flex-end;
+    padding-bottom: 3.75rem;
+    background:
+      radial-gradient(ellipse 90% 45% at 50% 26%, #fffdf7 0%, rgb(255 253 247 / 0) 75%),
+      linear-gradient(180deg, var(--bg) 0%, #f2ede3 50%, #e8e0d1 100%);
+  }
+
+  .hero-globe {
+    --g: min(200cqw, calc(var(--hero-h) * 1.2));
+    top: calc(26% - var(--g) / 2);
+    left: calc(50% - var(--g) / 2);
+  }
+
+  .hero-copy {
+    max-width: 34rem;
+  }
+
+  .hero-copy::before {
+    inset: -3rem -2rem -2rem;
+    background: linear-gradient(180deg, rgb(var(--hero-veil) / 0), rgb(var(--hero-veil) / 0.92) 22%);
+  }
+
+  .hero-act {
+    margin-top: var(--space-5);
+  }
+
+  .hero-foot {
+    bottom: var(--space-4);
+    right: auto;
+  }
+
+  .hero-place {
+    display: none;
+  }
+}
+
+/* The narrowest phones have a top strip of two rows; short ones a smaller headline, so the
+   words and both controls fit above the dial. */
+@media (max-width: 22.5em) {
+  .hero {
+    --hero-h: max(26rem, calc(100svh - 13.25rem - env(safe-area-inset-bottom)));
+  }
+}
+
+@media (max-width: 47.99rem) and (max-height: 46rem) {
+  .hero-lead {
+    font-size: 1.875rem;
+  }
+
+  .hero-label {
+    margin-bottom: var(--space-2);
+  }
+
+  .hero-promise,
+  .hero-act {
+    margin-top: var(--space-3);
+  }
+}
+
+/* An empty state: a dashed frame and a comment's slashes, in the label face. */
 .empty {
   margin-bottom: var(--space-6);
   padding: var(--space-4);
@@ -3356,6 +3441,30 @@ kbd {
     animation-delay: calc(var(--i, 0) * 38ms);
   }
 
+  /* The hero's words rise into place once, as its globe gathers after the opening (hero.ts adds
+     is-entering when the opening's cover lifts). */
+  .hero.is-entering .hero-copy > * {
+    animation: hero-rise 900ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+
+  .hero.is-entering .hero-copy > :nth-child(2) {
+    animation-delay: 110ms;
+  }
+
+  .hero.is-entering .hero-copy > :nth-child(3) {
+    animation-delay: 260ms;
+  }
+
+  .hero.is-entering .hero-copy > :nth-child(4) {
+    animation-delay: 380ms;
+  }
+
+  /* The bezel and the orbit draw themselves round as the points gather. */
+  .hero.is-entering .hero-rings [pathLength] {
+    stroke-dasharray: 1;
+    animation: hero-draw 1800ms cubic-bezier(0.4, 0, 0.2, 1) both;
+  }
+
   /* The end of the edition switches off like a screen, once. */
   .is-off .screen-off {
     animation: screen-off 650ms cubic-bezier(0.7, 0, 0.3, 1) forwards;
@@ -3363,15 +3472,6 @@ kbd {
 
   /* The horizon's dish turns once a minute's third, its birds glide on their own slow courses.
      Paused, the dish faces the reader and the birds hold their places. */
-  /* The introduction's table: its beam turns and the whole rig floats a little. Paused, both hold. */
-  html.js:not(.still) .pitch-beam {
-    animation: pitch-turn 6s linear infinite;
-  }
-
-  html.js:not(.still) .pitch-rig {
-    animation: pitch-float 6s ease-in-out infinite;
-  }
-
   html.js:not(.still) .hz-turn {
     animation: dish-turn 20s ease-in-out infinite;
   }
@@ -3406,6 +3506,14 @@ kbd {
     .progress {
       animation: progress-fill linear both;
       animation-timeline: scroll(root);
+    }
+
+    /* The hero's globe sinks back and shrinks a little as the page scrolls past it (not once the
+       reader has paused the motion). */
+    html:not(.still) .hero-globe {
+      animation: hero-sink linear both;
+      animation-timeline: scroll(root);
+      animation-range: 0 100svh;
     }
 
     /* Stories after the lead rise a little as they come into view. */
@@ -3546,25 +3654,25 @@ kbd {
   }
 }
 
-/* A full turn of the dish seen from the side: it faces away, edge on, then back. */
-@keyframes pitch-turn {
+/* A ring of the hero drawn round from its start; its globe sinking back. */
+@keyframes hero-draw {
   from {
-    rotate: -50deg;
-  }
-
-  to {
-    rotate: 310deg;
+    stroke-dashoffset: 1;
   }
 }
 
-@keyframes pitch-float {
-  0%,
-  100% {
-    translate: 0 0;
+@keyframes hero-sink {
+  to {
+    translate: 0 14%;
+    scale: 0.86;
   }
+}
 
-  50% {
-    translate: 0 -0.375rem;
+/* A line of the hero's words rises into place from half strength (never unreadable). */
+@keyframes hero-rise {
+  from {
+    opacity: 0.5;
+    translate: 0 0.75em;
   }
 }
 
@@ -3649,8 +3757,9 @@ kbd {
   html.intro body::before,
   .ink-go .ink-w,
   .is-off .screen-off,
-  html.js:not(.still) .pitch-beam,
-  html.js:not(.still) .pitch-rig,
+  .hero.is-entering .hero-copy > *,
+  .hero.is-entering .hero-rings [pathLength],
+  html:not(.still) .hero-globe,
   html.js:not(.still) .hz-turn,
   html.js:not(.still) .hz-bird,
   .em-mid .em-face,
@@ -3671,6 +3780,10 @@ kbd {
 
   .screen-off,
   .horizon {
+    display: none;
+  }
+
+  .hero {
     display: none;
   }
 

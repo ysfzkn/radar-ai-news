@@ -814,11 +814,18 @@ describe("built site", () => {
     let horizons = 0;
     let ghostLayers = 0;
     let rulers = 0;
+    let heroLayers = 0;
     const files = [DEMO, REAL].flatMap(htmlFiles);
     for (const file of files) {
       const html = readFileSync(file, "utf8");
       blips += (html.match(/<a class="blip b-/g) ?? []).length;
       for (const [svg] of html.matchAll(/<svg[\s\S]*?<\/svg>/g)) {
+        // The home page's hero globe is the one drawing shaded in its own markup (hundreds of tones
+        // computed at build): its three layers carry their colours as presentation attributes.
+        if (svg.startsWith('<svg class="hero-layer')) {
+          heroLayers++;
+          continue;
+        }
         expect(svg, file).not.toMatch(/\s(fill|stroke|color|stop-color)="/);
         expect(svg, file).not.toMatch(/#[0-9a-f]{3,8}\b|rgb\(/i);
         if (svg.startsWith('<svg class="mark" viewBox="0 0 24 24"')) {
@@ -859,6 +866,8 @@ describe("built site", () => {
     // One dial on every page; ghosts only on the thin editions.
     expect(rulers).toBe(files.length);
     expect(ghostLayers).toBeGreaterThan(0);
+    // Three hero layers on each of the two home pages of each build.
+    expect(heroLayers).toBe(3 * 2 * 2);
     // Before the wordmark: 20 px, hidden from screen readers.
     const strip = page(DEMO, "").match(/<a class="wordmark"[\s\S]*?<\/svg>/)![0];
     expect(strip).toMatch(/<svg class="mark" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">/);
@@ -950,7 +959,7 @@ describe("built site", () => {
     expect(line).toContain("vector-effect: non-scaling-stroke;");
   });
 
-  it("a pause button sits on the scope and in the footer, hidden without script, sharing one state", () => {
+  it("a pause button sits on the scope, on the home page's hero and in the footer, hidden without script, sharing one state", () => {
     for (const [dir, lang] of [
       [DEMO, "tr"],
       [EMPTY, "tr"],
@@ -962,9 +971,11 @@ describe("built site", () => {
         const button = `<button class="still-toggle label" type="button" data-still hidden><span class="still-pause">${motion.pause}</span><span class="still-play">${motion.play}</span></button>`;
         const all = html.match(/<button class="still-toggle[\s\S]*?<\/button>/g) ?? [];
         const scope = html.match(/<section class="scope"[\s\S]*?<\/section>/)?.[0];
-        expect(all.length, file).toBe(scope ? 2 : 1);
+        const hero = html.match(/<section class="hero"[\s\S]*?<\/section>/)?.[0];
+        expect(all.length, file).toBe(1 + Number(!!scope) + Number(!!hero));
         for (const b of all) expect(b, file).toBe(button);
         if (scope) expect(scope, file).toContain(button);
+        if (hero) expect(hero, file).toContain(button);
         const foot = html.match(/<footer class="foot label">[\s\S]*?<\/footer>/)![0];
         expect(foot, file).toContain(button);
       }
@@ -1134,10 +1145,14 @@ describe("built site", () => {
         expect(head, file).toContain('<script src="/boot.js"></script>');
         const archive = /[\\/](arsiv|archive)[\\/]index\.html$/.test(file);
         const edition = html.includes('<section class="scope"');
-        expect(srcs.length, file).toBe(archive || edition ? 3 : 2);
+        // The home page's hero brings its own, before the scope's.
+        const hero = html.includes('<section class="hero"');
+        expect(srcs.length, file).toBe(2 + Number(archive || edition) + Number(hero));
         expect(srcs.at(-1), file).toMatch(/^\/_astro\/Base[^"]+\.js$/);
         if (archive) expect(srcs[1], file).toMatch(/^\/_astro\/ArchiveView[^"]+\.js$/);
-        if (edition) expect(srcs[1], file).toMatch(/^\/_astro\/Scope[^"]+\.js$/);
+        if (hero) expect(srcs[1], file).toMatch(/^\/_astro\/Hero[^"]+\.js$/);
+        if (edition) expect(srcs.at(-2), file).toMatch(/^\/_astro\/Scope[^"]+\.js$/);
+        expect(hero, file).toBe(/[\\/]dist-[a-z]+[\\/](en[\\/])?index\.html$/.test(file));
       }
     }
   });
@@ -1911,7 +1926,10 @@ describe("built site", () => {
   });
 
   it("only the lead card, the scope, the search box, the two buttons and the two dialogs have a box-shadow, and none is blurred", () => {
-    const shadows = declarations(sheets()).filter((d) => d.prop === "box-shadow");
+    // The home page's hero is the one place allowed light: its soft shadows and gradients are
+    // checked on their own below; everything else stays flat.
+    const isHero = (d: { selector: string }) => d.selector.split(",").every((x) => x.trim().startsWith(".hero"));
+    const shadows = declarations(sheets()).filter((d) => d.prop === "box-shadow" && !isHero(d));
     expect(shadows.length).toBeGreaterThan(3);
     for (const shadow of shadows) {
       expect(shadow.value === "none" || /^\d+px \d+px 0 var\(--ink\)$/.test(shadow.value), shadow.value).toBe(true);
@@ -1965,11 +1983,24 @@ describe("built site", () => {
     expect(
       shadows.find((d) => d.selector === ".scope" && d.stack[0] === "@media (min-width: 48rem)")?.value,
     ).toBe("4px 4px 0 var(--ink)");
-    // One gradient on the site: the sweep's fade.
-    const gradients = declarations(sheets()).filter((d) => /gradient\(/.test(d.value));
+    // One gradient on the site outside the hero: the sweep's fade.
+    const all = declarations(sheets()).filter((d) => /gradient\(/.test(d.value));
+    const gradients = all.filter((d) => !isHero(d));
     expect(gradients.map((d) => `${d.selector} ${d.prop}`)).toEqual([".scope-sweep background"]);
     expect(gradients[0].value).toMatch(/^conic-gradient\(transparent 0deg \d+deg, var\(--sweep\) 360deg\)$/);
-    expect(sheets().replace(gradients[0].value, "")).not.toMatch(/gradient\(|backdrop-filter|filter:\s*drop-shadow|text-shadow/);
+    let rest = sheets().replace(gradients[0].value, "");
+    for (const d of all.filter(isHero)) rest = rest.replace(d.value, "");
+    expect(rest).not.toMatch(/gradient\(|backdrop-filter|filter:\s*drop-shadow|text-shadow/);
+    // The hero's light: gradients only on its ground and its veil, soft shadows only on its jump
+    // control and its labels.
+    expect([...new Set(all.filter(isHero).map((d) => `${d.selector} ${d.prop}`))].sort()).toEqual([
+      ".hero background",
+      ".hero-copy::before background",
+    ]);
+    expect(declarations(sheets()).filter((d) => d.prop === "box-shadow" && isHero(d)).map((d) => d.selector).sort()).toEqual([
+      ".hero-jump",
+      ".hero-tag-in",
+    ]);
   });
 
   it("every animation and transition sits inside a reduced-motion or @supports guard", () => {
@@ -1987,7 +2018,8 @@ describe("built site", () => {
     // or slower. Each loops only with motion allowed, only with script (html.js: where the pause
     // button exists; without script the scope and the horizon stand still), and never once the
     // reader has paused (html.still). Stopped, each rests on its plain frame: no animation at all.
-    const LOOPED = [".blip-echo", ".hz-bird", ".hz-turn", ".pitch-beam", ".pitch-rig", ".readout-line", ".scope-sweep"];
+    // (The home page's globe turns on a canvas, by script, under the same two conditions.)
+    const LOOPED = [".blip-echo", ".hz-bird", ".hz-turn", ".readout-line", ".scope-sweep"];
     const GATE = "html.js:not(.still) ";
     expect(sheets()).not.toMatch(/alternate/);
     const loops = decls.filter((d) => /infinite/.test(d.value));
@@ -2030,8 +2062,10 @@ describe("built site", () => {
       expect(rules.find((d) => d.prop === "opacity")?.value, selector).toBe("1");
       expect(rules.find((d) => d.prop === "transform")?.value, selector).toBe("none");
     }
-    // Faded or offset states live only in keyframes, never as an element's default.
-    for (const d of decls.filter((x) => x.prop === "opacity")) expect(d.stack.join(" ")).toMatch(/@keyframes|@media print/);
+    // Faded or offset states live only in keyframes, never as an element's default; the one
+    // exception is the hero's labels, whose strength the script sets (--on).
+    for (const d of decls.filter((x) => x.prop === "opacity" && x.selector !== ".hero-tag")) expect(d.stack.join(" ")).toMatch(/@keyframes|@media print/);
+    expect(decls.filter((x) => x.prop === "opacity" && x.selector === ".hero-tag").map((x) => x.value)).toEqual(["var(--on, 0)"]);
     // Where a timeline does not advance (a capture, a throttled view), an element sits at its
     // first keyframe: no keyframe fades a lit arc or a story below half strength.
     const keyframes = decls.filter((d) => d.stack[0]?.startsWith("@keyframes"));
@@ -2049,8 +2083,9 @@ describe("built site", () => {
         "@keyframes screen-off",
         "@keyframes emblem-lift",
         "@keyframes dish-turn",
-        "@keyframes pitch-turn",
-        "@keyframes pitch-float",
+        "@keyframes hero-rise",
+        "@keyframes hero-draw",
+        "@keyframes hero-sink",
         "@keyframes bird-drift",
         "@keyframes vt-scan",
         "@keyframes ns-draw",
@@ -2062,6 +2097,7 @@ describe("built site", () => {
     expect([...new Set(fades.map((d) => d.stack[0]))].sort()).toEqual([
       "@keyframes arc-in",
       "@keyframes blip-ping",
+      "@keyframes hero-rise",
       "@keyframes story-rise",
     ]);
     // The blip's echo is a ring that leaves and vanishes; what carries information never fades far.

@@ -1,0 +1,266 @@
+---
+// The first screen of the home page: what Radar is, set large over a radar globe that fills the
+// screen. The globe is a lattice of points on a sphere, lit from the upper left, with an equatorial
+// bezel, a tipped orbit and its satellite, a red sweep that lights the points it has just passed,
+// and the day's stories standing on it as numbered pins. It is decoration (aria-hidden): the
+// stories are links in the edition below, which the first control jumps to.
+// The build draws it in three SVG layers (lib/globe.ts holds the geometry): behind, what never
+// moves under the globe's turn (shadow, halo, body, parallels, the far halves of the rings); in
+// the middle, one still frame of what does (points, meridians, sweep, satellite, pins); in front,
+// the near halves of the bezel and the orbit. So the page is finished without script;
+// scripts/hero.ts draws the middle layer live on a canvas and takes the still frame's place.
+import StillToggle from "./StillToggle.astro";
+import { COPY } from "../lib/copy";
+import type { Edition } from "../lib/editions";
+import {
+  BEZEL,
+  BOX,
+  HIGHLIGHT,
+  LIMB,
+  SPIN,
+  SWEEP,
+  TAU,
+  TILT,
+  TRAIL,
+  ink,
+  lattice,
+  onSphere,
+  orbit,
+  persp,
+  pin,
+  tone,
+  view,
+} from "../lib/globe";
+import { routes } from "../lib/routes";
+import type { Lang } from "../lib/schema";
+
+interface Props {
+  lang: Lang;
+  /** The newest edition, whose stories stand on the globe; null on a site without one. */
+  edition: Edition | null;
+}
+
+const { lang, edition } = Astro.props;
+const copy = COPY[lang];
+const { hero } = copy;
+const [before, marked, after] = hero.lead;
+
+// The still frame, in a box of BOX radii with the globe's centre at 0 and a radius of 100.
+const U = 100;
+const half = (BOX * U) / 2;
+const f1 = (n: number) => String(Math.round(n * 10) / 10);
+type V = [number, number, number];
+const P = (v: V): V => [v[0] * persp(v[2]) * U, -v[1] * persp(v[2]) * U, v[2]];
+const mod = (n: number) => ((n % TAU) + TAU) % TAU;
+
+/** The near or far half of a curve through f(0 … 1), as path data. */
+function curve(f: (k: number) => V, steps: number, front: boolean): string {
+  let d = "";
+  let on = false;
+  let pen = false;
+  let prev = "";
+  for (let i = 0; i <= steps; i++) {
+    const q = P(f(i / steps));
+    const show = front === q[2] >= 0;
+    const at = `${f1(q[0])} ${f1(q[1])}`;
+    if (show && on) d += `${pen ? "" : `M${prev}`}L${at}`;
+    pen = show && on;
+    on = show;
+    prev = at;
+  }
+  return d;
+}
+
+const ring = (radius: number) => (k: number): V => view(Math.cos(k * TAU) * radius, 0, Math.sin(k * TAU) * radius, 0, TILT);
+const path = (k: number): V => view(...orbit(k * TAU), 0, TILT);
+const meridian = (k: number): V => {
+  const phi = k * Math.PI - Math.PI / 2;
+  return view(Math.cos(phi) * Math.sin(SWEEP), Math.sin(phi), Math.cos(phi) * Math.cos(SWEEP), 0, TILT);
+};
+const great = (lam: number) => (k: number): V =>
+  view(Math.cos(k * TAU) * Math.sin(lam), Math.sin(k * TAU), Math.cos(k * TAU) * Math.cos(lam), SPIN, TILT);
+const lat = (phi: number) => (k: number): V =>
+  view(Math.cos(phi) * Math.sin(k * TAU), Math.sin(phi), Math.cos(phi) * Math.cos(k * TAU), SPIN, TILT);
+
+// The near points, grouped by tone and size into one path each (a dot is a round-capped "h0"),
+// and the ones the sweep has just lit.
+const { xyz, w } = lattice(1800);
+const groups = new Map<string, string>();
+const flares: { d: string; alpha: string; width: string }[] = [];
+for (let i = 0; i < xyz.length / 3; i++) {
+  const v = view(xyz[i * 3], xyz[i * 3 + 1], xyz[i * 3 + 2], SPIN, TILT);
+  if (v[2] < 0) continue;
+  const [level, shade, s] = tone(v[0], v[1], v[2], w[i]);
+  const q = P(v);
+  const r = Math.max(0.3, Math.round(s * U * 4) / 4);
+  const id = `${level} ${shade} ${r}`;
+  const dot = `M${f1(q[0])} ${f1(q[1])}h0`;
+  groups.set(id, (groups.get(id) ?? "") + dot);
+  const d = mod(SWEEP - Math.atan2(xyz[i * 3], xyz[i * 3 + 2]) - SPIN);
+  if (d < TRAIL) {
+    const f = (1 - d / TRAIL) ** 3;
+    if (f >= 0.02) flares.push({ d: dot, alpha: (0.1 + 0.9 * f).toFixed(2), width: f1(r * 2 * (1 + 0.5 * f)) });
+  }
+}
+const dots = [...groups].map(([id, d]) => {
+  const [level, shade, r] = id.split(" ").map(Number);
+  return { d, colour: ink(level, shade), width: f1(r * 2) };
+});
+
+// The bezel's ticks and bearings, the far and near halves.
+const ticks = (front: boolean) => {
+  let d = "";
+  const labels: { x: string; y: string; text: string }[] = [];
+  for (let j = 0; j < 72; j++) {
+    const inner = P(ring(BEZEL)(j / 72));
+    if (front !== inner[2] >= 0) continue;
+    const outer = P(ring(BEZEL + (j % 6 ? 0.04 : 0.1))(j / 72));
+    d += `M${f1(inner[0])} ${f1(inner[1])}L${f1(outer[0])} ${f1(outer[1])}`;
+    if (j % 6 === 0 && front) {
+      const at = P(ring(BEZEL + 0.2)(j / 72));
+      labels.push({ x: f1(at[0]), y: f1(at[1]), text: String(j * 5).padStart(3, "0") });
+    }
+  }
+  return { d, labels };
+};
+const [farTicks, nearTicks] = [ticks(false), ticks(true)];
+const sat = P(view(...orbit(1.9), 0, TILT));
+const sweepHalf = curve(meridian, 48, true);
+
+// The day's stories: a pin each, where scripts/hero.ts puts them too.
+const stories = (edition?.stories ?? []).map((story, i, all) => {
+  const [la, lo] = pin(i, all.length);
+  const base = P(view(...onSphere(la, lo), SPIN, TILT));
+  const tip = P(view(...onSphere(la, lo, 1.2), SPIN, TILT));
+  return {
+    no: String(i + 1).padStart(2, "0"),
+    category: copy.categories[story.category],
+    title: story.texts[lang]!.title,
+    lat: la.toFixed(3),
+    lon: lo.toFixed(3),
+    near: base[2] > 0.05,
+    base,
+    tip,
+  };
+});
+const viewBox = `${-half} ${-half} ${2 * half} ${2 * half}`;
+const hx = f1(HIGHLIGHT[0] * U);
+const hy = f1(HIGHLIGHT[1] * U);
+---
+
+<section class="hero" aria-labelledby="hero-lead">
+  <div class="hero-stage" aria-hidden="true">
+    <div class="hero-globe">
+      {/* Behind what moves: the ground's shadow, the halo, the far halves of the rings, the body, the parallels. */}
+      <svg class="hero-layer" viewBox={viewBox} focusable="false">
+        <defs>
+          <radialGradient id="hero-floor">
+            <stop offset="0" stop-color="#46341f" stop-opacity="0.34"></stop>
+            <stop offset="1" stop-color="#46341f" stop-opacity="0"></stop>
+          </radialGradient>
+          <radialGradient id="hero-halo" gradientUnits="userSpaceOnUse" cx="0" cy="0" r={f1(1.32 * U)}>
+            <stop offset={`${f1(((LIMB * 0.96) / 1.32) * 100)}%`} stop-color="#fffcf4" stop-opacity="0.95"></stop>
+            <stop offset="80%" stop-color="#c2371a" stop-opacity="0.05"></stop>
+            <stop offset="100%" stop-color="#c2371a" stop-opacity="0"></stop>
+          </radialGradient>
+          <radialGradient id="hero-body" gradientUnits="userSpaceOnUse" cx="0" cy="0" fx={hx} fy={hy} r={f1(LIMB * U)}>
+            <stop offset="0" stop-color="#fffefa"></stop>
+            <stop offset="0.5" stop-color="#efe9de"></stop>
+            <stop offset="0.82" stop-color="#c9bead"></stop>
+            <stop offset="1" stop-color="#9c8f7d"></stop>
+          </radialGradient>
+        </defs>
+        <g fill="none" stroke="#17181a" stroke-opacity="0.13" stroke-width="0.3">
+          {[1.75, 2.3, 2.95, 3.7].map((r) => <circle r={f1(r * U)} />)}
+          <path d={`M${-4 * U} 0H${-1.45 * U}M0 ${-4 * U}V${-1.45 * U}`} stroke-dasharray="1 2"></path>
+        </g>
+        <ellipse cx="0" cy={f1(1.22 * U)} rx={f1(1.1 * U)} ry={f1(0.154 * U)} fill="url(#hero-floor)"></ellipse>
+        <circle r={f1(1.32 * U)} fill="url(#hero-halo)"></circle>
+        <g class="hero-rings" fill="none" stroke="#17181a" stroke-width="0.36">
+          <path d={curve(ring(BEZEL), 96, false)} stroke-opacity="0.18" pathLength="1"></path>
+          <path d={farTicks.d} stroke-opacity="0.22"></path>
+          <path d={curve(path, 120, false)} stroke-opacity="0.12" pathLength="1"></path>
+        </g>
+        <circle r={f1(LIMB * U)} fill="url(#hero-body)" stroke="#17181a" stroke-opacity="0.27" stroke-width="0.36"></circle>
+        <g fill="none" stroke="#17181a" stroke-width="0.3" stroke-opacity="0.13">
+          {[-1, -0.5, 0.5, 1].map((phi) => <path d={curve(lat(phi), 72, true)} />)}
+          <path d={curve(lat(0), 72, true)} stroke-opacity="0.3" stroke-width="0.44"></path>
+        </g>
+      </svg>
+      {/* What moves, as one still frame; the canvas takes its place with script. */}
+      <svg class="hero-layer hero-still" viewBox={viewBox} focusable="false">
+        <g fill="none" stroke-linecap="round">
+          {[0, 1, 2, 3, 4, 5].map((i) => <path d={curve(great((i * Math.PI) / 6), 64, true)} stroke="#17181a" stroke-opacity="0.13" stroke-width="0.3" />)}
+          {dots.map((g) => <path d={g.d} stroke={g.colour} stroke-width={g.width} />)}
+          {flares.map((g) => <path d={g.d} stroke="#c2371a" stroke-opacity={g.alpha} stroke-width={g.width} />)}
+          <path d={sweepHalf} stroke="#c2371a" stroke-opacity="0.06" stroke-width="4.4"></path>
+          <path d={sweepHalf} stroke="#c2371a" stroke-opacity="0.14" stroke-width="1.8"></path>
+          <path d={sweepHalf} stroke="#c2371a" stroke-opacity="0.95" stroke-width="0.6"></path>
+        </g>
+        {
+          sat[2] > 0 && (
+            <g fill="#17181a">
+              <rect x={f1(sat[0] - 2.6)} y={f1(sat[1] - 0.5)} width="5.2" height="1"></rect>
+              <rect x={f1(sat[0] - 0.9)} y={f1(sat[1] - 0.9)} width="1.8" height="1.8"></rect>
+            </g>
+          )
+        }
+        {
+          stories
+            .filter((s) => s.near)
+            .map((s) => (
+              <g class="hero-pin">
+                <path d={`M${f1(s.base[0])} ${f1(s.base[1])}L${f1(s.tip[0])} ${f1(s.tip[1])}`} stroke="#17181a" stroke-width="0.5"></path>
+                <circle cx={f1(s.tip[0])} cy={f1(s.tip[1])} r="1.6" fill="#c2371a" stroke="#ffffff" stroke-width="0.7"></circle>
+                <text x={f1(s.tip[0] + 3.2)} y={f1(s.tip[1] - 2.4)}>{`${s.no} ${s.category}`}</text>
+              </g>
+            ))
+        }
+      </svg>
+      <canvas class="hero-layer hero-canvas"></canvas>
+      {/* In front of what moves: the near halves of the bezel, its bearings, and the orbit. */}
+      <svg class="hero-layer" viewBox={viewBox} focusable="false">
+        <g class="hero-rings" fill="none" stroke="#17181a" stroke-width="0.36">
+          <path d={curve(ring(BEZEL), 96, true)} stroke-opacity="0.5" stroke-width="0.5" pathLength="1"></path>
+          <path d={nearTicks.d} stroke-opacity="0.55"></path>
+          <path d={curve(path, 120, true)} stroke-opacity="0.45" pathLength="1"></path>
+        </g>
+        <g class="hero-bearings">
+          {nearTicks.labels.map((l) => <text x={l.x} y={l.y} text-anchor="middle" dominant-baseline="middle">{l.text}</text>)}
+        </g>
+      </svg>
+      <ol class="hero-tags">
+        {
+          stories.map((s) => (
+            <li class="hero-tag" data-lat={s.lat} data-lon={s.lon}>
+              <span class="hero-tag-in">
+                <b>{s.no}</b> {s.category}
+                <span class="hero-tag-title">{s.title}</span>
+              </span>
+            </li>
+          ))
+        }
+      </ol>
+    </div>
+  </div>
+  <div class="hero-copy">
+    <p class="hero-label">))) {hero.label}</p>
+    <p class="hero-lead" id="hero-lead">{before}<em class="hero-mark">{marked}</em>{after}</p>
+    <p class="hero-promise">
+      <span>{hero.promises[0]}</span><span class="hero-dot" aria-hidden="true"></span><span>{hero.promises[1]}</span>
+    </p>
+    <p class="hero-act">
+      {edition && <a class="hero-jump" href="#edition">{hero.jump} <span aria-hidden="true">↓</span></a>}
+      <a class="hero-more" href={routes[lang].about}>{hero.more} <span aria-hidden="true">→</span></a>
+    </p>
+  </div>
+  <div class="hero-foot label" aria-hidden="true">
+    <span class="hero-place">{hero.place}</span>
+    {edition && <span>{`${copy.issue(edition.number)} · ${copy.storyCount(edition.stories.length)}`}</span>}
+  </div>
+  <p class="hero-still-toggle"><StillToggle lang={lang} /></p>
+</section>
+
+<script>
+  import "../scripts/hero";
+</script>
