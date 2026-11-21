@@ -1,35 +1,16 @@
-// Runs first, in <head>, before anything is painted. It marks the page as scripted, applies the
-// reader's pause and decides whether this view opens with the loading screen.
-// 1. The pause: the class `still` on <html> stops every looping motion. The buttons marked
-//    `data-still` (on the scope and in the footer) toggle it; it is remembered for the browser
-//    session under `radar:still`.
-// 2. The opening: every time the site is entered (a new visit, a typed address, a link from
-//    elsewhere, a reload), on whichever page; not when the reader moves between pages of the
-//    site, never for a reader who asked for less motion, on back/forward or in a hidden tab.
-//    Nothing is stored for it. It is the class `intro` on
-//    <html>, which the stylesheet paints as an ink cover before the first paint; the loader
-//    (scripts/intro.ts) draws over it. Anything that removes the class ends the opening at once,
-//    and this file removes it at the hard cap of 3500 ms whatever the loader does. The press or key
-//    that skips it is consumed, and so is the click that follows a press, so nothing under the
-//    opening is activated.
-// Storage is only ever touched inside try/catch: when it fails, motion stays on.
+// Runs first, in <head>, before anything is painted. It marks the page as scripted and decides
+// whether this view opens with the loading screen. It stores nothing.
+// The opening: every time the site is entered (a new visit, a typed address, a link from
+// elsewhere, a reload), on whichever page; not when the reader moves between pages of the site,
+// never for a reader who asked for less motion, on back/forward or in a hidden tab. It is the
+// class `intro` on <html>, which the stylesheet paints as an ink cover before the first paint; the
+// loader (scripts/intro.ts) draws over it. Anything that removes the class ends the opening at
+// once, and this file removes it at the hard cap of 3500 ms whatever the loader does. The press or
+// key that skips it is consumed, and so is the click that follows a press, so nothing under the
+// opening is activated.
 (function () {
   var d = document.documentElement;
   d.classList.add("js");
-
-  var STILL = "radar:still";
-  try {
-    if (sessionStorage.getItem(STILL)) d.classList.add("still");
-  } catch (e) {}
-  document.addEventListener("click", function (event) {
-    var t = event.target;
-    if (!t || !t.closest || !t.closest("[data-still]")) return;
-    var on = d.classList.toggle("still");
-    try {
-      if (on) sessionStorage.setItem(STILL, "1");
-      else sessionStorage.removeItem(STILL);
-    } catch (e) {}
-  });
 
   try {
     var nav = performance.getEntriesByType("navigation")[0];

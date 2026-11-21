@@ -1,4 +1,4 @@
-// A departure board's flaps, for readers who have not asked for less motion and have not paused it.
+// A departure board's flaps, for readers who have not asked for less motion.
 // 1. An edition's big date and the masthead's counts settle in once, when first in view (and only
 //    after the opening): each character flips through a few glyphs and lands, left to right, in
 //    about half a second.
@@ -16,7 +16,7 @@ const UPPER = "ABCDEFGHIKLMNOPRSTUVYZ";
 const FLIPS = 3;
 const FLIP_MS = 45;
 
-const calm = () => matchMedia("(prefers-reduced-motion: reduce)").matches || root.classList.contains("still");
+const calm = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /** A glyph of the same kind as `ch`: a digit for a digit, a letter of the same case for a letter. */
 function glyph(ch: string): string {

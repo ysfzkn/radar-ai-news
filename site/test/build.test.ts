@@ -811,7 +811,7 @@ describe("built site", () => {
     const dir = join(root, "src", "scripts");
     for (const name of readdirSync(dir)) {
       const source = readFileSync(join(dir, name), "utf8");
-      // Storage belongs to boot.js alone (its two session keys).
+      // No script keeps storage of any kind (boot.js does not either; see boot.test.ts).
       expect(source, name).not.toMatch(/innerHTML|outerHTML|insertAdjacentHTML|document\.write|localStorage|sessionStorage|document\.cookie|\beval\(/);
       // CSSOM custom properties only, never a style attribute.
       expect(source, name).not.toMatch(/setAttribute\(\s*["']style|\.style\.(?!setProperty)/);
@@ -1009,8 +1009,8 @@ describe("built site", () => {
   it("every page ends with the horizon above the signature, hidden from assistive tech and from print", () => {
     for (const file of [DEMO, EMPTY].flatMap(htmlFiles)) {
       const foot = readFileSync(file, "utf8").match(/<footer class="foot label">([\s\S]*?)<\/footer>/)![1];
-      // The horizon, the pause beside it, then the signature.
-      expect(foot, file).toMatch(/^\s*<svg class="horizon" [^>]*aria-hidden="true">[\s\S]*?<\/svg>\s*<p class="foot-still">\s*<button [^>]*data-still[\s\S]*?<\/button>\s*<\/p>\s*<p class="sig">/);
+      // The horizon, then the signature: no pause button between them.
+      expect(foot, file).toMatch(/^\s*<svg class="horizon" [^>]*aria-hidden="true">[\s\S]*?<\/svg>\s*<p class="sig">/);
       const horizon = foot.match(/<svg class="horizon"[\s\S]*?<\/svg>/)![0];
       expect(horizon).not.toMatch(/<a\s|<text|tabindex/);
       expect(horizon).toContain('class="hz-turn"');
@@ -1024,37 +1024,14 @@ describe("built site", () => {
     expect(line).toContain("vector-effect: non-scaling-stroke;");
   });
 
-  it("a pause button sits on the scope (on the home page, in the hero) and in the footer, hidden without script, sharing one state", () => {
-    for (const [dir, lang] of [
-      [DEMO, "tr"],
-      [EMPTY, "tr"],
-    ] as const) {
-      for (const file of htmlFiles(dir)) {
-        const html = readFileSync(file, "utf8");
-        const l = html.includes('<html lang="en"') ? "en" : lang;
-        const motion = COPY[l].motion;
-        const button = `<button class="still-toggle label" type="button" data-still hidden><span class="still-pause">${motion.pause}</span><span class="still-play">${motion.play}</span></button>`;
-        const all = html.match(/<button class="still-toggle[\s\S]*?<\/button>/g) ?? [];
-        const scope = html.match(/<section class="scope"[\s\S]*?<\/section>/)?.[0];
-        const hero = html.match(/<section class="hero"[\s\S]*?<\/section>/)?.[0];
-        expect(all.length, file).toBe(1 + Number(!!scope));
-        for (const b of all) expect(b, file).toBe(button);
-        if (scope) expect(scope, file).toContain(button);
-        // On the home page the scope, and so its button, is the hero's (none on a site without an edition).
-        if (hero) expect(hero.includes(button), file).toBe(!!scope);
-        const foot = html.match(/<footer class="foot label">[\s\S]*?<\/footer>/)![0];
-        expect(foot, file).toContain(button);
-      }
+  it("there is no pause button: motion runs whenever the reader's system allows it", () => {
+    for (const file of [DEMO, EMPTY, REAL].flatMap(htmlFiles)) {
+      const html = readFileSync(file, "utf8");
+      expect(html, file).not.toMatch(/data-still|still-toggle|scope-still|foot-still|Hareketi durdur|Pause motion/);
     }
-    expect(COPY.tr.motion).toEqual({ pause: "Hareketi durdur", play: "Hareketi başlat" });
-    expect(COPY.en.motion).toEqual({ pause: "Pause motion", play: "Play motion" });
-    const decls = declarations(css());
-    // Shown only with script and with motion to stop; it reads what a press does.
-    const shown = decls.filter((d) => d.selector === "html.js .still-toggle" && d.prop === "display");
-    expect(shown.map((d) => `${d.stack[0]} ${d.value}`)).toEqual(["@media (prefers-reduced-motion: no-preference) inline-flex"]);
-    expect(cssRule(css(), ".still-play")).toContain("display: none;");
-    expect(cssRule(css(), "html.still .still-pause")).toContain("display: none;");
-    expect(cssRule(css(), "html.still .still-play")).toContain("display: inline;");
+    expect(COPY.tr).not.toHaveProperty("motion");
+    expect(COPY.en).not.toHaveProperty("motion");
+    expect(sheets()).not.toMatch(/\.still\b|still-toggle|html\.js:not/);
   });
 
   it("the why-it-matters line inks in only by script, only with motion, and prints in ink", () => {
@@ -1165,7 +1142,7 @@ describe("built site", () => {
     expect(narrow(".story-lead", "padding")).toBe("1rem");
   });
 
-  it("the Künye page says what the site's own script does, where the search words go and the two keys it keeps", () => {
+  it("the Künye page says what the site's own script does, where the search words go and that nothing is stored", () => {
     for (const [path, lang] of [["kunye", "tr"], ["en/about", "en"]] as const) {
       const body = text(page(DEMO, path));
       expect(body, path).not.toMatch(/betik yok|no outside fonts or scripts/);
@@ -1178,7 +1155,13 @@ describe("built site", () => {
       );
       expect(body).toContain(lang === "tr" ? "başka kimseye gönderilmez" : "it is sent to no one else");
       expect(body).not.toContain("radar:intro");
-      expect(body).toContain("radar:still");
+      // Nothing at all is stored in the browser.
+      expect(body).not.toContain("radar:");
+      expect(body).toContain(
+        lang === "tr"
+          ? "Tarayıcına hiçbir şey yazılmaz: ne çerez ne yerel ya da oturum belleği."
+          : "Nothing is written to your browser: no cookie, no local or session storage.",
+      );
       expect(body).toContain(lang === "tr" ? "betik olmadan da eksiksiz çalışır" : "complete without scripts");
       expect(body).toContain(lang === "tr" ? "seni izlemez" : "does not track you");
     }
@@ -1335,10 +1318,10 @@ describe("built site", () => {
     expect(sky).not.toMatch(/\bfetch\(|XMLHttpRequest/);
   });
 
-  it("the departure board flips only with motion allowed and not paused, keeping the real text for assistive tech", () => {
+  it("the departure board flips only with motion allowed, keeping the real text for assistive tech", () => {
     const board = readFileSync(join(root, "src", "scripts", "board.ts"), "utf8");
     expect(board).toContain('matchMedia("(prefers-reduced-motion: reduce)")');
-    expect(board).toContain('root.classList.contains("still")');
+    expect(board).not.toContain("still");
     expect(board).toContain('real.className = "visually-hidden"');
     expect(board).toContain('show.setAttribute("aria-hidden", "true")');
     expect(board).toContain("el.replaceChildren(text)");
@@ -2079,29 +2062,31 @@ describe("built site", () => {
       if (d.prop === "animation-timeline") expect(context).toMatch(/@supports \(animation-timeline: scroll\(\)\)/);
       if (d.prop.startsWith("transition")) expect(d.value).toMatch(/120ms/);
     }
-    // Looping motion can be stopped (WCAG 2.2.2). Only five things loop: the scope's one 6 s clock
-    // (the sweep, each blip's echo and the readout) and the horizon's slow dish and birds, at 20 s
-    // or slower. Each loops only with motion allowed, only with script (html.js: where the pause
-    // button exists; without script the scope and the horizon stand still), and never once the
-    // reader has paused (html.still). Stopped, each rests on its plain frame: no animation at all.
+    // Only a fixed set of things loop: the scope's one 6 s clock (the sweep, each blip's echo and
+    // the readout) and the horizon's slow life, at 20 s or slower. There is no pause button: each
+    // loops whenever the reader's system allows motion (with or without script) and the
+    // reduced-motion setting stops them all, each resting on its plain frame.
     const LOOPED = [".blip-echo", ".hz-bird", ".hz-turn", ".readout-line", ".scope-sweep"];
-    const GATE = "html.js:not(.still) ";
     expect(sheets()).not.toMatch(/alternate/);
     const loops = decls.filter((d) => /infinite/.test(d.value));
-    expect(loops.map((d) => d.selector).sort()).toEqual(LOOPED.map((s) => GATE + s));
+    expect(loops.map((d) => d.selector).sort()).toEqual(LOOPED);
     for (const d of loops) {
       expect(d.stack, d.selector).toEqual(["@media (prefers-reduced-motion: no-preference)", d.selector]);
       expect(d.prop).toBe("animation");
     }
-    for (const d of loops.filter((x) => !x.selector.startsWith(`${GATE}.hz-`))) expect(d.value, d.selector).toMatch(/^[a-z-]+ 6s .*infinite$/);
-    const hz = decls.filter((x) => x.selector.startsWith(`${GATE}.hz-`) && /^animation(-duration)?$/.test(x.prop));
+    for (const d of loops.filter((x) => !x.selector.startsWith(".hz-"))) expect(d.value, d.selector).toMatch(/^[a-z-]+ 6s .*infinite$/);
+    const hz = decls.filter(
+      (x) => x.stack[0] === "@media (prefers-reduced-motion: no-preference)" && x.selector.startsWith(".hz-") && /^animation(-duration)?$/.test(x.prop),
+    );
     expect(hz.length).toBe(4);
     for (const d of hz) expect(Number(d.value.match(/(\d+)s\b/)![1]), `${d.selector} ${d.value}`).toBeGreaterThanOrEqual(20);
     // No other rule sets these animations going: anything else on them only pauses or cancels.
     const looped = new RegExp(`(${LOOPED.map((s) => s.replace(".", "\\.")).join("|")})\\b`);
-    for (const d of decls.filter((x) => /^animation/.test(x.prop) && looped.test(x.selector) && !x.selector.startsWith(GATE))) {
-      expect(d.stack[0] === "@media print" ? d.value : `${d.prop}: ${d.value}`, d.selector).toMatch(/^none$|^animation-play-state: paused$/);
+    const starts = new Set(loops);
+    for (const d of decls.filter((x) => x.prop === "animation" && looped.test(x.selector) && !starts.has(x))) {
+      expect(d.stack[0] === "@media print" ? d.value : `${d.prop}: ${d.value}`, d.selector).toMatch(/^none$|^animation: none$/);
     }
+    for (const d of decls.filter((x) => x.prop === "animation-play-state")) expect(d.value, d.selector).toBe("paused");
     // The progress bar is invisible by default; only the edition view renders it.
     const bar = cssRule(css(), ".progress");
     for (const rule of ["position: fixed;", "top: 0;", "height: 3px;", "transform: scaleX(0);", "transform-origin: 0 50%;"]) {

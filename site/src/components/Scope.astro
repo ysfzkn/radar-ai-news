@@ -5,7 +5,6 @@ import { anchorId, buildEditions, earlierStories, forLang, type Edition } from "
 import { categoryClass, shortDate } from "../lib/format";
 import { GHOST_FEW, GHOST_LIMIT } from "../lib/nav";
 import { storyLink } from "../lib/routes";
-import StillToggle from "./StillToggle.astro";
 import {
   BLIP_DOT,
   BLIP_HIT,
@@ -236,7 +235,6 @@ const rings: Ring[] = [3, 2, 1];
       }
     </p>
     <p class="scope-caption label">{copy.scope.caption}</p>
-    <p class="scope-still"><StillToggle lang={lang} /></p>
   </section>
   {/*
     The readout panel: one row per story, its number, bearing, sources, topic and title, each a

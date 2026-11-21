@@ -39,7 +39,7 @@ function boot(options: Options = {}) {
     if (options.storageThrows) throw new Error("SecurityError");
     return fn();
   };
-  /** A pause button: `closest("[data-still]")` finds the button itself. */
+  /** A button marked as the old pause was: boot.js must no longer answer it. */
   const button = () => {
     const b = {
       attrs: new Map<string, string>(),
@@ -193,39 +193,14 @@ describe("boot.js: the opening", () => {
   });
 });
 
-describe("boot.js: the reader's pause", () => {
-  it("applies a remembered pause before the first paint", () => {
-    expect(boot({ stored: { "radar:still": "1" } }).classes.has("still")).toBe(true);
-    expect(boot().classes.has("still")).toBe(false);
-    // Storage that throws leaves the motion on and the script running.
-    const broken = boot({ storageThrows: true });
-    expect(broken.classes.has("still")).toBe(false);
-    expect(broken.classes.has("js")).toBe(true);
-  });
-
-  it("toggles the pause from either button, and remembers it for the session", () => {
-    // On a page without the opening: while it is up, the opening takes every press.
-    const page = boot({ referrer: INSIDE });
-    page.fire("click", page.buttons[0]);
-    expect(page.classes.has("still")).toBe(true);
-    expect(page.store.get("radar:still")).toBe("1");
+describe("boot.js: storage", () => {
+  it("touches no storage at all: there is no pause to remember", () => {
+    expect(source).not.toMatch(/localStorage|sessionStorage|cookie|radar:/);
+    expect(source).not.toMatch(/still/);
+    const page = boot({ stored: { "radar:still": "1" }, referrer: INSIDE });
+    expect(page.classes.has("still")).toBe(false);
     page.fire("click", page.buttons[0]);
     expect(page.classes.has("still")).toBe(false);
-    expect(page.store.has("radar:still")).toBe(false);
-    // Any other click changes nothing.
-    page.fire("click");
-    expect(page.classes.has("still")).toBe(false);
-  });
-
-  it("still toggles when storage fails", () => {
-    const page = boot({ storageThrows: true, referrer: INSIDE });
-    page.fire("click", page.buttons[0]);
-    expect(page.classes.has("still")).toBe(true);
-  });
-
-  it("keeps no storage but its one session key", () => {
-    expect(source).not.toMatch(/localStorage|cookie/);
-    const keys = [...source.matchAll(/"(radar:[a-z]+)"/g)].map((m) => m[1]);
-    expect([...new Set(keys)].sort()).toEqual(["radar:still"]);
+    expect([...page.store.keys()]).toEqual(["radar:still"]);
   });
 });

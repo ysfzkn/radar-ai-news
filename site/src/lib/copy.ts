@@ -58,8 +58,6 @@ export interface Copy {
     panel: string;
     columns: readonly [string, string, string, string, string];
   };
-  /** The pause for looping motion (the sweep, the horizon): the button reads what a press does. */
-  motion: { pause: string; play: string };
   /** The end of an edition: the closing line, and its reading time under it. */
   closed: string;
   readTime(minutes: number): string;
@@ -252,7 +250,6 @@ export const COPY: Record<Lang, Copy> = {
       panel: "Okuma",
       columns: ["No", "Krt", "Kyn", "Konu", "Başlık"],
     },
-    motion: { pause: "Hareketi durdur", play: "Hareketi başlat" },
     closed: "Bugünlük bu kadar.",
     readTime: (n) => `${n} dk okuma`,
     previous: "Önceki sayı",
@@ -452,9 +449,9 @@ export const COPY: Record<Lang, Copy> = {
           heading: "Gizlilik",
           paragraphs: [
             "Bu site çerez kullanmaz, seni izlemez ve üçüncü taraflardan hiçbir şey yüklemez: analitik, reklam ya da dış yazı tipi yok. Her sayfa statik bir HTML dosyasıdır ve betik olmadan da eksiksiz çalışır.",
-            "Sitenin kendi küçük betiği yalnızca bir kolaylık ekler: arşivde arama ve komut paleti (arama verisi bu siteden gelir), klavye kısayolları, kopyalama düğmeleri (panoya yalnızca sen bastığında yazar), radar ekranının eğimi ve okunan haberlerin işareti, ana sayfadaki arama kutusu (yazdığın sözcükleri arşivin aramasına, yani o sayfanın adresine taşır), ana sayfanın başındaki yazının ve radarın açılıştan sonra bir kez yerine oturması, “Neden önemli” satırının belirişi, baskının tarihinin ve sayılarının bir kalkış tabelası gibi yerine oturması, abone ol düğmesinin yazısının üzerine gelince çözülmesi, komut paletine “ping” yazınca radarın bir kez atması, siteye her girişte oynayan kısa açılış ve dönen hareketi durduran düğme. Sayfanın altındaki ufuk çizimi akşamdan sabaha gece hâline geçer: saati senin cihazının saatinden İstanbul saatine göre hesaplar, hiçbir yere sormaz. Hareketi azaltmayı seçtiysen hareketlerin hiçbiri oynamaz.",
+            "Sitenin kendi küçük betiği yalnızca bir kolaylık ekler: arşivde arama ve komut paleti (arama verisi bu siteden gelir), klavye kısayolları, kopyalama düğmeleri (panoya yalnızca sen bastığında yazar), radar ekranının eğimi ve okunan haberlerin işareti, ana sayfadaki arama kutusu (yazdığın sözcükleri arşivin aramasına, yani o sayfanın adresine taşır), ana sayfanın başındaki yazının ve radarın açılıştan sonra bir kez yerine oturması, “Neden önemli” satırının belirişi, baskının tarihinin ve sayılarının bir kalkış tabelası gibi yerine oturması, abone ol düğmesinin yazısının üzerine gelince çözülmesi, komut paletine “ping” yazınca radarın bir kez atması ve siteye her girişte oynayan kısa açılış. Sayfanın altındaki ufuk çizimi akşamdan sabaha gece hâline geçer: saati senin cihazının saatinden İstanbul saatine göre hesaplar, hiçbir yere sormaz. Hareketi azaltmayı seçtiysen hareketlerin hiçbiri oynamaz.",
             "Arşivde aradığın sözcükler tarayıcında ve sayfanın adresinde kalır; adres de tarayıcı geçmişine yazılır. Sayfayı yenilediğinde ya da bir sonuca tıkladığında adres yalnızca bu siteye gider; başka kimseye gönderilmez.",
-            "Tarayıcının oturum belleğine en çok bir anahtar yazılır: hareketi durdurduysan bunu hatırlayan radar:still. Sekme kapanınca silinir. Başka hiçbir şey saklanmaz.",
+            "Tarayıcına hiçbir şey yazılmaz: ne çerez ne yerel ya da oturum belleği. Sayfayı yenilediğinde her şey baştan başlar.",
           ],
         },
       ],
@@ -521,7 +518,6 @@ export const COPY: Record<Lang, Copy> = {
       panel: "Readout",
       columns: ["No", "Brg", "Src", "Topic", "Title"],
     },
-    motion: { pause: "Pause motion", play: "Play motion" },
     closed: "That's all for today.",
     readTime: (n) => `${n} min read`,
     previous: "Previous issue",
@@ -722,9 +718,9 @@ export const COPY: Record<Lang, Copy> = {
           heading: "Privacy",
           paragraphs: [
             "This site sets no cookies, does not track you and loads nothing from third parties: no analytics, no ads, no outside fonts. Every page is a static HTML file and is complete without scripts.",
-            "The site's own small script only adds conveniences: the archive search and the command palette (their data comes from this site), keyboard shortcuts, copy buttons (they write to your clipboard only when you press them), the radar's tilt and the marks on stories you have read, the home page's search field (it takes your words to the archive search, that is, into that page's address), the home page's words and radar rising into place once after the opening, the way the “Why it matters” line appears, the edition's date and counts settling in like a departure board, the subscribe button's label decoding when you point at it, the radar's single pulse when you type “ping” in the command palette, a short opening each time you enter the site, and the button that pauses the looping motion. The horizon at the foot of each page turns to night from evening to morning: it works out Istanbul's time from your own device's clock and asks nothing of anyone. If you have asked for less motion, none of it moves.",
+            "The site's own small script only adds conveniences: the archive search and the command palette (their data comes from this site), keyboard shortcuts, copy buttons (they write to your clipboard only when you press them), the radar's tilt and the marks on stories you have read, the home page's search field (it takes your words to the archive search, that is, into that page's address), the home page's words and radar rising into place once after the opening, the way the “Why it matters” line appears, the edition's date and counts settling in like a departure board, the subscribe button's label decoding when you point at it, the radar's single pulse when you type “ping” in the command palette and a short opening each time you enter the site. The horizon at the foot of each page turns to night from evening to morning: it works out Istanbul's time from your own device's clock and asks nothing of anyone. If you have asked for less motion, none of it moves.",
             "What you type in the archive search stays in your browser and in the page's address, so it is also in your browser history. When you reload the page or click a result, that address goes to this site only; it is sent to no one else.",
-            "At most one key is written to the browser's session storage: radar:still, which remembers that you paused the motion. It is gone when the tab closes. Nothing else is stored.",
+            "Nothing is written to your browser: no cookie, no local or session storage. When you reload a page, everything starts afresh.",
           ],
         },
       ],

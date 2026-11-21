@@ -706,10 +706,6 @@ a.lang-part:focus-visible {
     font-size: 1.0625rem;
   }
 
-  .hero .still-toggle {
-    min-height: 1.75rem;
-  }
-
   .hero .scope-stage {
     aspect-ratio: 1 / 0.46;
     perspective: 110rem;
@@ -749,10 +745,6 @@ a.lang-part:focus-visible {
 
   .hero .scope-caption {
     display: none;
-  }
-
-  .hero .scope-still {
-    margin-top: 0;
   }
 }
 
@@ -798,7 +790,7 @@ a.lang-part:focus-visible {
     grid-column: 1 / -1;
   }
 
-  .hero :is(.scope-caption, .scope-still) {
+  .hero .scope-caption {
     margin-top: 0;
   }
 
@@ -3230,45 +3222,6 @@ html.night .hz-win {
   transform-origin: 392px 0;
 }
 
-/* The pause for looping motion (StillToggle.astro), on the scope and in the footer beside the
-   horizon. It shows only with script and with motion to stop (in the motion rules below), and
-   reads what a press does. */
-.still-toggle {
-  min-height: 2rem;
-  padding: 0.125rem 0.625rem;
-  border: 1px solid var(--control-border);
-  border-radius: 999px;
-  background: var(--surface);
-  color: var(--ink);
-  font-size: 0.75rem;
-  cursor: pointer;
-}
-
-.still-toggle:hover {
-  border-color: var(--ink);
-}
-
-.still-play {
-  display: none;
-}
-
-html.still .still-pause {
-  display: none;
-}
-
-html.still .still-play {
-  display: inline;
-}
-
-.scope-still {
-  display: none;
-  margin-top: var(--space-2);
-}
-
-.foot-still {
-  display: none;
-}
-
 /* Footer: the owner's signature, then the site's own links. */
 .foot {
   display: flex;
@@ -3753,20 +3706,11 @@ kbd {
   color: var(--muted);
 }
 
-/* Motion: only for readers who have not asked for less. Five things loop (the scope's sweep, its
-   blip echoes and readout, the horizon's dish and birds); they run only with script, which brings
-   the pause button, and stop on their plain frame once the reader pauses (html.still). Without
-   script, or with less motion asked for, nothing loops. */
+/* Motion: only for readers who have not asked for less. A few things loop (the scope's sweep, its
+   blip echoes and readout, the horizon's slow life); they run with or without script, and the
+   reader's system setting for reduced motion is what stops them: then nothing loops and each
+   rests on its plain frame. */
 @media (prefers-reduced-motion: no-preference) {
-  html.js .still-toggle {
-    display: inline-flex;
-  }
-
-  html.js .scope-still,
-  html.js .foot-still {
-    display: block;
-  }
-
   a,
   .pager-issue,
   .row-date {
@@ -3827,18 +3771,18 @@ kbd {
   }
 
   /* The scope keeps turning while it is in view: the sweep, the echo of each blip it passes
-     and the readout's title follow one 6 s clock. Off screen it stands still; paused, the sweep
-     points up, no echo shows and the readout rests on its own line. */
-  html.js:not(.still) .scope-sweep {
+     and the readout's title follow one 6 s clock. Off screen it stands still; with less motion
+     asked for, the sweep points up, no echo shows and the readout rests on its own line. */
+  .scope-sweep {
     animation: scope-sweep 6s linear infinite;
   }
 
-  html.js:not(.still) .blip-echo {
+  .blip-echo {
     animation: blip-ping 6s ease-out infinite;
     animation-delay: var(--sweep-at, 0ms);
   }
 
-  html.js:not(.still) .readout-line {
+  .readout-line {
     animation: scope-readout 6s steps(24, end) infinite;
     animation-delay: var(--sweep-at, 0ms);
   }
@@ -3949,21 +3893,21 @@ kbd {
   }
 
   /* The horizon's dish turns once a minute's third, its birds glide on their own slow courses.
-     Paused, the dish faces the reader and the birds hold their places. */
-  html.js:not(.still) .hz-turn {
+     With less motion asked for, the dish faces the reader and the birds hold their places. */
+  .hz-turn {
     animation: dish-turn 20s ease-in-out infinite;
   }
 
-  html.js:not(.still) .hz-bird {
+  .hz-bird {
     animation: bird-drift 36s ease-in-out infinite;
   }
 
-  html.js:not(.still) .hz-bird-2 {
+  .hz-bird-2 {
     animation-duration: 44s;
     animation-delay: -12s;
   }
 
-  html.js:not(.still) .hz-bird-3 {
+  .hz-bird-3 {
     animation-duration: 52s;
     animation-delay: -30s;
   }
@@ -4207,16 +4151,16 @@ kbd {
   .story:target::before,
   .progress,
   .story:not(.story-lead),
-  html.js:not(.still) .scope-sweep,
-  html.js:not(.still) .blip-echo,
-  html.js:not(.still) .readout-line,
+  .scope-sweep,
+  .blip-echo,
+  .readout-line,
   html.intro body::before,
   .ink-go .ink-w,
   .is-off .screen-off,
   .hero.is-entering .hero-copy > *,
   .hero.is-entering .hero-radar,
-  html.js:not(.still) .hz-turn,
-  html.js:not(.still) .hz-bird,
+  .hz-turn,
+  .hz-bird,
   .em-mid .em-face,
   .em-top .em-face,
   ::view-transition-old(root),
