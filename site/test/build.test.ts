@@ -6,6 +6,7 @@ import { COPY } from "../src/lib/copy";
 import { routes } from "../src/lib/routes";
 import { CATEGORIES } from "../src/lib/schema";
 import { BLIP_HIT, RING_RADIUS, SCOPE_HALF } from "../src/lib/scope";
+import { GHOST_LIMIT, signalLevel } from "../src/lib/nav";
 
 // These tests read the files of finished builds. beforeAll runs four builds one after
 // another (never concurrently): the demo fixture, a hostile file, an empty file, and the
@@ -495,8 +496,9 @@ describe("built site", () => {
     expect(hover).toContain("transform: translate(-1px, -1px);");
     expect(hover).toContain("box-shadow: 4px 4px 0 var(--ink);");
     const active = cssRule(sheet, ".subscribe:active,\n.try:active");
-    expect(active).toContain("transform: translate(2px, 2px);");
-    expect(active).toContain("box-shadow: 1px 1px 0 var(--ink);");
+    // A press sinks the key into its shadow: moved by the shadow's offset, the shadow gone.
+    expect(active).toContain("transform: translate(3px, 3px);");
+    expect(active).toContain("box-shadow: 0px 0px 0 var(--ink);");
     expect(cssRule(sheet, ".story-try")).toContain("margin-top: var(--space-3);");
   });
 
@@ -597,7 +599,7 @@ describe("built site", () => {
     expect(cssRule(css(), ".story-no")).toContain("font-size: 1.0625rem;");
     // The elements the print rules hide carry those classes.
     const edition = page(DEMO, "2026-11-19");
-    expect(edition).toMatch(/<nav class="top-nav">/);
+    expect(edition).toMatch(/<nav class="top-nav dial" aria-label="Bölümler">/);
     expect(edition).toContain('<p class="pager">');
     expect(edition).toContain('<footer class="foot label">');
     expect(edition).toContain('<nav class="index"');
@@ -810,6 +812,8 @@ describe("built site", () => {
     let blips = 0;
     let emblems = 0;
     let horizons = 0;
+    let ghostLayers = 0;
+    let rulers = 0;
     const files = [DEMO, REAL].flatMap(htmlFiles);
     for (const file of files) {
       const html = readFileSync(file, "utf8");
@@ -829,6 +833,10 @@ describe("built site", () => {
           emblems++;
         } else if (svg.startsWith('<svg class="horizon" viewBox="0 0 640 96" preserveAspectRatio="xMidYMax slice" aria-hidden="true">')) {
           horizons++;
+        } else if (/^<svg class="scope-layer layer-[123]" viewBox="-100 -100 200 200"><a class="ghost g-\d+" /.test(svg)) {
+          ghostLayers++;
+        } else if (svg.startsWith('<svg class="dial-ruler" viewBox="0 0 400 12" preserveAspectRatio="none" width="100%" height="12" aria-hidden="true">')) {
+          rulers++;
         } else if (svg.startsWith('<svg class="nosignal" viewBox="-100 -100 200 200" aria-hidden="true">')) {
           expect(file.endsWith("404.html"), file).toBe(true);
         } else {
@@ -848,6 +856,9 @@ describe("built site", () => {
     // One emblem on each edition page (the lead's) and on each topic page; one horizon on every page.
     expect(emblems).toBe(2 * ((4 * 2 + 2) + 8 * 2));
     expect(horizons).toBe(files.length);
+    // One dial on every page; ghosts only on the thin editions.
+    expect(rulers).toBe(files.length);
+    expect(ghostLayers).toBeGreaterThan(0);
     // Before the wordmark: 20 px, hidden from screen readers.
     const strip = page(DEMO, "").match(/<a class="wordmark"[\s\S]*?<\/svg>/)![0];
     expect(strip).toMatch(/<svg class="mark" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">/);
@@ -995,7 +1006,12 @@ describe("built site", () => {
     const bundle = readFileSync(join(root, "src", "components", "Scope.astro"), "utf8").match(/<script>([\s\S]*?)<\/script>/)![1];
     expect(bundle.trim().split(/\s*\n\s*/)).toEqual(['import "../scripts/scope";', 'import "../scripts/reading";']);
     const base = readFileSync(join(root, "src", "layouts", "Base.astro"), "utf8").match(/<script>([\s\S]*?)<\/script>/)![1];
-    expect(base.trim().split(/\s*\n\s*/)).toEqual(['import "../scripts/intro";', 'import "../scripts/palette";']);
+    expect(base.trim().split(/\s*\n\s*/)).toEqual([
+      'import "../scripts/intro";',
+      'import "../scripts/palette";',
+      'import "../scripts/board";',
+      'import "../scripts/sky";',
+    ]);
     for (const name of ["scope.ts", "reading.ts"]) {
       const source = readFileSync(join(root, "src", "scripts", name), "utf8");
       expect(source, name).toMatch(/\ntry \{\n[\s\S]*\n\} catch \{\n[\s\S]*\n\}\n$/);
@@ -1124,6 +1140,132 @@ describe("built site", () => {
         if (edition) expect(srcs[1], file).toMatch(/^\/_astro\/Scope[^"]+\.js$/);
       }
     }
+  });
+
+  it("the dial is a nav of four real links whose current station is marked in the markup, and the needle rests there by CSS", () => {
+    const dial = (html: string) => html.match(/<nav class="top-nav dial" aria-label="([^"]+)">([\s\S]*?)<\/nav>/)!;
+    const cases = [
+      ["", "tr", 0, "page"],
+      ["en", "en", 0, "page"],
+      ["arsiv", "tr", 1, "page"],
+      ["en/week", "en", 2, "page"],
+      ["kunye", "tr", 3, "page"],
+      // The newest edition is today's; an older one, a topic and a week are under their section.
+      ["2026-11-20", "tr", 0, "true"],
+      ["en/2026-11-18", "en", 1, "true"],
+      ["konu/model", "tr", 1, "true"],
+      ["hafta/2026-W47", "tr", 2, "true"],
+      ["abone", "tr", -1, ""],
+    ] as const;
+    for (const [path, lang, at, value] of cases) {
+      const [, label, inner] = dial(page(DEMO, path));
+      expect(label).toBe(COPY[lang].navLabel);
+      const links = [...inner.matchAll(/<li><a href="([^"]+)"( aria-current="(page|true)")?>([\s\S]*?)<\/a><\/li>/g)];
+      const r = routes[lang];
+      expect(links.map((l) => l[1]), path).toEqual([r.home, r.archive, r.weekIndex, r.about]);
+      expect(links.map((l) => text(l[4]))).toEqual([COPY[lang].nav.today, COPY[lang].nav.archive, COPY[lang].nav.week, COPY[lang].nav.about]);
+      links.forEach((l, i) => expect(l[3], `${path} ${i}`).toBe(i === at ? value : undefined));
+      // The scale and the needle are drawings.
+      expect(inner).toContain('<span class="dial-needle" aria-hidden="true"></span>');
+    }
+    const sheet = css();
+    for (let i = 1; i <= 4; i++) {
+      const resting = cssRule(sheet, `.dial:has(li:nth-child(${i}) > [aria-current]) .dial-needle`);
+      expect(resting).toContain(`--at: ${i};`);
+      expect(resting).toContain("visibility: visible;");
+      expect(cssRule(sheet, `.dial:has(li:nth-child(${i}) > a:is(:hover, :focus-visible)) .dial-needle`)).toContain(`--at: ${i};`);
+    }
+    const decls = declarations(sheet);
+    // On a phone: fixed to the window's foot, full width, 44px stations, clear of the home indicator,
+    // and the page keeps room under its footer.
+    const phone = (selector: string, prop: string) =>
+      decls.find((d) => d.selector === selector && d.prop === prop && d.stack[0] === "@media (max-width: 39.99em)")?.value;
+    expect(phone(".dial", "position")).toBe("fixed");
+    expect(phone(".dial", "bottom")).toBe("0");
+    expect(phone(".dial", "padding")).toContain("env(safe-area-inset-bottom)");
+    expect(phone(".dial-stations a", "min-height")).toBe("2.75rem");
+    expect(phone("body", "padding-bottom")).toBe("calc(4.25rem + env(safe-area-inset-bottom))");
+    // The needle and the language thumb glide between pages only with motion allowed.
+    for (const name of ["dial-needle", "lang-thumb"]) {
+      const named = decls.filter((d) => d.prop === "view-transition-name" && d.value === name);
+      expect(named.map((d) => d.stack[0])).toEqual(["@media (prefers-reduced-motion: no-preference)"]);
+    }
+    // The language switch is a slider: its thumb lies under the current part.
+    expect(langControl(page(DEMO, "")).inner).toContain('<span class="lang-thumb" aria-hidden="true"></span>');
+    expect(cssRule(sheet, ".lang:has(> .lang-part:nth-child(2)[aria-current]) .lang-thumb")).toContain("translate: 100% 0;");
+  });
+
+  it("a thin edition's scope shows earlier stories as ghosts after its own blips, and every scope has a readout panel for the eye only", () => {
+    // 19 Nov has two stories: the ghosts are 18 Nov's four and 17 Nov's three.
+    const html = page(DEMO, "2026-11-19");
+    const rail = html.match(/<div class="scope-rail">([\s\S]*?)<\/ol>\s*<\/div>\s*<\/div>/)![1];
+    const ghosts = [...rail.matchAll(/<a class="ghost g-(\d+)" href="([^"]+)" aria-labelledby="scope-g-(\d+)">/g)];
+    expect(ghosts).toHaveLength(7);
+    expect(ghosts.map((g) => g[2].split("#")[0])).toEqual([...Array(4).fill("/2026-11-18/"), ...Array(3).fill("/2026-11-17/")]);
+    for (const [, n, href, named] of ghosts) {
+      expect(named).toBe(n);
+      const target = articles(page(DEMO, href.split("/")[1])).find((a) => a.includes(`id="${href.split("#")[1]}"`))!;
+      const title = text(target.match(/<h2[^>]*>([\s\S]*?)<\/h2>/)![1]);
+      const line = rail.match(new RegExp(`<span class="readout-ghost u-${n}" id="scope-g-${n}"><span class="readout-when">([^<]*)</span>([^<]*)</span>`))!;
+      expect(line, n).not.toBeNull();
+      expect(line[1]).toBe(COPY.tr.scope.earlier(href.startsWith("/2026-11-18/") ? "18 Kas" : "17 Kas"));
+      expect(text(line[2])).toBe(title);
+    }
+    // After the day's own blips in the document, so after them for Tab.
+    expect(rail.lastIndexOf('<a class="blip ')).toBeLessThan(rail.indexOf('<a class="ghost '));
+    // An edition of five or more has none; never more than eight.
+    expect(page(DEMO, "2026-11-20")).not.toContain('class="ghost ');
+    expect(GHOST_LIMIT).toBe(8);
+    // The panel: one row per story, the blip's link, out of the tab order and of the accessibility tree.
+    for (const path of ["", "en/2026-11-18", "2026-11-19"]) {
+      const edition = page(DEMO, path);
+      const panel = edition.match(/<div class="scope-panel label" aria-hidden="true" hidden>([\s\S]*?)<\/ol>/)![1];
+      const rows = [...panel.matchAll(/<a class="panel-row panel-grid r-(\d+)" href="([^"]+)" tabindex="-1"><span class="pr-no">(\d\d)<\/span><span>(\d{3})°<\/span><span>(\d+)<\/span>/g)];
+      const list = articles(edition);
+      expect(rows.map((r) => r[2]), path).toEqual(list.map((a) => `#${a.match(/<article id="([^"]+)"/)![1]}`));
+      rows.forEach((r, i) => expect(Number(r[5])).toBe(sourceCount(list[i])));
+    }
+    const sheet = css();
+    expect(sheet).toContain(".scope-rail:has(.r-16:hover) .b-16 .blip-dot");
+    expect(sheet).toContain(".scope-rail:has(.b-16:is(:hover, :focus-visible)) .r-16");
+    expect(cssRule(sheet, ".scope-panel")).toContain("display: none;");
+  });
+
+  it("each story carries three signal bars with a name, lit by its source count", () => {
+    for (const path of ["", "en/2026-11-18", "hafta/2026-W47"]) {
+      const lang = path.startsWith("en") ? "en" : "tr";
+      for (const article of articles(page(DEMO, path))) {
+        const bars = article.match(/<span class="bars bars-([123])" role="img" aria-label="([^"]+)"><span><\/span><span><\/span><span><\/span><\/span>/)!;
+        expect(bars, path).not.toBeNull();
+        const level = signalLevel(sourceCount(article));
+        expect(Number(bars[1])).toBe(level);
+        expect(bars[2]).toBe(COPY[lang].signal[level - 1]);
+      }
+    }
+  });
+
+  it("the horizon keeps Istanbul's hours by script and shows the day without it", () => {
+    const horizon = page(DEMO, "").match(/<svg class="horizon"[\s\S]*?<\/svg>/)![0];
+    for (const part of ["hz-sun", "hz-moon", "hz-win"]) expect(horizon).toContain(`hz-line ${part === "hz-win" ? "hz-fine hz-win" : part}"`);
+    const sheet = css();
+    expect(cssRule(sheet, ".hz-moon,\nhtml.night :is(.hz-sun, .hz-bird)")).toContain("display: none;");
+    expect(cssRule(sheet, "html.night .hz-win")).toContain("stroke: var(--accent);");
+    const sky = readFileSync(join(root, "src", "scripts", "sky.ts"), "utf8");
+    expect(sky).toContain("(new Date().getUTCHours() + 3) % 24");
+    expect(sky).not.toMatch(/\bfetch\(|XMLHttpRequest/);
+  });
+
+  it("the departure board flips only with motion allowed and not paused, keeping the real text for assistive tech", () => {
+    const board = readFileSync(join(root, "src", "scripts", "board.ts"), "utf8");
+    expect(board).toContain('matchMedia("(prefers-reduced-motion: reduce)")');
+    expect(board).toContain('root.classList.contains("still")');
+    expect(board).toContain('real.className = "visually-hidden"');
+    expect(board).toContain('show.setAttribute("aria-hidden", "true")');
+    expect(board).toContain("el.replaceChildren(text)");
+    // The masthead's text is in the page from the start.
+    expect(h1(page(DEMO, "2026-11-18"))).toMatch(/18 Kasım/);
+    const palette = readFileSync(join(root, "src", "scripts", "palette.ts"), "utf8");
+    expect(palette).toContain('=== "ping"');
   });
 
   it("all the scripts of a build together are at most 30 000 bytes", () => {
@@ -1495,7 +1637,7 @@ describe("built site", () => {
     // The navigation and the footer name the page.
     for (const [path, lang] of [["", "tr"], ["en", "en"]] as const) {
       const html = page(DEMO, path);
-      const nav = html.match(/<nav class="top-nav">([\s\S]*?)<\/nav>/)![1];
+      const nav = html.match(/<nav class="top-nav dial"[^>]*>([\s\S]*?)<\/nav>/)![1];
       expect(nav).toContain(`<a href="${lang === "tr" ? "/kunye/" : "/en/about/"}">${COPY[lang].nav.about}</a>`);
       const foot = html.match(/<footer[\s\S]*?<\/footer>/)![0];
       expect(foot).toContain(`<a href="${lang === "tr" ? "/kunye/" : "/en/about/"}">${COPY[lang].nav.about}</a>`);
@@ -1910,6 +2052,8 @@ describe("built site", () => {
         "@keyframes bird-drift",
         "@keyframes vt-scan",
         "@keyframes ns-draw",
+        "@keyframes check-in",
+        "@keyframes ping",
       ]),
     );
     const fades = keyframes.filter((d) => d.prop === "opacity");
