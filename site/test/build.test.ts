@@ -1917,7 +1917,7 @@ describe("built site", () => {
       expect(shadow.value === "none" || /^\d+px \d+px 0 var\(--ink\)$/.test(shadow.value), shadow.value).toBe(true);
       for (const part of shadow.selector.split(",").map((x) => x.trim())) {
         expect(part.replace(/:(hover|focus-visible|active)$/, "").replace(/\[aria-current="page"\]$/, "")).toMatch(
-          /^(\.story-lead \.try|\.(story-lead|scope|search-box|subscribe|try|palette|keys|pitch-mark))$/,
+          /^(\.story-lead \.try|\.(story-lead|scope|search-box|subscribe|try|palette|keys))$/,
         );
         if (part.startsWith(".story-lead .try")) expect(shadow.value).toBe("none");
       }
@@ -1969,11 +1969,7 @@ describe("built site", () => {
     const gradients = declarations(sheets()).filter((d) => /gradient\(/.test(d.value));
     expect(gradients.map((d) => `${d.selector} ${d.prop}`)).toEqual([".scope-sweep background"]);
     expect(gradients[0].value).toMatch(/^conic-gradient\(transparent 0deg \d+deg, var\(--sweep\) 360deg\)$/);
-    expect(sheets().replace(gradients[0].value, "")).not.toMatch(/gradient\(|backdrop-filter|filter:\s*drop-shadow/);
-    // One text-shadow on the site: the home page headline's hard accent extrusion (and its reset on the plate).
-    const lifted = declarations(sheets()).filter((d) => d.prop === "text-shadow");
-    expect(lifted.map((d) => d.selector).sort()).toEqual([".pitch-lead", ".pitch-mark"]);
-    for (const d of lifted) expect(d.value === "none" || /^(\d+px \d+px 0 var\(--accent\),?\s*)+$/.test(d.value), d.value).toBe(true);
+    expect(sheets().replace(gradients[0].value, "")).not.toMatch(/gradient\(|backdrop-filter|filter:\s*drop-shadow|text-shadow/);
   });
 
   it("every animation and transition sits inside a reduced-motion or @supports guard", () => {
@@ -1991,7 +1987,7 @@ describe("built site", () => {
     // or slower. Each loops only with motion allowed, only with script (html.js: where the pause
     // button exists; without script the scope and the horizon stand still), and never once the
     // reader has paused (html.still). Stopped, each rests on its plain frame: no animation at all.
-    const LOOPED = [".blip-echo", ".hz-bird", ".hz-turn", ".readout-line", ".scope-sweep"];
+    const LOOPED = [".blip-echo", ".hz-bird", ".hz-turn", ".pitch-beam", ".pitch-rig", ".readout-line", ".scope-sweep"];
     const GATE = "html.js:not(.still) ";
     expect(sheets()).not.toMatch(/alternate/);
     const loops = decls.filter((d) => /infinite/.test(d.value));
@@ -2053,6 +2049,8 @@ describe("built site", () => {
         "@keyframes screen-off",
         "@keyframes emblem-lift",
         "@keyframes dish-turn",
+        "@keyframes pitch-turn",
+        "@keyframes pitch-float",
         "@keyframes bird-drift",
         "@keyframes vt-scan",
         "@keyframes ns-draw",

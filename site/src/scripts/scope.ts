@@ -96,6 +96,10 @@ try {
     reading(scope);
     idle(scope);
   }
+  // The home page's introduction: the same tilt, on its little radar table.
+  const stage = document.querySelector<HTMLElement>(".pitch-stage");
+  const rig = stage?.querySelector<HTMLElement>(".pitch-rig");
+  if (stage && rig) tilt(stage, rig);
 } catch {
   // The scope is still its markup and stylesheet: links, rings and readout.
 }

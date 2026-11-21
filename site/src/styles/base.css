@@ -474,12 +474,30 @@ a.lang-part:focus-visible {
 }
 
 /* An empty state: a dashed frame and a comment's slashes, in the label face. */
-/* What Radar is, once, at the top of the home page (Pitch.astro): no box, a headline set like
-   raised type. Its letters stand on a short accent extrusion (the site's one text-shadow, hard,
-   never blurred), and the marked words are a tilted plate with its own hard shadow that presses
-   flat under the pointer. */
+/* What Radar is, once, at the top of the home page (Pitch.astro): the statement, and beside it a
+   small radar table in three dimensions. The rig is one plane tipped back and turned
+   (preserve-3d); the dish is a slab (six ink discs under a white one), its ground shadow lies
+   well below it, and three plates stand over it on poles, turned back to face the reader. The
+   pointer tips the rig a little (scripts/scope.ts, --tilt-x / --tilt-y). */
 .pitch {
+  display: grid;
+  gap: var(--space-4);
+  align-items: center;
   margin: var(--space-5) 0 var(--space-6);
+}
+
+/* On a phone the table is two thirds the size, so the day's edition is not pushed off the screen. */
+@media (max-width: 47.99rem) {
+  .pitch {
+    --pitch-scale: 0.66;
+  }
+}
+
+@media (min-width: 48rem) {
+  .pitch {
+    grid-template-columns: minmax(0, 1fr) 21rem;
+    gap: var(--space-5);
+  }
 }
 
 .pitch-label {
@@ -494,46 +512,24 @@ a.lang-part:focus-visible {
 
 .pitch-lead {
   margin: 0;
-  max-width: 16em;
   font-family: var(--font-display);
-  font-size: clamp(1.875rem, 8.4vw, 3rem);
+  font-size: clamp(1.625rem, 6.4vw, 2.25rem);
   font-weight: 800;
   line-height: 1.12;
   letter-spacing: -0.015em;
-  text-shadow:
-    1px 1px 0 var(--accent),
-    2px 2px 0 var(--accent),
-    3px 3px 0 var(--accent);
   text-wrap: balance;
 }
 
 .pitch-mark {
-  display: inline-block;
-  margin: 0 0.12em 0.12em 0;
-  padding: 0 0.22em 0.04em;
-  border: 2px solid var(--ink);
-  background: var(--surface);
-  box-shadow: 5px 5px 0 var(--ink);
   font-style: normal;
-  text-shadow: none;
-  rotate: -2deg;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .pitch-mark {
-    transition:
-      translate 120ms ease-out,
-      box-shadow 120ms ease-out;
-  }
-}
-
-.pitch-mark:hover {
-  translate: 5px 5px;
-  box-shadow: 0px 0px 0 var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 0.12em;
+  text-underline-offset: 0.14em;
 }
 
 .pitch-sub {
-  margin: var(--space-4) 0 0;
+  margin: var(--space-3) 0 0;
   color: var(--muted);
   font-family: var(--font-label);
   font-size: 0.8125rem;
@@ -545,8 +541,184 @@ a.lang-part:focus-visible {
 }
 
 .pitch-more {
-  margin-left: var(--space-2);
   white-space: nowrap;
+}
+
+.pitch-stage {
+  display: grid;
+  place-items: end center;
+  height: calc(18.5rem * var(--pitch-scale, 1));
+  padding-bottom: calc(4.5rem * var(--pitch-scale, 1));
+  perspective: 60rem;
+}
+
+.pitch-rig {
+  --rx: 60deg;
+  --rz: -24deg;
+  position: relative;
+  width: calc(15rem * var(--pitch-scale, 1));
+  height: calc(15rem * var(--pitch-scale, 1));
+  margin-bottom: calc(-3.75rem * var(--pitch-scale, 1));
+  transform: rotateX(calc(var(--rx) + var(--tilt-x, 0deg))) rotateZ(calc(var(--rz) + var(--tilt-y, 0deg)));
+  transform-style: preserve-3d;
+}
+
+.pitch-shadow,
+.pitch-edge,
+.pitch-disc {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+}
+
+.pitch-shadow {
+  background: var(--line);
+  transform: translateZ(calc(-2.75rem * var(--pitch-scale, 1)));
+}
+
+.pitch-edge {
+  background: var(--ink);
+}
+
+.pitch-edge-1 {
+  transform: translateZ(-2px);
+}
+
+.pitch-edge-2 {
+  transform: translateZ(-4px);
+}
+
+.pitch-edge-3 {
+  transform: translateZ(-6px);
+}
+
+.pitch-edge-4 {
+  transform: translateZ(-8px);
+}
+
+.pitch-edge-5 {
+  transform: translateZ(-10px);
+}
+
+.pitch-edge-6 {
+  transform: translateZ(-12px);
+}
+
+.pitch-disc {
+  border: 2px solid var(--ink);
+  background: var(--surface);
+}
+
+.pitch-ring,
+.pitch-hub {
+  position: absolute;
+  border-radius: 50%;
+}
+
+.pitch-ring {
+  border: 1.5px solid var(--control-border);
+}
+
+.pitch-ring-1 {
+  inset: 17%;
+}
+
+.pitch-ring-2 {
+  inset: 34%;
+  border-color: var(--ink);
+}
+
+.pitch-hub {
+  inset: calc(50% - 0.25rem);
+  background: var(--ink);
+}
+
+.pitch-beam {
+  position: absolute;
+  top: calc(50% - 1px);
+  left: 50%;
+  width: 50%;
+  height: 2px;
+  background: var(--accent);
+  transform-origin: 0 50%;
+  rotate: -50deg;
+}
+
+.pitch-specs {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  transform-style: preserve-3d;
+}
+
+/* A pin: a point on the dish, with its blip; the plate stands --h above it. */
+.pitch-pin {
+  position: absolute;
+  width: 0;
+  height: 0;
+  transform-style: preserve-3d;
+}
+
+.pitch-pin::before {
+  content: "";
+  position: absolute;
+  top: -0.3125rem;
+  left: -0.3125rem;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.pitch-pin-1 {
+  --h: calc(6rem * var(--pitch-scale, 1));
+  top: 30%;
+  left: 20%;
+}
+
+.pitch-pin-2 {
+  --h: calc(4rem * var(--pitch-scale, 1));
+  top: 32%;
+  left: 82%;
+}
+
+.pitch-pin-3 {
+  --h: calc(0.875rem * var(--pitch-scale, 1));
+  top: 90%;
+  left: 42%;
+}
+
+/* The plate undoes the rig's turn, so it faces the reader; its pole is the plate's own, drawn
+   straight down for the height as the tipped rig shows it. */
+.pitch-plate {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  width: max-content;
+  padding: 0.25rem 0.5rem;
+  border: 1.5px solid var(--ink);
+  background: var(--surface);
+  font-family: var(--font-label);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.35;
+  text-transform: uppercase;
+  transform: translateZ(var(--h)) rotateZ(calc(0deg - var(--rz) - var(--tilt-y, 0deg)))
+    rotateX(calc(0deg - var(--rx) - var(--tilt-x, 0deg))) translate(-50%, -100%) translateY(calc(var(--h) * -0.02));
+}
+
+.pitch-plate::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: calc(50% - 0.75px);
+  width: 1.5px;
+  height: calc(var(--h) * 0.86);
+  background: var(--ink);
 }
 
 .empty {
@@ -3191,6 +3363,15 @@ kbd {
 
   /* The horizon's dish turns once a minute's third, its birds glide on their own slow courses.
      Paused, the dish faces the reader and the birds hold their places. */
+  /* The introduction's table: its beam turns and the whole rig floats a little. Paused, both hold. */
+  html.js:not(.still) .pitch-beam {
+    animation: pitch-turn 6s linear infinite;
+  }
+
+  html.js:not(.still) .pitch-rig {
+    animation: pitch-float 6s ease-in-out infinite;
+  }
+
   html.js:not(.still) .hz-turn {
     animation: dish-turn 20s ease-in-out infinite;
   }
@@ -3366,6 +3547,27 @@ kbd {
 }
 
 /* A full turn of the dish seen from the side: it faces away, edge on, then back. */
+@keyframes pitch-turn {
+  from {
+    rotate: -50deg;
+  }
+
+  to {
+    rotate: 310deg;
+  }
+}
+
+@keyframes pitch-float {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+
+  50% {
+    translate: 0 -0.375rem;
+  }
+}
+
 @keyframes dish-turn {
   0%,
   100% {
@@ -3447,6 +3649,8 @@ kbd {
   html.intro body::before,
   .ink-go .ink-w,
   .is-off .screen-off,
+  html.js:not(.still) .pitch-beam,
+  html.js:not(.still) .pitch-rig,
   html.js:not(.still) .hz-turn,
   html.js:not(.still) .hz-bird,
   .em-mid .em-face,

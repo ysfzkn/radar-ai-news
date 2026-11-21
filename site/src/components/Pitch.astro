@@ -1,6 +1,9 @@
 ---
-// What Radar is, said once at the top of the home page, for a reader who has just arrived: a
-// headline set like raised type, with its three facts on one mono line under it.
+// What Radar is, said once at the top of the home page, for a reader who has just arrived: the
+// statement, and beside it a small radar table built in three dimensions. The dish is a slab seen
+// from above at an angle, its beam turns, and Radar's three promises stand over it as plates on
+// poles, each over its own blip. The promises are spelled out in the paragraph; the table is
+// decoration.
 import { COPY } from "../lib/copy";
 import { routes } from "../lib/routes";
 import type { Lang } from "../lib/schema";
@@ -14,18 +17,42 @@ const [before, marked, after] = pitch.lead;
 ---
 
 <section class="pitch" aria-label={pitch.label}>
-  <p class="pitch-label">))) {pitch.label}</p>
-  <p class="pitch-lead">{before}<em class="pitch-mark">{marked}</em>{after}</p>
-  <p class="pitch-sub">
-    {pitch.sub}
-    {
-      pitch.specs.map((s) => (
-        <>
-          {" "}
-          <b>{s.k}:</b> {s.v}.
-        </>
-      ))
-    }
-    <a class="pitch-more" href={routes[lang].about}>{pitch.more} →</a>
-  </p>
+  <div class="pitch-copy">
+    <p class="pitch-label">))) {pitch.label}</p>
+    <p class="pitch-lead">{before}<em class="pitch-mark">{marked}</em>{after}</p>
+    <p class="pitch-sub">
+      {pitch.sub}
+      {
+        pitch.specs.map((s) => (
+          <>
+            {" "}
+            <b>{s.k}:</b> {s.v}.
+          </>
+        ))
+      }
+      {" "}
+      <a class="pitch-more" href={routes[lang].about}>{pitch.more} →</a>
+    </p>
+  </div>
+  <div class="pitch-stage">
+    <div class="pitch-rig">
+      <span class="pitch-shadow" aria-hidden="true"></span>
+      {[1, 2, 3, 4, 5, 6].map((n) => <span class={`pitch-edge pitch-edge-${n}`} aria-hidden="true" />)}
+      <div class="pitch-disc" aria-hidden="true">
+        <span class="pitch-ring pitch-ring-1"></span>
+        <span class="pitch-ring pitch-ring-2"></span>
+        <span class="pitch-hub"></span>
+        <span class="pitch-beam"></span>
+      </div>
+      <div class="pitch-specs" aria-hidden="true">
+        {
+          pitch.specs.map((s, i) => (
+            <span class={`pitch-pin pitch-pin-${i + 1}`}>
+              <span class="pitch-plate">{s.k}</span>
+            </span>
+          ))
+        }
+      </div>
+    </div>
+  </div>
 </section>
