@@ -3,7 +3,11 @@
 // 1. A pointer tilt of at most 6°, eased, for a fine pointer only and never under reduced motion,
 //    passed to the stylesheet as --tilt-x / --tilt-y.
 // 2. A blip turns hollow (`is-read`) once its story has been on screen for 2 s.
-// It also stops the sweep while the scope is out of view.
+// It also stops the sweep while the scope is out of view, and on the home page, where the scope is
+// the hero's radar, lets the hero rise into place once the opening's cover lifts.
+
+// The home page's search field comes in the same bundle (the scope is on the home page).
+import "./desk";
 
 const MAX_TILT = 6;
 const READ_AFTER = 2000;
@@ -87,7 +91,26 @@ function idle(scope: HTMLElement): void {
   new IntersectionObserver(([entry]) => scope.classList.toggle("is-away", !entry.isIntersecting)).observe(scope);
 }
 
+// On the home page the radar is the hero's: once the opening's cover lifts (boot.js, intro.ts take
+// the class `intro` off the root), its words and the instrument rise into place, once.
+function handOver(hero: Element): void {
+  const root = document.documentElement;
+  if (!root.classList.contains("intro")) return;
+  new MutationObserver((_, watch) => {
+    if (root.classList.contains("intro")) return;
+    watch.disconnect();
+    hero.classList.add("is-entering");
+  }).observe(root, { attributeFilter: ["class"] });
+}
+
 // Its own failure stays its own: the opening and the reading details in the same bundle go on.
+try {
+  const hero = document.querySelector(".hero");
+  if (hero) handOver(hero);
+} catch {
+  // The hero stands as it is.
+}
+
 try {
   const scope = document.querySelector<HTMLElement>(".scope");
   const dish = scope?.querySelector<HTMLElement>("[data-scope-dish]");

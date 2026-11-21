@@ -41,6 +41,20 @@ export const MIN_GAP: Record<Ring, number> = { 1: 50, 2: 27, 3: 22 };
  */
 export const RING_CAPACITY = ([1, 2, 3] as Ring[]).reduce((n, ring) => n + Math.floor(360 / MIN_GAP[ring]), 0);
 
+/**
+ * How high a ring's blips stand above the face, in drawing units: the louder a story, the taller.
+ * The stylesheet raises each ring's layer by as much (0.431cqi a unit: the drawing is 86.2% of
+ * the dish), and the plate draws each blip's shadow where the light from the upper left drops it.
+ */
+export const RING_LIFT: Record<Ring, number> = { 1: 32, 2: 23, 3: 14 };
+
+/** A blip's shadow on the face: down and to the right of its foot, by its height. */
+export function shadowPoint(ring: Ring, angle: number): { x: number; y: number } {
+  const { x, y } = blipPoint(ring, angle);
+  const lift = RING_LIFT[ring];
+  return { x: round(x + lift * 0.42), y: round(y + lift * 0.3) };
+}
+
 /** Sources per ring: the louder a story, the nearer the centre. */
 export const RING_SOURCES: Record<Ring, string> = { 1: "5+", 2: "3–4", 3: "1–2" };
 

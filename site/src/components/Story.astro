@@ -19,11 +19,14 @@ interface Props {
   lead?: boolean;
   /** Show the date in the label row: on week pages, where stories come from several days. */
   showDate?: boolean;
+  /** The title's heading level: 3 under the home page's topic headings, else 2. */
+  level?: 2 | 3;
 }
 
 const SOURCE_LIMIT = 4;
 
-const { lang, story, index, date, lead = false, showDate = false } = Astro.props;
+const { lang, story, index, date, lead = false, showDate = false, level = 2 } = Astro.props;
+const Title = level === 3 ? "h3" : "h2";
 const copy = COPY[lang];
 const text = story.texts[lang]!;
 
@@ -50,7 +53,7 @@ const no = String(index).padStart(2, "0");
     <span class="signal"><Echo lang={lang} count={story.source_count} /><Bars lang={lang} count={story.source_count} /></span>
   </p>
   {lead && <Emblem category={story.category} size={56} />}
-  <h2 class="story-title">{text.title}</h2>
+  <Title class="story-title">{text.title}</Title>
   <p class="story-summary">{text.summary}</p>
   <p class="story-why">
     <span class="why-label label caps">{copy.whyItMatters}</span><span class="visually-hidden">{copy.labelColon}</span>{" "}

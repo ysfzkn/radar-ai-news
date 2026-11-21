@@ -476,333 +476,613 @@ a.lang-part:focus-visible {
   font-weight: 600;
 }
 
-/* The home page's first screen (Hero.astro, scripts/hero.ts): what Radar is, set large over a radar
-   globe that fills the screen. The one place the site lets light in: a warm ground with gradients,
-   soft shadows and a veil of light behind the words; everywhere else stays flat ink on paper.
-   The section breaks out of the reading column to the window's edges (100cqw of the body) and is a screen tall less the top strip (on a phone, less the dial too).
-   The globe's box (.hero-globe) is BOX = 3.6 radii square: the build's SVG fills it, and the
-   script reads its place and size to draw the same globe on the canvas, which covers the section.
-   Desktop: the words on the left, the globe on the right, its edge running off the window. */
+/* The top of the home page (Hero.astro): what Radar is, in one line, beside the day's radar.
+   On a wide screen the words stand on the left and the radar on the right, in a band a little
+   wider than the reading column, about half a screen tall; the stories follow at once. On a phone
+   the words come first and the radar under them, tipped further back, wide and low. The band's
+   ground is the page's own, lit round the radar. */
 .hero {
-  --hero-h: max(36rem, calc(100svh - 7.75rem));
-  --hero-pad: max(var(--gutter), calc(50cqw - 37rem));
-  --hero-veil: 247 244 236;
+  --hero-w: min(58rem, 100cqw - 2 * var(--gutter));
   position: relative;
-  isolation: isolate;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  height: var(--hero-h);
-  margin: 0 calc(50% - 50cqw) var(--space-6);
-  padding: var(--space-6) var(--hero-pad) var(--space-7);
-  overflow: clip;
-  border-bottom: 1px solid #d8cfbf;
-  background:
-    radial-gradient(ellipse 55% 70% at 76% 44%, #fffdf7 0%, rgb(255 253 247 / 0) 72%),
-    linear-gradient(180deg, var(--bg) 0%, #f2ede3 58%, #e8e0d1 100%);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding-block: var(--space-4) var(--space-2);
+  /* The radar's sweep turns in a square box; nothing of it may widen the page. */
+  overflow-x: clip;
 }
 
-.hero-stage {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-}
-
-.hero-globe {
-  --g: min(calc(var(--hero-h) * 1.62), 130cqw);
-  position: absolute;
-  top: calc(47% - var(--g) / 2);
-  left: calc(100% - var(--g) * 0.76);
-  width: var(--g);
-  height: var(--g);
-}
-
-.hero-layer {
-  position: absolute;
-  inset: 0;
-  display: block;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-}
-
-.hero-bearings {
-  font-family: var(--font-label);
-  font-size: 3.8px;
-  font-weight: 600;
-  fill: #5a5e66;
-}
-
-.hero-pin text {
-  font-family: var(--font-label);
-  font-size: 3.6px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  fill: var(--ink);
-}
-
-/* With the script the canvas takes the still frame's place, and the labels follow the pins. */
-.hero-canvas,
-.hero-tags,
-.hero.is-live .hero-still {
-  display: none;
-}
-
-.hero.is-live .hero-canvas,
-.hero.is-live .hero-tags {
-  display: block;
-}
-
-.hero-tags {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-/* Each label stands where hero.ts puts its pin's head (--at) and shows as strongly as it says
-   (--on: by the side of the globe the pin is on and how lately the sweep passed it). */
-.hero-tag {
-  position: absolute;
-  top: 0;
-  left: 0;
-  opacity: var(--on, 0);
-  translate: var(--at, 0 0);
-  will-change: translate, opacity;
-}
-
-/* A label: a small white plate above and to the right of its pin's head (left of it near the
-   window's right edge), the number in the accent, the category, and on wide screens the title. */
-.hero-tag-in {
-  display: block;
-  width: max-content;
-  max-width: 17rem;
-  padding: 0.3rem 0.5rem 0.35rem;
-  border: 1px solid var(--ink);
-  border-radius: 2px;
-  background: rgb(255 255 255 / 0.92);
-  box-shadow: 0 6px 18px -6px rgb(40 30 20 / 0.35);
-  color: var(--ink);
-  font-family: var(--font-label);
-  font-size: 0.6875rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  line-height: 1.35;
-  text-transform: uppercase;
-  translate: 0.7rem calc(-100% - 0.45rem);
-}
-
-.hero-tag.is-left .hero-tag-in {
-  translate: calc(-100% - 0.7rem) calc(-100% - 0.45rem);
-}
-
-.hero-tag-in b {
-  color: var(--accent);
-}
-
-.hero-tag-title {
-  display: none;
-}
-
-@media (min-width: 64rem) {
-  .hero-tag-title {
-    display: block;
-    overflow: hidden;
-    margin-top: 0.125rem;
-    font-family: var(--font-body);
-    font-size: 0.8125rem;
-    font-weight: 500;
-    letter-spacing: 0;
-    text-overflow: ellipsis;
-    text-transform: none;
-    white-space: nowrap;
-  }
-}
-
-/* The words, over a veil of the ground's light so they read whatever the globe does behind. */
 .hero-copy {
-  position: relative;
-  max-width: min(37rem, 50cqw);
-}
-
-.hero-copy::before {
-  content: "";
-  position: absolute;
-  inset: -4rem -6rem -4rem -10rem;
-  z-index: -1;
-  background: radial-gradient(closest-side, rgb(var(--hero-veil) / 0.94) 55%, rgb(var(--hero-veil) / 0));
+  max-width: 34rem;
 }
 
 .hero-label {
-  margin: 0 0 var(--space-4);
-  color: var(--accent);
-  font-family: var(--font-label);
-  font-size: 0.8125rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: var(--space-2);
+  color: var(--muted);
+  font-size: 0.75rem;
   font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  letter-spacing: 0.12em;
 }
 
-.hero-lead {
-  margin: 0;
+.hero-arcs {
+  color: var(--accent);
+  letter-spacing: -0.12em;
+}
+
+/* The two promises are the slogan, set large, each on its line with the accent's full stop. */
+.hero-slogan {
   font-family: var(--font-display);
-  font-size: clamp(2.375rem, 5.4vw, 4.25rem);
+  font-size: clamp(2rem, 9vw, 2.5rem);
   font-weight: 800;
-  line-height: 1.02;
-  letter-spacing: -0.032em;
-  text-wrap: balance;
+  line-height: 1;
+  letter-spacing: -0.035em;
+}
+
+.hero-slogan > span {
+  display: block;
+}
+
+.hero-stop {
+  color: var(--accent);
+}
+
+/* What Radar is: one line under the slogan. */
+.hero-lead {
+  margin-top: var(--space-3);
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
 }
 
 .hero-mark {
   font-style: normal;
   text-decoration: underline;
   text-decoration-color: var(--accent);
-  text-decoration-thickness: 0.09em;
-  text-underline-offset: 0.1em;
+  text-decoration-thickness: 0.12em;
+  text-underline-offset: 0.16em;
   text-decoration-skip-ink: none;
 }
 
-.hero-promise {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.25rem 0.75rem;
-  margin: var(--space-5) 0 0;
-  font-family: var(--font-display);
-  font-size: clamp(1.125rem, 1.9vw, 1.4rem);
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-
-.hero-dot {
-  width: 0.4rem;
-  height: 0.4rem;
-  border-radius: 50%;
-  background: var(--accent);
-}
-
-.hero-act {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-3) var(--space-5);
-  margin: var(--space-6) 0 0;
-}
-
-.hero-jump {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.6rem;
-  min-height: 3rem;
-  padding: 0.75rem 1.4rem;
-  border-radius: 999px;
-  background: var(--ink);
-  box-shadow:
-    0 14px 28px -12px rgb(23 24 26 / 0.55),
-    inset 0 1px 0 rgb(255 255 255 / 0.14);
-  color: var(--surface);
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.hero-jump:hover,
-.hero-jump:focus-visible {
-  background: var(--accent);
-}
-
 .hero-more {
-  padding-block: 0.6rem;
-  font-weight: 600;
+  margin-top: var(--space-1);
+  font-size: 0.8125rem;
 }
 
-/* The instrument's readout along the foot, and the pause for the globe's motion at the right. */
-.hero-foot {
-  position: absolute;
-  right: var(--hero-pad);
-  bottom: var(--space-4);
-  left: var(--hero-pad);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 var(--space-5);
+.hero-more a {
+  display: inline-block;
+  padding-block: 0.375rem;
   color: var(--muted);
-  font-size: 0.75rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  text-decoration-color: var(--control-border);
 }
 
-.hero-still-toggle {
+.hero-more a:hover {
+  color: var(--ink);
+  text-decoration-color: var(--accent);
+}
+
+/* The radar in the hero: no card round it, the instrument stands on the band's ground. Its head
+   names the section for assistive tech only; the readout panel is the edition pages' own. */
+.hero .scope {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.hero .scope-head {
   position: absolute;
-  right: var(--hero-pad);
-  bottom: 0.625rem;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
-.hero-next {
-  scroll-margin-top: var(--space-4);
+.hero .scope-panel {
+  display: none;
 }
 
-/* A phone, or a screen taller than wide: the globe above, running off the top and the sides, the
-   words under it, everything clear of the dial at the window's foot. */
-@media (max-width: 47.99rem), (orientation: portrait) and (max-width: 64rem) {
+.hero .readout-idle,
+.hero .readout-line,
+.hero .readout-ghost {
+  background: var(--bg);
+}
+
+.hero .scope-readout {
+  border-top-color: transparent;
+}
+
+.hero:not(:has(.hero-radar)) {
+  padding-bottom: var(--space-5);
+}
+
+/* The home page's masthead: the same h1, set small at the top of the hero as the radar's
+   dateline (the issue pill, the date, the counts). */
+.hero .masthead {
+  --mh-size: 0.8125rem;
+  align-items: center;
+  row-gap: var(--space-1);
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  border: 0;
+}
+
+.hero .masthead::before,
+.hero .masthead::after {
+  content: none;
+}
+
+.hero .mh-no {
+  margin: 0 0.25rem 0 0;
+  padding: 0.0625rem 0.5rem;
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+}
+
+.hero .mh-big {
+  font-size: 0.9375rem;
+  letter-spacing: -0.005em;
+}
+
+.hero .mh-year {
+  order: 2;
+  margin: 0;
+}
+
+.hero .mh-year + .mh-big {
+  order: 2;
+}
+
+.hero .mh-rest {
+  margin: 0;
+}
+
+/* A phone: the radar is as wide as the column and tipped back to 63°, so it is wide and low; its
+   readout keeps one line, and the caption goes (the pause stays under it). */
+@media (max-width: 47.99rem) {
+  .hero .scope {
+    --tip: 63deg;
+    --up: 2.2;
+    --stem-1: 72;
+    --stem-2: 51;
+    --stem-3: 31;
+  }
+
   .hero {
-    --hero-h: max(26rem, calc(100svh - 10rem - env(safe-area-inset-bottom)));
-    justify-content: flex-end;
-    padding-bottom: 3.75rem;
-    background:
-      radial-gradient(ellipse 90% 45% at 50% 26%, #fffdf7 0%, rgb(255 253 247 / 0) 75%),
-      linear-gradient(180deg, var(--bg) 0%, #f2ede3 50%, #e8e0d1 100%);
+    gap: 0;
+    padding-top: var(--space-2);
   }
 
-  .hero-globe {
-    --g: min(200cqw, calc(var(--hero-h) * 1.2));
-    top: calc(26% - var(--g) / 2);
-    left: calc(50% - var(--g) / 2);
-  }
-
+  /* The words: the dateline, the slogan with the quiet link at its foot on the right, the line. */
   .hero-copy {
-    max-width: 34rem;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
   }
 
-  .hero-copy::before {
-    inset: -3rem -2rem -2rem;
-    background: linear-gradient(180deg, rgb(var(--hero-veil) / 0), rgb(var(--hero-veil) / 0.92) 22%);
+  .hero-copy > * {
+    grid-column: 1 / -1;
   }
 
-  .hero-act {
-    margin-top: var(--space-5);
+  .hero .masthead {
+    row-gap: 0;
+    margin-bottom: var(--space-2);
+    line-height: 1.5;
   }
 
-  .hero-foot {
-    bottom: var(--space-4);
-    right: auto;
+  .hero .mh-big {
+    font-size: 0.875rem;
   }
 
-  .hero-place {
+  .hero .mh-rest,
+  .hero .mh-year {
+    font-size: 0.6875rem;
+  }
+
+  .hero-slogan {
+    grid-column: 1;
+    font-size: clamp(1.75rem, 8.4vw, 2.125rem);
+  }
+
+  .hero-more {
+    grid-row: 2;
+    grid-column: 2;
+    margin-top: 0;
+  }
+
+  .hero-lead {
+    margin-top: var(--space-1);
+    font-size: 1.0625rem;
+  }
+
+  .hero .still-toggle {
+    min-height: 1.75rem;
+  }
+
+  .hero .scope-stage {
+    aspect-ratio: 1 / 0.46;
+    perspective: 110rem;
+  }
+
+  .hero .scope-dish {
+    top: 47%;
+    left: 6%;
+    width: 88%;
+    margin-top: -44%;
+  }
+
+  /* The readout keeps one line, with the pause at its end; the caption goes. */
+  .hero .scope {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: var(--space-3);
+  }
+
+  .hero .scope-stage {
+    grid-column: 1 / -1;
+  }
+
+  .hero .scope-readout {
+    height: calc(1.35em + var(--space-2));
+    margin-top: 0;
+  }
+
+  .hero :is(.readout-idle, .readout-line, .readout-ghost) {
+    -webkit-line-clamp: 1;
+  }
+
+  .hero .scope-caption {
     display: none;
   }
+
+  .hero .scope-still {
+    margin-top: 0;
+  }
 }
 
-/* The narrowest phones have a top strip of two rows; short ones a smaller headline, so the
-   words and both controls fit above the dial. */
-@media (max-width: 22.5em) {
+/* A wide screen: the band is wider than the reading column, the words on the left and the radar
+   (22rem across) on the right. */
+@media (min-width: 48rem) {
   .hero {
-    --hero-h: max(26rem, calc(100svh - 13.25rem - env(safe-area-inset-bottom)));
+    grid-template-columns: minmax(0, 1fr) minmax(0, 24rem);
+    align-items: center;
+    column-gap: var(--space-6);
+    width: var(--hero-w);
+    margin-inline: calc(50% - var(--hero-w) / 2);
+    margin-top: var(--space-3);
+    padding: var(--space-4) var(--space-5) var(--space-3);
+  }
+
+  .hero:not(:has(.hero-radar)) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .hero-slogan {
+    font-size: clamp(2.75rem, 5vw, 3.75rem);
+  }
+
+  .hero-lead {
+    margin-top: var(--space-4);
+    font-size: 1.25rem;
+  }
+
+  .hero-more {
+    margin-top: var(--space-2);
+  }
+
+  /* Under the radar: its readout, then the caption and the pause on one line. */
+  .hero .scope {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: var(--space-3);
+  }
+
+  .hero :is(.scope-stage, .scope-readout) {
+    grid-column: 1 / -1;
+  }
+
+  .hero :is(.scope-caption, .scope-still) {
+    margin-top: 0;
+  }
+
+  .hero .scope-caption {
+    font-size: 0.6875rem;
   }
 }
 
-@media (max-width: 47.99rem) and (max-height: 46rem) {
-  .hero-lead {
-    font-size: 1.875rem;
+/* The home page's toolbar over the day's stories: the search over every story, and the day's
+   topics as chips. A chip is the label of a radio button; the stylesheet shows the chosen
+   topic's group only (a story the address points at stays shown) and greys the radar's other
+   blips. */
+.desk {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.desk-search {
+  display: flex;
+  min-width: 0;
+  border: 1.5px solid var(--ink);
+  border-radius: 999px;
+  background: var(--surface);
+}
+
+.desk-search[hidden] {
+  display: none;
+}
+
+.desk-search:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.desk-input {
+  flex: 1;
+  min-width: 0;
+  min-height: 2.5rem;
+  padding: 0 0.75rem 0 1.125rem;
+  border: 0;
+  border-radius: 999px 0 0 999px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 1rem;
+}
+
+.desk-input:focus {
+  outline: none;
+}
+
+.desk-input::placeholder {
+  color: var(--muted);
+}
+
+.desk-go {
+  margin: 0.1875rem;
+  padding: 0 1rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--surface);
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.desk-go:hover,
+.desk-go:focus-visible {
+  background: var(--accent);
+}
+
+.desk-link {
+  justify-self: start;
+  padding-block: 0.375rem;
+  font-size: 0.875rem;
+}
+
+.desk-link[hidden] {
+  display: none;
+}
+
+/* The chips: one row that scrolls sideways on a phone, wrapping from 40em. */
+.desk-topics {
+  display: flex;
+  gap: 0.375rem;
+  min-width: 0;
+  margin: 0 calc(-1 * var(--gutter));
+  padding: 0.125rem var(--gutter) 0.375rem;
+  border: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.desk-topics::-webkit-scrollbar {
+  display: none;
+}
+
+@media (min-width: 40em) {
+  .desk-topics {
+    flex-wrap: wrap;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+  }
+}
+
+.topic-pick {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.topic-chip {
+  --cat: var(--ink);
+  --cat-soft: var(--chip);
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.3125rem;
+  min-height: 2rem;
+  padding: 0 0.625rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+.topic-chip::before {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--cat);
+}
+
+.topic-n {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.topic-chip.is-zero {
+  border-style: dashed;
+  background: transparent;
+  color: var(--muted);
+}
+
+.topic-chip.is-zero::before {
+  background: var(--line);
+}
+
+.topic-chip:hover {
+  border-color: var(--cat);
+}
+
+.topic-pick:checked + .topic-chip {
+  border-color: var(--cat);
+  background: var(--cat-soft);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.topic-pick:checked + .topic-chip .topic-n {
+  color: var(--cat);
+}
+
+.topic-pick:focus-visible + .topic-chip {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* A topic's group of the day: a small heading in its colour with the link to its page. */
+.topic-groups {
+  margin-top: var(--space-5);
+}
+
+.topic-group + .topic-group {
+  margin-top: var(--space-6);
+}
+
+.group-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0 var(--space-3);
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-1);
+  border-bottom: 1.5px solid var(--cat);
+  color: var(--cat);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.group-more {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-decoration-color: var(--control-border);
+  text-transform: none;
+}
+
+.topic-none {
+  display: none;
+  padding: var(--space-4);
+  border: 1px dashed var(--control-border);
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.edition-home .stories {
+  margin-top: 0;
+}
+
+/* On a phone the toolbar and the first heading are pulled up, so the first story's headline is
+   on the first screen above the dial. */
+@media (max-width: 47.99rem) {
+  .desk {
+    gap: var(--space-2);
   }
 
-  .hero-label {
-    margin-bottom: var(--space-2);
+  .desk-input {
+    min-height: 2.25rem;
   }
 
-  .hero-promise,
-  .hero-act {
+  .topic-groups {
     margin-top: var(--space-3);
   }
+
+  .group-head {
+    margin-bottom: var(--space-3);
+  }
+}
+
+/* The filter: the chosen topic's group and its blips; the other groups go (a story the address
+   points at excepted), and the other blips and their shadows turn grey. */
+.home:has(#topic-protocol:checked) .topic-group:not(.in-protocol, :has(:target)),
+.home:has(#topic-model:checked) .topic-group:not(.in-model, :has(:target)),
+.home:has(#topic-framework:checked) .topic-group:not(.in-framework, :has(:target)),
+.home:has(#topic-tooling:checked) .topic-group:not(.in-tooling, :has(:target)),
+.home:has(#topic-research:checked) .topic-group:not(.in-research, :has(:target)),
+.home:has(#topic-security:checked) .topic-group:not(.in-security, :has(:target)),
+.home:has(#topic-industry:checked) .topic-group:not(.in-industry, :has(:target)),
+.home:has(#topic-policy:checked) .topic-group:not(.in-policy, :has(:target)) {
+  display: none;
+}
+
+.home:has(#topic-protocol:checked) .none-protocol,
+.home:has(#topic-model:checked) .none-model,
+.home:has(#topic-framework:checked) .none-framework,
+.home:has(#topic-tooling:checked) .none-tooling,
+.home:has(#topic-research:checked) .none-research,
+.home:has(#topic-security:checked) .none-security,
+.home:has(#topic-industry:checked) .none-industry,
+.home:has(#topic-policy:checked) .none-policy {
+  display: block;
+}
+
+.home:has(#topic-protocol:checked) .blip:not(.cat-protocol),
+.home:has(#topic-model:checked) .blip:not(.cat-model),
+.home:has(#topic-framework:checked) .blip:not(.cat-framework),
+.home:has(#topic-tooling:checked) .blip:not(.cat-tooling),
+.home:has(#topic-research:checked) .blip:not(.cat-research),
+.home:has(#topic-security:checked) .blip:not(.cat-security),
+.home:has(#topic-industry:checked) .blip:not(.cat-industry),
+.home:has(#topic-policy:checked) .blip:not(.cat-policy) {
+  --cat: var(--line);
+  --blip-ink: var(--muted);
+}
+
+.home:has(#topic-protocol:checked) :is(.blip-shade, .blip-foot):not(.cat-protocol),
+.home:has(#topic-model:checked) :is(.blip-shade, .blip-foot):not(.cat-model),
+.home:has(#topic-framework:checked) :is(.blip-shade, .blip-foot):not(.cat-framework),
+.home:has(#topic-tooling:checked) :is(.blip-shade, .blip-foot):not(.cat-tooling),
+.home:has(#topic-research:checked) :is(.blip-shade, .blip-foot):not(.cat-research),
+.home:has(#topic-security:checked) :is(.blip-shade, .blip-foot):not(.cat-security),
+.home:has(#topic-industry:checked) :is(.blip-shade, .blip-foot):not(.cat-industry),
+.home:has(#topic-policy:checked) :is(.blip-shade, .blip-foot):not(.cat-policy) {
+  display: none;
 }
 
 /* An empty state: a dashed frame and a comment's slashes, in the label face. */
@@ -1026,14 +1306,25 @@ a.lang-part:focus-visible {
   }
 }
 
-/* The scope: the edition's stories as blips on a radar, seen slightly from above. A card in the
-   lead's language (ink outline, white, hard shadow) holding a plate, three range rings and a
-   sweep. Each ring is a layer of its own, the inner ones nearer the reader, and so is each blip,
-   at its ring's depth and in story order in the document; every blip is a link to its story in
-   its category's colour, nearer the centre the more sources it has.
+/* The scope: the edition's stories as blips on a radar display seen from above at an angle. On an
+   edition page it sits in a card in the lead's language (ink outline, white, hard shadow); on the
+   home page it is the hero's object and stands on the page's ground (see .hero .scope).
+   The instrument is drawn as a body: a ground shadow, a wall of thin slices one under another, a
+   bezel ring with bearings lit from the upper left, a glass face with its graduation, a sweep and
+   a gleam. Each ring is a layer of its own, standing higher the nearer the centre (the louder a
+   story, the taller its blip), and so is each blip, at its ring's height and in story order in
+   the document; every blip is a link to its story in its category's colour, on a stem down to
+   its shadow on the face, its head drawn taller than round so that it faces the reader.
+   --tip is how far the dish is tipped back; --up, 1 / cos(--tip), and --stem-N, the ring's height
+   in drawing units × tan(--tip), keep the heads round and the stems on their shadows.
    The markup carries `hidden`, so a page without its stylesheet shows the plain list instead;
    `display` here overrides it. */
 .scope {
+  --tip: 52deg;
+  --up: 1.62;
+  --stem-1: 41;
+  --stem-2: 29;
+  --stem-3: 18;
   display: block;
   max-width: 26.25rem;
   margin-top: var(--space-5);
@@ -1051,11 +1342,11 @@ a.lang-part:focus-visible {
   }
 }
 
-/* On a phone the instrument is capped at 280px, in the middle of the column, with a tighter card,
-   so the first story's headline comes up sooner. */
+/* On a phone the instrument is capped at 352px, in the middle of the column, with a tighter card:
+   tipped back, it is no taller than the flat plate it replaced, and its targets stay 32px. */
 @media (max-width: 39.99em) {
   .scope {
-    max-width: 17.5rem;
+    max-width: 22rem;
     margin: var(--space-4) auto 0;
     padding: var(--space-2);
   }
@@ -1075,64 +1366,214 @@ a.lang-part:focus-visible {
   font-weight: 600;
 }
 
-/* The resting tilt shows the plate from a little above; scripts/scope.ts adds the pointer's
-   tilt through --tilt-x and --tilt-y. */
+/* The stage is as wide as the dish and as tall as the dish looks once tipped; scripts/scope.ts
+   adds the pointer's tilt through --tilt-x and --tilt-y. Heights inside are in cqi of the stage,
+   so the drawing keeps its proportions at any size (a drawing unit is 0.431cqi: the face is
+   86.2% of the dish). */
 .scope-stage {
+  position: relative;
+  aspect-ratio: 1 / 0.76;
+  container-type: inline-size;
   perspective: 75rem;
+  perspective-origin: 50% 30%;
 }
 
 .scope-dish {
-  position: relative;
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
   aspect-ratio: 1;
-  transform: rotateX(calc(14deg + var(--tilt-x, 0deg))) rotateY(var(--tilt-y, 0deg));
+  margin-top: -50%;
+  pointer-events: none;
+  transform: rotateX(calc(var(--tip) + var(--tilt-x, 0deg))) rotateY(var(--tilt-y, 0deg));
   transform-style: preserve-3d;
 }
 
 .scope-dish > * {
   position: absolute;
-  inset: 0;
+  top: 6.9%;
+  left: 6.9%;
+  width: 86.2%;
+  height: 86.2%;
+}
+
+.scope-dish > :is(.dish-floor, .dish-wall, .scope-bezel) {
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
 }
 
-.scope-plate {
+/* The ground's shadow, under the body and off to the lower right, away from the light. */
+.dish-floor {
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(58 44 26 / 0.38), rgb(58 44 26 / 0.14) 60%, rgb(58 44 26 / 0));
+  transform: translate3d(3%, 5%, -9cqi) scale(1.12);
+}
+
+/* The body's wall: six slices, each a little lower, lit from the left. */
+.dish-wall {
+  border-radius: 50%;
+  background: linear-gradient(90deg, #d8d1c3, #ada493 50%, #857c6c);
+  transform: translateZ(calc(var(--k) * -0.9cqi));
+}
+
+.w-1 {
+  --k: 1;
+}
+
+.w-2 {
+  --k: 2;
+}
+
+.w-3 {
+  --k: 3;
+}
+
+.w-4 {
+  --k: 4;
+}
+
+.w-5 {
+  --k: 5;
+}
+
+.w-6 {
+  --k: 6;
+}
+
+/* The bezel stands a little proud of the glass, so its inner edge throws the face into a recess. */
+.scope-bezel {
+  overflow: visible;
+  transform: translateZ(0.9cqi);
+}
+
+.metal-0 {
+  stop-color: #fbf9f4;
+}
+
+.metal-1 {
+  stop-color: #d9d3c6;
+}
+
+.metal-2 {
+  stop-color: #978e7e;
+}
+
+.lip-0 {
+  stop-color: #8c8475;
+}
+
+.lip-1 {
+  stop-color: #fbf9f4;
+}
+
+.bezel-body {
   fill: none;
-  stroke-linecap: round;
+  stroke: url(#scope-metal);
+  stroke-width: 16;
 }
 
-.plate-face {
-  fill: var(--bg);
-  stroke: var(--ink);
-  stroke-width: 1.25;
+.bezel-edge {
+  fill: none;
+  stroke: #7d7465;
+  stroke-width: 0.7;
 }
 
-.plate-cross {
-  stroke: var(--line);
-  stroke-width: 0.6;
+.bezel-lip {
+  fill: none;
+  stroke: url(#scope-lip);
+  stroke-width: 2.4;
 }
 
-.ring-trace {
-  stroke: var(--line);
-  stroke-width: 1.4;
+.bezel-minor {
+  stroke: #8f8879;
+  stroke-width: 0.5;
 }
 
-.plate-minor {
-  stroke: var(--control-border);
-  stroke-width: 0.45;
-}
-
-.plate-major {
+.bezel-major {
   stroke: var(--ink);
   stroke-width: 0.9;
 }
 
+.bezel-bearings {
+  fill: var(--muted);
+  font-family: var(--font-label);
+  font-size: 5.4px;
+  font-weight: 600;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.bezel-index {
+  fill: var(--accent);
+}
+
+/* The glass face: warm white in the light, greying to its edge; its graduation and range rings. */
+.scope-plate {
+  overflow: visible;
+  fill: none;
+  stroke-linecap: round;
+}
+
+.glass-0 {
+  stop-color: #fffefb;
+}
+
+.glass-1 {
+  stop-color: #f1eee6;
+}
+
+.glass-2 {
+  stop-color: #d3cdbf;
+}
+
+.plate-face {
+  fill: url(#scope-glass);
+}
+
+.plate-cross {
+  stroke: #cfcabe;
+  stroke-width: 0.5;
+}
+
+.ring-trace {
+  stroke: #d9d4c8;
+  stroke-width: 0.8;
+}
+
+.plate-minor {
+  stroke: #a39d90;
+  stroke-width: 0.4;
+}
+
+.plate-major {
+  stroke: var(--ink);
+  stroke-width: 0.7;
+}
+
+/* A blip's shadow on the face, soft, where the light drops it. */
+.shade-0 {
+  stop-color: rgb(52 40 24 / 0.34);
+}
+
+.shade-1 {
+  stop-color: rgb(52 40 24 / 0);
+}
+
+.blip-shade {
+  fill: url(#scope-shade);
+}
+
+.blip-foot {
+  fill: var(--cat);
+}
+
 /* The sweep turns once in 6 s (clockwise from straight up): a fading wedge behind an accent edge. */
 .scope-sweep {
-  inset: 2%;
-  width: auto;
-  height: auto;
   border-radius: 50%;
-  background: conic-gradient(transparent 0deg 285deg, var(--sweep) 360deg);
+  background: conic-gradient(transparent 0deg 255deg, var(--sweep) 360deg);
   transform: translateZ(1px);
 }
 
@@ -1146,31 +1587,40 @@ a.lang-part:focus-visible {
   background: var(--accent);
 }
 
+/* The glass's gleam, from the upper left, and its edge darkening into the bezel. */
+.dish-glass {
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse 52% 34% at 34% 24%, rgb(255 255 255 / 0.7), rgb(255 255 255 / 0) 72%),
+    radial-gradient(closest-side, rgb(70 58 40 / 0) 84%, rgb(70 58 40 / 0.16));
+  transform: translateZ(2px);
+}
+
 .scope-layer {
   overflow: visible;
   pointer-events: none;
 }
 
 .layer-3 {
-  transform: translateZ(0.5rem);
+  --stem: var(--stem-3);
+  transform: translateZ(6cqi);
 }
 
 .layer-2 {
-  transform: translateZ(1rem);
+  --stem: var(--stem-2);
+  transform: translateZ(9.9cqi);
 }
 
 .layer-1 {
-  transform: translateZ(1.5rem);
+  --stem: var(--stem-1);
+  transform: translateZ(13.8cqi);
 }
 
 .ring {
   fill: none;
   stroke: var(--control-border);
-  stroke-width: 0.6;
-}
-
-.layer-1 .ring {
-  stroke: var(--ink);
+  stroke-width: 0.5;
+  stroke-dasharray: 0.5 3;
 }
 
 .ring-label {
@@ -1180,13 +1630,23 @@ a.lang-part:focus-visible {
   letter-spacing: 0.04em;
 }
 
-/* A blip: a target of at least 32px (at phone width) around a dot with the story's number. Once its story
-   has been read for two seconds the dot turns hollow. */
+/* A blip: a target of at least 32px around a dot with the story's number, on its stem. Once its
+   story has been read for two seconds the dot turns hollow. */
 .blip {
   cursor: pointer;
   outline: none;
   pointer-events: auto;
   text-decoration: none;
+}
+
+.blip-up {
+  transform: scale(1, var(--up));
+}
+
+.blip-stem {
+  stroke: var(--cat);
+  stroke-width: 1.5;
+  transform: scaleY(var(--stem));
 }
 
 .blip-hit {
@@ -1196,11 +1656,15 @@ a.lang-part:focus-visible {
 .blip-dot {
   fill: var(--cat);
   stroke: var(--surface);
-  stroke-width: 1.25;
+  stroke-width: 1.4;
+}
+
+.blip-shine {
+  fill: rgb(255 255 255 / 0.4);
 }
 
 .blip-no {
-  fill: var(--surface);
+  fill: var(--blip-ink, var(--surface));
   font-family: var(--font-display);
   font-size: 7px;
   font-weight: 700;
@@ -1212,7 +1676,7 @@ a.lang-part:focus-visible {
 .blip-echo {
   fill: none;
   stroke: var(--cat);
-  stroke-width: 0.8;
+  stroke-width: 1.2;
   visibility: hidden;
   transform-box: fill-box;
   transform-origin: center;
@@ -1237,6 +1701,10 @@ a.lang-part:focus-visible {
 
 .blip.is-read .blip-no {
   fill: var(--cat);
+}
+
+.blip.is-read .blip-shine {
+  fill: none;
 }
 
 /* The readout under the plate: two lines, the resting line under a stack of titles. Only the
@@ -3441,9 +3909,10 @@ kbd {
     animation-delay: calc(var(--i, 0) * 38ms);
   }
 
-  /* The hero's words rise into place once, as its globe gathers after the opening (hero.ts adds
-     is-entering when the opening's cover lifts). */
-  .hero.is-entering .hero-copy > * {
+  /* The hero's words and its radar rise into place once, after the opening (scripts/scope.ts
+     adds is-entering when the opening's cover lifts). */
+  .hero.is-entering .hero-copy > *,
+  .hero.is-entering .hero-radar {
     animation: hero-rise 900ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
   }
 
@@ -3455,14 +3924,9 @@ kbd {
     animation-delay: 260ms;
   }
 
-  .hero.is-entering .hero-copy > :nth-child(4) {
+  .hero.is-entering .hero-copy > :nth-child(4),
+  .hero.is-entering .hero-radar {
     animation-delay: 380ms;
-  }
-
-  /* The bezel and the orbit draw themselves round as the points gather. */
-  .hero.is-entering .hero-rings [pathLength] {
-    stroke-dasharray: 1;
-    animation: hero-draw 1800ms cubic-bezier(0.4, 0, 0.2, 1) both;
   }
 
   /* The end of the edition switches off like a screen, once. */
@@ -3506,14 +3970,6 @@ kbd {
     .progress {
       animation: progress-fill linear both;
       animation-timeline: scroll(root);
-    }
-
-    /* The hero's globe sinks back and shrinks a little as the page scrolls past it (not once the
-       reader has paused the motion). */
-    html:not(.still) .hero-globe {
-      animation: hero-sink linear both;
-      animation-timeline: scroll(root);
-      animation-range: 0 100svh;
     }
 
     /* Stories after the lead rise a little as they come into view. */
@@ -3654,20 +4110,6 @@ kbd {
   }
 }
 
-/* A ring of the hero drawn round from its start; its globe sinking back. */
-@keyframes hero-draw {
-  from {
-    stroke-dashoffset: 1;
-  }
-}
-
-@keyframes hero-sink {
-  to {
-    translate: 0 14%;
-    scale: 0.86;
-  }
-}
-
 /* A line of the hero's words rises into place from half strength (never unreadable). */
 @keyframes hero-rise {
   from {
@@ -3758,8 +4200,7 @@ kbd {
   .ink-go .ink-w,
   .is-off .screen-off,
   .hero.is-entering .hero-copy > *,
-  .hero.is-entering .hero-rings [pathLength],
-  html:not(.still) .hero-globe,
+  .hero.is-entering .hero-radar,
   html.js:not(.still) .hz-turn,
   html.js:not(.still) .hz-bird,
   .em-mid .em-face,
@@ -3783,7 +4224,8 @@ kbd {
     display: none;
   }
 
-  .hero {
+  .hero,
+  .desk {
     display: none;
   }
 

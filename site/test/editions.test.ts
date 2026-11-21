@@ -9,6 +9,7 @@ import {
   forLang,
   istanbulDate,
   readingMinutes,
+  topicGroups,
 } from "../src/lib/editions";
 import { parseStories, type PublicStory } from "../src/lib/schema";
 
@@ -168,5 +169,17 @@ describe("readingMinutes", () => {
 describe("anchorId", () => {
   it("is s- plus the first 8 characters", () => {
     expect(anchorId("0123456789abcdef0123456789abcdef")).toBe("s-01234567");
+  });
+});
+
+describe("topicGroups", () => {
+  it("groups an edition by topic in the order the topics first come, each story keeping its number", () => {
+    const at = "2026-11-20T06:00:00Z";
+    const of = (n: number, category: PublicStory["category"]) => ({ ...story(n, at), category });
+    const groups = topicGroups([of(1, "model"), of(2, "security"), of(3, "model"), of(4, "policy"), of(5, "security")]);
+    expect(groups.map((g) => g.category)).toEqual(["model", "security", "policy"]);
+    expect(groups.map((g) => g.items.map((item) => item.n))).toEqual([[1, 3], [2, 5], [4]]);
+    expect(groups[0].items[1].story.uid).toBe(uidOf(3));
+    expect(topicGroups([])).toEqual([]);
   });
 });

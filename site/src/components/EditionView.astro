@@ -1,15 +1,14 @@
 ---
 import EditionIndex from "./EditionIndex.astro";
+import EditionMasthead from "./EditionMasthead.astro";
 import EchoArcs from "./EchoArcs.astro";
 import Scope from "./Scope.astro";
 import Story from "./Story.astro";
 import { COPY } from "../lib/copy";
-import { buildEditions, earlierStories, forLang, readingMinutes, type Edition } from "../lib/editions";
-import { loadData } from "../lib/data";
-import { GHOST_FEW, GHOST_LIMIT } from "../lib/nav";
-import { dayMonth, shortDate, weekdayName, yearOf } from "../lib/format";
+import { readingMinutes, topicGroups, type Edition } from "../lib/editions";
+import { categoryClass, shortDate } from "../lib/format";
 import { routes } from "../lib/routes";
-import type { Lang } from "../lib/schema";
+import { CATEGORIES, type Lang } from "../lib/schema";
 
 interface Props {
   lang: Lang;
@@ -19,64 +18,103 @@ interface Props {
   /** The newer neighbour, or null for the newest edition. */
   next: Edition | null;
   isLatest: boolean;
+  /** The home page: the radar stands in the hero above, and the stories come by topic under a toolbar. */
+  home?: boolean;
 }
 
-const { lang, edition, previous, next, isLatest } = Astro.props;
+const { lang, edition, previous, next, isLatest, home = false } = Astro.props;
 const copy = COPY[lang];
 const newer = isLatest ? null : next;
 const count = edition.stories.length;
-// The scope stands in the rail for any edition; the plain list under it, for no stylesheet and
-// print, only where there is more than one story to list.
-const hasScope = count > 0;
+// The scope stands in the rail for any edition (on the home page, in the hero); the plain list
+// under it, for no stylesheet and print, only where there is more than one story to list.
+const hasScope = count > 0 && !home;
 const hasIndex = count > 1;
-const weekday = weekdayName(edition.date, lang);
-const sources = edition.stories.reduce((sum, story) => sum + story.source_count, 0);
-// Words ÷ 200, rounded up, counted at build.
+// Words ÷ 200, rounded up, counted at build (the end line's reading time).
 const minutes = readingMinutes(edition.stories, lang);
-// An edition of fewer than five stories shows up to eight of the week's earlier ones on its scope.
-const ghosts = earlierStories(buildEditions(forLang(loadData().stories, lang)), edition, GHOST_FEW, GHOST_LIMIT);
+// The home page's groups: one per topic with a story today, the lead's first; and each topic's count.
+const groups = topicGroups(edition.stories);
+const order = groups.flatMap((g) => g.items);
+const tally = new Map(groups.map((g) => [g.category, g.items.length]));
+// The chips: all, then the day's topics as they come, then the topics with no story today.
+const chips = [...groups.map((g) => g.category), ...CATEGORIES.filter((category) => !tally.has(category))];
+const { desk } = copy;
 ---
 
-<div class:list={["edition", { "edition-railed": hasScope }]}>
+<div class:list={["edition", { "edition-railed": hasScope, "edition-home": home }]}>
   {/* A reading-progress line at the window's top; the stylesheet fills it with the scroll where it can. */}
   <div class="progress" aria-hidden="true"></div>
-  {/* One h1 that reads "Sayı 4 · 20 Kasım 2026 Cuma · 5 haber · 22 kaynak · ~2 dk" in order; CSS sets it as three rows. */}
-  <h1 class="masthead">
-    <span class="mh-no label caps">{copy.issue(edition.number)}</span>
-    <span class="mh-sep">{" · "}</span>
-    <time datetime={edition.date}>
-      {
-        lang === "tr" ? (
-          <>
-            <span class="mh-big">{dayMonth(edition.date, lang)}</span>
-            <span class="mh-year label">{` ${yearOf(edition.date)}`}</span>
-            <span class="mh-big">{` ${weekday}`}</span>
-          </>
-        ) : (
-          <>
-            <span class="mh-big">{`${weekday}, ${dayMonth(edition.date, lang)}`}</span>
-            <span class="mh-year label">{` ${yearOf(edition.date)}`}</span>
-          </>
-        )
-      }
-    </time>
-    <span class="mh-rest label">
-      {` · ${copy.storyCount(count)} · ${copy.sources(sources)} · ${copy.minutes(minutes)}`}
-    </span>
-  </h1>
+  {/* One h1 that reads "Sayı 4 · 20 Kasım 2026 Cuma · 5 haber · 22 kaynak · ~2 dk"; on the home page it is the hero's. */}
+  {!home && <EditionMasthead lang={lang} edition={edition} />}
 
-  {hasScope && <Scope lang={lang} edition={edition} ghosts={ghosts} />}
-  {hasIndex && <EditionIndex lang={lang} edition={edition} />}
+  {hasScope && <Scope lang={lang} edition={edition} />}
 
-  <ol class="stories" role="list">
-    {
-      edition.stories.map((story, i) => (
-        <li>
-          <Story lang={lang} story={story} index={i + 1} date={edition.date} lead={i === 0} />
-        </li>
-      ))
-    }
-  </ol>
+  {
+    home ? (
+      <>
+        {/*
+          The toolbar: a search over every story (with script; a link to the archive without), and
+          the day's topics as radio chips, each with its count. The stylesheet shows only the chosen
+          topic's group below, and fades the radar's other blips; it needs no script.
+        */}
+        <div class="desk">
+          <form class="desk-search" role="search" data-desk={routes[lang].archive} hidden>
+            <label class="visually-hidden" for="desk-q">{desk.search}</label>
+            <input class="desk-input" id="desk-q" type="search" name="q" placeholder={desk.placeholder} autocomplete="off" spellcheck="false" enterkeyhint="search" />
+            <button class="desk-go label caps" type="submit">{desk.go}</button>
+          </form>
+          <a class="desk-link label" href={routes[lang].archive} data-desk-link>{desk.fallback} <span aria-hidden="true">→</span></a>
+          <fieldset class="desk-topics">
+            <legend class="visually-hidden">{desk.topics}</legend>
+            <input class="topic-pick" type="radio" name="topic" id="topic-all" checked />
+            <label class="topic-chip label" for="topic-all">{desk.all} <span class="topic-n">{count}</span></label>
+            {chips.map((category) => (
+              <>
+                <input class="topic-pick" type="radio" name="topic" id={`topic-${category}`} />
+                <label class:list={["topic-chip label", categoryClass(category), { "is-zero": !tally.has(category) }]} for={`topic-${category}`}>
+                  {copy.categories[category]} <span class="topic-n">{tally.get(category) ?? 0}</span>
+                </label>
+              </>
+            ))}
+          </fieldset>
+        </div>
+        {hasIndex && <EditionIndex lang={lang} edition={edition} order={order} />}
+        <div class="topic-groups">
+          {groups.map(({ category, items }) => (
+            <div class:list={["topic-group", `in-${category}`]}>
+              <h2 class={`group-head label caps ${categoryClass(category)}`}>
+                <span class="group-name">{copy.categories[category]}</span>{" "}
+                <a class="group-more" href={routes[lang].topic(category)}>{desk.more(copy.categories[category])} <span aria-hidden="true">→</span></a>
+              </h2>
+              <ol class="stories" role="list">
+                {items.map(({ story, n }) => (
+                  <li>
+                    <Story lang={lang} story={story} index={n} date={edition.date} lead={n === 1} level={3} />
+                  </li>
+                ))}
+              </ol>
+            </div>
+          ))}
+          {CATEGORIES.filter((category) => !tally.has(category)).map((category) => (
+            <p class={`topic-none none-${category} label`}>
+              {desk.none}{" "}<a href={routes[lang].topic(category)}>{desk.more(copy.categories[category])} <span aria-hidden="true">→</span></a>
+            </p>
+          ))}
+        </div>
+      </>
+    ) : (
+      <>
+        {hasIndex && <EditionIndex lang={lang} edition={edition} />}
+        <ol class="stories" role="list">
+          {edition.stories.map((story, i) => (
+            <li>
+              <Story lang={lang} story={story} index={i + 1} date={edition.date} lead={i === 0} />
+            </li>
+          ))}
+        </ol>
+      </>
+    )
+  }
 
   <div class="end">
     {/* The end of the edition: the closing line, its reading time, and a line that switches off like a screen. */}

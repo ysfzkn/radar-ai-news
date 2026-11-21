@@ -1,7 +1,9 @@
 ---
 import { COPY } from "../lib/copy";
-import { anchorId, type Edition } from "../lib/editions";
+import { loadData } from "../lib/data";
+import { anchorId, buildEditions, earlierStories, forLang, type Edition } from "../lib/editions";
 import { categoryClass, shortDate } from "../lib/format";
+import { GHOST_FEW, GHOST_LIMIT } from "../lib/nav";
 import { storyLink } from "../lib/routes";
 import StillToggle from "./StillToggle.astro";
 import {
@@ -11,25 +13,28 @@ import {
   RING_SOURCES,
   blipPoint,
   placeBlips,
+  shadowPoint,
   sweepStep,
   type Ring,
 } from "../lib/scope";
-import type { Lang, PublicStory } from "../lib/schema";
+import type { Lang } from "../lib/schema";
 
 interface Props {
   lang: Lang;
   edition: Edition;
-  /** Stories of the week's earlier editions, drawn faint when this edition is thin (lib/editions). */
-  ghosts?: { date: string; story: PublicStory }[];
 }
 
-const { lang, edition, ghosts = [] } = Astro.props;
+const { lang, edition } = Astro.props;
 const copy = COPY[lang];
+// An edition of fewer than five stories shows up to eight of the week's earlier ones, faint.
+const ghosts = earlierStories(buildEditions(forLang(loadData().stories, lang)), edition, GHOST_FEW, GHOST_LIMIT);
 // The day's stories first, so they keep the places they would have alone; the ghosts fit round them.
 const placed = placeBlips([...edition.stories, ...ghosts.map((g) => g.story)]);
 const blips = edition.stories.map((story, i) => {
   const { ring, angle } = placed[i];
   const { x, y } = blipPoint(ring, angle);
+  const shade = shadowPoint(ring, angle);
+  const foot = { x, y };
   const no = String(i + 1).padStart(2, "0");
   const title = story.texts[lang]!.title;
   return {
@@ -37,6 +42,8 @@ const blips = edition.stories.map((story, i) => {
     no,
     title,
     ring,
+    shade,
+    foot,
     href: `#${anchorId(story.uid)}`,
     cat: categoryClass(story.category),
     category: copy.categories[story.category],
@@ -60,20 +67,26 @@ const faint = ghosts.map(({ date, story }, i) => {
   };
 });
 
-// The plate's ticks: one every 5°, a longer one every 30°, from the rim inward.
-const RIM = 96;
-const ticks = (every: number, length: number, skip = 0) =>
+// A polar point as path text, bearing 0 straight up and turning clockwise.
+const at = (r: number, deg: number) => {
+  const rad = (deg * Math.PI) / 180;
+  return `${+(r * Math.sin(rad)).toFixed(2)} ${+(-r * Math.cos(rad)).toFixed(2)}`;
+};
+const marks = (every: number, from: number, to: number, skip = 0) =>
   Array.from({ length: 360 / every }, (_, i) => i * every)
     .filter((deg) => !skip || deg % skip !== 0)
-    .map((deg) => {
-      const rad = (deg * Math.PI) / 180;
-      const [s, c] = [Math.sin(rad), -Math.cos(rad)];
-      const p = (r: number) => `${+(r * s).toFixed(2)} ${+(r * c).toFixed(2)}`;
-      return `M${p(RIM)}L${p(RIM - length)}`;
-    })
+    .map((deg) => `M${at(from, deg)}L${at(to, deg)}`)
     .join("");
-const minor = ticks(5, 2.5, 30);
-const major = ticks(30, 6);
+// The face's fine graduation, every 5°, a longer mark every 30°, from its edge inward.
+const minor = marks(5, 99, 96, 30);
+const major = marks(30, 99, 92);
+// The bezel's: every 10° on its inner band, every 30° longer; and its bearings, every 30°.
+const bezelMinor = marks(10, 102, 104.4, 30);
+const bezelMajor = marks(30, 101.6, 105.6);
+const bearings = Array.from({ length: 12 }, (_, i) => {
+  const [x, y] = at(110.4, i * 30).split(" ");
+  return { x, y, text: String(i * 30).padStart(3, "0") };
+});
 // Outermost first: each ring is a layer of its own, the inner ones nearer the reader.
 const rings: Ring[] = [3, 2, 1];
 ---
@@ -89,17 +102,66 @@ const rings: Ring[] = [3, 2, 1];
       <span id="scope-label">{copy.scope.label}</span>
       <span class="scope-count">{copy.storyCount(blips.length)}</span>
     </p>
+    {/*
+      A radar display seen from above at an angle: a body with a wall (slices one under another), its
+      shadow on the ground, a bezel ring with bearings, a glass face with its graduation, a sweep and
+      a gleam, and over the face the ring layers and the blips, each standing on a stem above its
+      shadow, the louder the taller.
+    */}
     <div class="scope-stage">
       <div class="scope-dish" data-scope-dish>
+        <i class="dish-floor"></i>
+        <i class="dish-wall w-6"></i>
+        <i class="dish-wall w-5"></i>
+        <i class="dish-wall w-4"></i>
+        <i class="dish-wall w-3"></i>
+        <i class="dish-wall w-2"></i>
+        <i class="dish-wall w-1"></i>
         <svg class="scope-plate" viewBox="-100 -100 200 200" aria-hidden="true">
-          <circle class="plate-face" r={RIM}></circle>
-          <path class="plate-cross" d={`M${-RIM} 0H${RIM}M0 ${-RIM}V${RIM}`}></path>
-          {/* Where each ring would meet the plate: its raised layer shows above this trace. */}
+          <circle class="plate-face" r="100"></circle>
+          <defs>
+            <radialGradient id="scope-glass" cx="0.4" cy="0.34" r="0.72">
+              <stop class="glass-0" offset="0"></stop>
+              <stop class="glass-1" offset="0.7"></stop>
+              <stop class="glass-2" offset="1"></stop>
+            </radialGradient>
+            <radialGradient id="scope-shade">
+              <stop class="shade-0" offset="0"></stop>
+              <stop class="shade-1" offset="1"></stop>
+            </radialGradient>
+          </defs>
+          <path class="plate-cross" d="M-99 0H99M0 -99V99"></path>
+          {/* Where each ring would meet the plate: its raised layer stands above this trace. */}
           {rings.map((ring) => <circle class="ring-trace" r={RING_RADIUS[ring]}></circle>)}
           <path class="plate-minor" d={minor}></path>
           <path class="plate-major" d={major}></path>
+          {blips.map((blip) => <circle class={`blip-shade ${blip.cat}`} cx={blip.shade.x} cy={blip.shade.y} r="9"></circle>)}
+          {blips.map((blip) => <circle class={`blip-foot ${blip.cat}`} cx={blip.foot.x} cy={blip.foot.y} r="1.4"></circle>)}
         </svg>
         <div class="scope-sweep" aria-hidden="true"></div>
+        <i class="dish-glass"></i>
+        <svg class="scope-bezel" viewBox="-116 -116 232 232" aria-hidden="true">
+          <defs>
+            <linearGradient id="scope-metal" x1="0.15" y1="0" x2="0.85" y2="1">
+              <stop class="metal-0" offset="0"></stop>
+              <stop class="metal-1" offset="0.45"></stop>
+              <stop class="metal-2" offset="1"></stop>
+            </linearGradient>
+            <linearGradient id="scope-lip" x1="0.15" y1="0" x2="0.85" y2="1">
+              <stop class="lip-0" offset="0"></stop>
+              <stop class="lip-1" offset="1"></stop>
+            </linearGradient>
+          </defs>
+          <circle class="bezel-body" r="108"></circle>
+          <circle class="bezel-edge" r="115.4"></circle>
+          <circle class="bezel-lip" r="100.8"></circle>
+          <path class="bezel-minor" d={bezelMinor}></path>
+          <path class="bezel-major" d={bezelMajor}></path>
+          <g class="bezel-bearings">
+            {bearings.map((b) => <text x={b.x} y={b.y}>{b.text}</text>)}
+          </g>
+          <path class="bezel-index" d="M0 -101.2L-2.6 -105.8H2.6Z"></path>
+        </svg>
         {
           rings.map((ring) => (
             <svg class={`scope-layer layer-${ring}`} viewBox="-100 -100 200 200">
@@ -113,18 +175,23 @@ const rings: Ring[] = [3, 2, 1];
           ))
         }
         {/*
-          The blips in story order, each a layer of its own at its ring's depth: the document (and
+          The blips in story order, each a layer of its own at its ring's height: the document (and
           so Tab and a screen reader) follows the edition, 01, 02, 03 …; ring and bearing are only
-          where a blip is drawn.
+          where a blip is drawn. A blip's head is drawn taller than round (blip-up), so that seen at
+          the dish's angle it faces the reader.
         */}
         {
           blips.map((blip) => (
             <svg class={`scope-layer layer-${blip.ring}`} viewBox="-100 -100 200 200"><a class={`blip b-${blip.n} ${blip.cat} ${blip.step}`} href={blip.href} aria-labelledby={`scope-t-${blip.n}`}>
                 <g transform={blip.transform}>
-                  <circle class="blip-hit" r={BLIP_HIT}></circle>
-                  <circle class="blip-echo" r={BLIP_DOT}></circle>
-                  <circle class="blip-dot" r={BLIP_DOT}></circle>
-                  <text class="blip-no">{blip.no}</text>
+                  <path class="blip-stem" d="M0 0V1"></path>
+                  <g class="blip-up">
+                    <circle class="blip-hit" r={BLIP_HIT}></circle>
+                    <circle class="blip-echo" r={BLIP_DOT}></circle>
+                    <circle class="blip-dot" r={BLIP_DOT}></circle>
+                    <ellipse class="blip-shine" cx="-2.3" cy="-3" rx="2.8" ry="1.7"></ellipse>
+                    <text class="blip-no">{blip.no}</text>
+                  </g>
                 </g>
               </a></svg>
           ))
@@ -138,8 +205,10 @@ const rings: Ring[] = [3, 2, 1];
           faint.map((ghost) => (
             <svg class={`scope-layer layer-${ghost.ring}`} viewBox="-100 -100 200 200"><a class={`ghost g-${ghost.n}`} href={ghost.href} aria-labelledby={`scope-g-${ghost.n}`}>
                 <g transform={ghost.transform}>
-                  <circle class="blip-hit" r={BLIP_HIT}></circle>
-                  <circle class="ghost-dot" r="4"></circle>
+                  <g class="blip-up">
+                    <circle class="blip-hit" r={BLIP_HIT}></circle>
+                    <circle class="ghost-dot" r="4"></circle>
+                  </g>
                 </g>
               </a></svg>
           ))

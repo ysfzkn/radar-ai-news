@@ -1,4 +1,4 @@
-import type { Lang, PublicStory } from "./schema";
+import type { Category, Lang, PublicStory } from "./schema";
 
 export interface Edition {
   /** "YYYY-MM-DD" in Istanbul. */
@@ -118,6 +118,21 @@ export function byCategory(stories: PublicStory[]): Map<string, PublicStory[]> {
     groups.set(category, newest.slice(0, TOPIC_LIMIT));
   }
   return groups;
+}
+
+/**
+ * An edition's stories by topic, for the home page: one group per category that has a story, in
+ * the order the topics first appear in the edition (so the lead's topic comes first), each story
+ * with its number in the edition (1-based), in edition order inside its group.
+ */
+export function topicGroups(stories: PublicStory[]): { category: Category; items: { story: PublicStory; n: number }[] }[] {
+  const groups = new Map<Category, { story: PublicStory; n: number }[]>();
+  stories.forEach((story, i) => {
+    const list = groups.get(story.category) ?? [];
+    list.push({ story, n: i + 1 });
+    groups.set(story.category, list);
+  });
+  return [...groups].map(([category, items]) => ({ category, items }));
 }
 
 export function echoLevel(sourceCount: number): 1 | 2 | 3 | 4 | 5 {

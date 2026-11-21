@@ -2,14 +2,16 @@
 import EchoArcs from "./EchoArcs.astro";
 import { COPY } from "../lib/copy";
 import { anchorId, echoLevel, type Edition } from "../lib/editions";
-import type { Lang } from "../lib/schema";
+import type { Lang, PublicStory } from "../lib/schema";
 
 interface Props {
   lang: Lang;
   edition: Edition;
+  /** The stories in the order the page shows them, each with its number (the home page groups them by topic). */
+  order?: { story: PublicStory; n: number }[];
 }
 
-const { lang, edition } = Astro.props;
+const { lang, edition, order = edition.stories.map((story, i) => ({ story, n: i + 1 })) } = Astro.props;
 const copy = COPY[lang];
 ---
 
@@ -17,9 +19,9 @@ const copy = COPY[lang];
   <p class="index-label label caps" id="index-label">{copy.inThisIssue}</p>
   <ol class="index-list" role="list">
     {
-      edition.stories.map((story, i) => (
+      order.map(({ story, n }) => (
         <li>
-          <span class="index-no label">{String(i + 1).padStart(2, "0")}</span>{" "}
+          <span class="index-no label">{String(n).padStart(2, "0")}</span>{" "}
           <a href={`#${anchorId(story.uid)}`}>{story.texts[lang]!.title}</a>
           {/* The story block carries the labelled meter; here the arcs are only a cue. */}
           <EchoArcs level={echoLevel(story.source_count)} width={33} height={10.5} />

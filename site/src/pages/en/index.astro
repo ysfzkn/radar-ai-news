@@ -21,12 +21,11 @@ const copy = COPY[lang];
   path={routes[lang].home}
   alternate={routes.tr.home}
 >
+  <div class="home">
   <Hero lang={lang} edition={latest ?? null} />
   {
     latest ? (
-      <div id="edition" class="hero-next">
-        <EditionView lang={lang} edition={latest} previous={editions[1] ?? null} next={null} isLatest />
-      </div>
+      <EditionView lang={lang} edition={latest} previous={editions[1] ?? null} next={null} isLatest home />
     ) : (
       <>
         <h1 class="kunye label">{copy.noEdition}</h1>
@@ -34,4 +33,5 @@ const copy = COPY[lang];
       </>
     )
   }
+  </div>
 </Base>

@@ -128,6 +128,10 @@ function articles(html: string): string[] {
   return [...html.matchAll(/<article[\s\S]*?<\/article>/g)].map((m) => m[0]);
 }
 
+/** The articles in edition order, by the number each carries (the home page groups them by topic). */
+const byNumber = (list: string[]) =>
+  [...list].sort((a, b) => Number(a.match(/class="story-no"[^>]*>(\d+)</)![1]) - Number(b.match(/class="story-no"[^>]*>(\d+)</)![1]));
+
 // A build test cannot measure layout, so layout rules are checked in the stylesheet itself.
 const css = () => readFileSync(join(root, "src", "styles", "base.css"), "utf8");
 
@@ -275,7 +279,8 @@ describe("built site", () => {
     for (const [path, lang] of [["", "tr"], ["en", "en"]] as const) {
       for (const article of articles(page(DEMO, path))) {
         expect(article).toMatch(/<article id="s-[0-9a-f]{8}"/);
-        expect(article).toMatch(/<h2[^>]*>/);
+        // h3 under the home page's topic headings.
+        expect(article).toMatch(/<h3 class="story-title">/);
         expect(article).not.toContain("story-dev");
         const why = article.match(/<p class="story-why">([\s\S]*?)<\/p>/);
         expect(why).not.toBeNull();
@@ -361,7 +366,7 @@ describe("built site", () => {
       expect(links.length).toBeGreaterThan(1);
       expect(links).toEqual(ids);
       const titles = [...index![1].matchAll(/<a href="#[^"]+"[^>]*>([\s\S]*?)<\/a>/g)].map((m) => text(m[1]));
-      const headings = articles(html).map((a) => text(a.match(/<h2[^>]*>([\s\S]*?)<\/h2>/)![1]));
+      const headings = articles(html).map((a) => text(a.match(/<h([23])[^>]*>([\s\S]*?)<\/h\1>/)![2]));
       expect(titles).toEqual(headings);
     }
   });
@@ -651,13 +656,13 @@ describe("built site", () => {
           },
         ),
       );
-      const list = articles(html);
+      const list = byNumber(articles(html));
       expect(blips.map((b) => b.n), path).toEqual(list.map((_, i) => i + 1));
       expect(blips.map((b) => b.id), path).toEqual(list.map((a) => a.match(/<article id="([^"]+)"/)![1]));
       blips.forEach((blip, i) => {
         const article = list[i];
         expect(article).toContain(`class="story${i === 0 ? " story-lead" : ""} cat-${blip.cat}"`);
-        const title = text(article.match(/<h2[^>]*>([\s\S]*?)<\/h2>/)![1]);
+        const title = text(article.match(/<h([23])[^>]*>([\s\S]*?)<\/h\1>/)![2]);
         const no = String(i + 1).padStart(2, "0");
         expect(blip.named).toBe(blip.n);
         expect(names.get(blip.n)).toBe(`${no} ${title} (${COPY[lang].sources(sourceCount(article))})`);
@@ -707,6 +712,70 @@ describe("built site", () => {
     // At most 420px wide (26.25rem); the rail on a wide screen is 24rem.
     expect(cssRule(sheet, ".scope")).toContain("max-width: 26.25rem;");
     expect(sheet).toContain("grid-template-columns: 24rem minmax(0, var(--measure));");
+  });
+
+  it("the home page: the day's radar in the hero, a toolbar of search and topic chips, and the stories by topic", () => {
+    for (const [path, lang] of [["", "tr"], ["en", "en"]] as const) {
+      const html = page(DEMO, path);
+      const copy = COPY[lang];
+      // One radar on the page, the hero's, with the edition's h1 as its dateline; the slogan and the line.
+      expect(html.match(/<section class="scope"/g), path).toHaveLength(1);
+      const hero = html.slice(html.indexOf('<section class="hero"'), html.indexOf('<div class="desk">'));
+      expect(hero).toContain('<section class="scope"');
+      expect(hero).toContain('<h1 class="masthead">');
+      expect(text(hero)).toContain(`${copy.hero.promises[0]}. ${copy.hero.promises[1]}.`);
+      expect(text(hero)).toContain(copy.hero.lead.join(""));
+      expect(hero).toContain(`<a href="${routes[lang].about}">`);
+      // The search: hidden until script (the CSP's form-action refuses a plain form), it hands its
+      // words to the archive's `q`; without script a link to the archive stands in.
+      const desk = html.match(/<div class="desk">([\s\S]*?)<\/fieldset>/)![1];
+      expect(desk).toContain(`<form class="desk-search" role="search" data-desk="${routes[lang].archive}" hidden>`);
+      expect(desk).toMatch(/<input class="desk-input" id="desk-q" type="search" name="q"/);
+      expect(desk).toContain(`<a class="desk-link label" href="${routes[lang].archive}" data-desk-link>`);
+      // The chips: all (chosen), then every topic once, each with its count of the day.
+      const list = articles(html);
+      const topicOf = (a: string) => a.match(/^<article id="[^"]+" class="story(?: story-lead)? cat-([a-z]+)"/)![1];
+      const ids = [...desk.matchAll(/<input class="topic-pick" type="radio" name="topic" id="topic-([a-z]+)"( checked)?/g)];
+      expect(ids.map((m) => m[1])[0]).toBe("all");
+      expect(ids.filter((m) => m[2]).map((m) => m[1])).toEqual(["all"]);
+      expect(ids.map((m) => m[1]).slice(1).sort()).toEqual([...CATEGORIES].sort());
+      expect(text(desk.match(/<label class="topic-chip label" for="topic-all">([\s\S]*?)<\/label>/)![1])).toBe(`${copy.desk.all} ${list.length}`);
+      for (const category of CATEGORIES) {
+        const n = list.filter((a) => topicOf(a) === category).length;
+        const chip = desk.match(new RegExp(`<label class="topic-chip label cat-${category}( is-zero)?" for="topic-${category}">([\\s\\S]*?)</label>`))!;
+        expect(text(chip[2]), category).toBe(`${copy.categories[category]} ${n}`);
+        expect(!!chip[1], category).toBe(n === 0);
+        // A topic without a story today: a note with the link to its page, shown when its chip is chosen.
+        expect(html.includes(`<p class="topic-none none-${category} label">`), category).toBe(n === 0);
+      }
+      // The groups: one per topic with a story, in the order the topics first come (so the lead
+      // first), each under its heading with the link to its page, its stories in edition order.
+      const groups = [...html.matchAll(/<div class="topic-group in-([a-z]+)">([\s\S]*?)<\/ol>/g)];
+      const seen = [...new Set(byNumber(list).map(topicOf))];
+      expect(groups.map((g) => g[1])).toEqual(seen);
+      for (const [, category, body] of groups) {
+        expect(body).toMatch(new RegExp(`^<h2 class="group-head label caps cat-${category}">`));
+        expect(body).toContain(`<a class="group-more" href="${routes[lang].topic(category)}">`);
+        const inside = articles(body);
+        expect(inside.every((a) => topicOf(a) === category)).toBe(true);
+        expect(inside).toEqual(byNumber(inside));
+      }
+      expect(list[0]).toMatch(/class="story story-lead /);
+      expect(list[0]).toMatch(/class="story-no"[^>]*>01</);
+    }
+    // The filter is the stylesheet's: for each topic its group stays and the others go (a story the
+    // address points at excepted), and the radar's other blips turn grey.
+    const sheet = css();
+    for (const category of CATEGORIES) {
+      expect(sheet).toContain(`.home:has(#topic-${category}:checked) .topic-group:not(.in-${category}, :has(:target))`);
+      expect(sheet).toContain(`.home:has(#topic-${category}:checked) .blip:not(.cat-${category})`);
+      expect(sheet).toContain(`.home:has(#topic-${category}:checked) .none-${category}`);
+    }
+    // Edition pages keep their order and their own scope, with no toolbar.
+    const edition = page(DEMO, "2026-11-18");
+    expect(edition).not.toContain('class="desk"');
+    expect(edition).not.toContain('class="topic-group');
+    expect(edition).not.toContain('<section class="hero"');
   });
 
   it("the opening is decided by boot.js and never written into the markup", () => {
@@ -814,18 +883,12 @@ describe("built site", () => {
     let horizons = 0;
     let ghostLayers = 0;
     let rulers = 0;
-    let heroLayers = 0;
+    let bezels = 0;
     const files = [DEMO, REAL].flatMap(htmlFiles);
     for (const file of files) {
       const html = readFileSync(file, "utf8");
       blips += (html.match(/<a class="blip b-/g) ?? []).length;
       for (const [svg] of html.matchAll(/<svg[\s\S]*?<\/svg>/g)) {
-        // The home page's hero globe is the one drawing shaded in its own markup (hundreds of tones
-        // computed at build): its three layers carry their colours as presentation attributes.
-        if (svg.startsWith('<svg class="hero-layer')) {
-          heroLayers++;
-          continue;
-        }
         expect(svg, file).not.toMatch(/\s(fill|stroke|color|stop-color)="/);
         expect(svg, file).not.toMatch(/#[0-9a-f]{3,8}\b|rgb\(/i);
         if (svg.startsWith('<svg class="mark" viewBox="0 0 24 24"')) {
@@ -834,6 +897,8 @@ describe("built site", () => {
           marks++;
         } else if (/^<svg class="scope-(plate|layer layer-[123])" viewBox="-100 -100 200 200"( aria-hidden="true")?><(circle|g) /.test(svg)) {
           scopes++;
+        } else if (svg.startsWith('<svg class="scope-bezel" viewBox="-116 -116 232 232" aria-hidden="true"><defs>')) {
+          bezels++;
         } else if (/^<svg class="scope-layer layer-[123]" viewBox="-100 -100 200 200"><a class="blip b-\d+ /.test(svg)) {
           blipLayers++;
         } else if (/^<svg class="emblem cat-[a-z]+" viewBox="0 0 48 48" width="(56|96)" height="\1" aria-hidden="true">/.test(svg)) {
@@ -866,8 +931,8 @@ describe("built site", () => {
     // One dial on every page; ghosts only on the thin editions.
     expect(rulers).toBe(files.length);
     expect(ghostLayers).toBeGreaterThan(0);
-    // Three hero layers on each of the two home pages of each build.
-    expect(heroLayers).toBe(3 * 2 * 2);
+    // One bezel per scope: every edition page and the two home pages, in each build.
+    expect(bezels).toBe(2 * (4 * 2 + 2));
     // Before the wordmark: 20 px, hidden from screen readers.
     const strip = page(DEMO, "").match(/<a class="wordmark"[\s\S]*?<\/svg>/)![0];
     expect(strip).toMatch(/<svg class="mark" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">/);
@@ -912,7 +977,7 @@ describe("built site", () => {
       const svgs = list[0].match(/<svg class="emblem[^"]*"[^>]*>/g)!;
       expect(svgs, path).toEqual([`<svg class="emblem cat-${category}" viewBox="0 0 48 48" width="56" height="56" aria-hidden="true">`]);
       // Between the label row and the headline, so the headline is still the article's first heading.
-      expect(list[0]).toMatch(/<\/p>\s*<svg class="emblem[\s\S]*?<\/svg>\s*<h2 class="story-title">/);
+      expect(list[0]).toMatch(/<\/p>\s*<svg class="emblem[\s\S]*?<\/svg>\s*<h[23] class="story-title">/);
       for (const article of list.slice(1)) expect(article, path).not.toContain('class="emblem');
     }
     for (const category of CATEGORIES) {
@@ -959,7 +1024,7 @@ describe("built site", () => {
     expect(line).toContain("vector-effect: non-scaling-stroke;");
   });
 
-  it("a pause button sits on the scope, on the home page's hero and in the footer, hidden without script, sharing one state", () => {
+  it("a pause button sits on the scope (on the home page, in the hero) and in the footer, hidden without script, sharing one state", () => {
     for (const [dir, lang] of [
       [DEMO, "tr"],
       [EMPTY, "tr"],
@@ -972,10 +1037,11 @@ describe("built site", () => {
         const all = html.match(/<button class="still-toggle[\s\S]*?<\/button>/g) ?? [];
         const scope = html.match(/<section class="scope"[\s\S]*?<\/section>/)?.[0];
         const hero = html.match(/<section class="hero"[\s\S]*?<\/section>/)?.[0];
-        expect(all.length, file).toBe(1 + Number(!!scope) + Number(!!hero));
+        expect(all.length, file).toBe(1 + Number(!!scope));
         for (const b of all) expect(b, file).toBe(button);
         if (scope) expect(scope, file).toContain(button);
-        if (hero) expect(hero, file).toContain(button);
+        // On the home page the scope, and so its button, is the hero's (none on a site without an edition).
+        if (hero) expect(hero.includes(button), file).toBe(!!scope);
         const foot = html.match(/<footer class="foot label">[\s\S]*?<\/footer>/)![0];
         expect(foot, file).toContain(button);
       }
@@ -1090,11 +1156,11 @@ describe("built site", () => {
     expect(css()).toContain("a.story-cat,\n.topic-tag,\n.result-cat {");
   });
 
-  it("on a phone the scope is capped at 280 px and the lead card is tighter", () => {
+  it("on a phone the scope is capped at 352 px and the lead card is tighter", () => {
     const decls = declarations(css());
     const narrow = (selector: string, prop: string) =>
       decls.find((d) => d.selector === selector && d.prop === prop && d.stack[0] === "@media (max-width: 39.99em)")?.value;
-    expect(narrow(".scope", "max-width")).toBe("17.5rem");
+    expect(narrow(".scope", "max-width")).toBe("22rem");
     expect(narrow(".scope", "padding")).toBe("var(--space-2)");
     expect(narrow(".story-lead", "padding")).toBe("1rem");
   });
@@ -1145,13 +1211,12 @@ describe("built site", () => {
         expect(head, file).toContain('<script src="/boot.js"></script>');
         const archive = /[\\/](arsiv|archive)[\\/]index\.html$/.test(file);
         const edition = html.includes('<section class="scope"');
-        // The home page's hero brings its own, before the scope's.
+        // The home page's hero holds the day's scope, so it loads the scope's bundle.
         const hero = html.includes('<section class="hero"');
-        expect(srcs.length, file).toBe(2 + Number(archive || edition) + Number(hero));
+        expect(srcs.length, file).toBe(2 + Number(archive || edition));
         expect(srcs.at(-1), file).toMatch(/^\/_astro\/Base[^"]+\.js$/);
         if (archive) expect(srcs[1], file).toMatch(/^\/_astro\/ArchiveView[^"]+\.js$/);
-        if (hero) expect(srcs[1], file).toMatch(/^\/_astro\/Hero[^"]+\.js$/);
-        if (edition) expect(srcs.at(-2), file).toMatch(/^\/_astro\/Scope[^"]+\.js$/);
+        if (edition) expect(srcs[1], file).toMatch(/^\/_astro\/Scope[^"]+\.js$/);
         expect(hero, file).toBe(/[\\/]dist-[a-z]+[\\/](en[\\/])?index\.html$/.test(file));
       }
     }
@@ -1236,7 +1301,7 @@ describe("built site", () => {
       const edition = page(DEMO, path);
       const panel = edition.match(/<div class="scope-panel label" aria-hidden="true" hidden>([\s\S]*?)<\/ol>/)![1];
       const rows = [...panel.matchAll(/<a class="panel-row panel-grid r-(\d+)" href="([^"]+)" tabindex="-1"><span class="pr-no">(\d\d)<\/span><span>(\d{3})°<\/span><span>(\d+)<\/span>/g)];
-      const list = articles(edition);
+      const list = byNumber(articles(edition));
       expect(rows.map((r) => r[2]), path).toEqual(list.map((a) => `#${a.match(/<article id="([^"]+)"/)![1]}`));
       rows.forEach((r, i) => expect(Number(r[5])).toBe(sourceCount(list[i])));
     }
@@ -1896,11 +1961,12 @@ describe("built site", () => {
     // Security reads apart from the brand red of the mark and the arcs.
     expect(table.security[0]).not.toBe(value(":root", "--accent"));
     expect(table.security[0]).not.toBe(value(":root", "--danger"));
-    // Exactly three consumers: the tag, the hanging number and the target bar.
+    // The tag, the hanging number and the target bar; the chips, the radar's blips and their feet
+    // and stems, and the home page's topic headings and chips.
     const users = decls.filter((d) => /var\(--cat(-soft)?[,)]/.test(d.value)).map((d) => d.selector);
     for (const selector of users) {
       expect(selector).toMatch(
-        /^(a\.story-cat, \.topic-tag, \.result-cat|\.story-cat|\.story-no|\.story:target::before|\.chip|\.chip\[aria-checked="true"\]|\.blip-dot|\.blip-echo|\.blip\.is-read \.blip-(dot|no)|\.readout-no|\.emblem|\.em-tile|\.em-top \.em-face)$/,
+        /^(a\.story-cat, \.topic-tag, \.result-cat|\.story-cat|\.story-no|\.story:target::before|\.chip|\.chip\[aria-checked="true"\]|\.blip-(dot|echo|stem|foot)|\.blip\.is-read \.blip-(dot|no)|\.readout-no|\.emblem|\.em-tile|\.em-top \.em-face|\.topic-chip(::before|:hover)|\.topic-pick:checked \+ \.topic-chip( \.topic-n)?|\.group-head)$/,
       );
     }
     expect(new Set(users)).toEqual(
@@ -1913,12 +1979,19 @@ describe("built site", () => {
         '.chip[aria-checked="true"]',
         ".blip-dot",
         ".blip-echo",
+        ".blip-stem",
+        ".blip-foot",
         ".blip.is-read .blip-dot",
         ".blip.is-read .blip-no",
         ".readout-no",
         ".emblem",
         ".em-tile",
         ".em-top .em-face",
+        ".topic-chip::before",
+        ".topic-chip:hover",
+        ".topic-pick:checked + .topic-chip",
+        ".topic-pick:checked + .topic-chip .topic-n",
+        ".group-head",
       ]),
     );
     // The emblem's mid tint is mixed from the category's own pair, so no new colour enters the table.
@@ -1926,18 +1999,16 @@ describe("built site", () => {
   });
 
   it("only the lead card, the scope, the search box, the two buttons and the two dialogs have a box-shadow, and none is blurred", () => {
-    // The home page's hero is the one place allowed light: its soft shadows and gradients are
-    // checked on their own below; everything else stays flat.
-    const isHero = (d: { selector: string }) => d.selector.split(",").every((x) => x.trim().startsWith(".hero"));
-    const shadows = declarations(sheets()).filter((d) => d.prop === "box-shadow" && !isHero(d));
+    const shadows = declarations(sheets()).filter((d) => d.prop === "box-shadow");
     expect(shadows.length).toBeGreaterThan(3);
     for (const shadow of shadows) {
       expect(shadow.value === "none" || /^\d+px \d+px 0 var\(--ink\)$/.test(shadow.value), shadow.value).toBe(true);
       for (const part of shadow.selector.split(",").map((x) => x.trim())) {
         expect(part.replace(/:(hover|focus-visible|active)$/, "").replace(/\[aria-current="page"\]$/, "")).toMatch(
-          /^(\.story-lead \.try|\.(story-lead|scope|search-box|subscribe|try|palette|keys))$/,
+          /^(\.story-lead \.try|\.hero \.scope|\.(story-lead|scope|search-box|subscribe|try|palette|keys))$/,
         );
-        if (part.startsWith(".story-lead .try")) expect(shadow.value).toBe("none");
+        // In the hero the scope leaves its card behind.
+        if (part.startsWith(".story-lead .try") || part === ".hero .scope") expect(shadow.value).toBe("none");
       }
     }
     // The lead card: a 3px shadow at phone width, 4px from 48rem.
@@ -1983,24 +2054,20 @@ describe("built site", () => {
     expect(
       shadows.find((d) => d.selector === ".scope" && d.stack[0] === "@media (min-width: 48rem)")?.value,
     ).toBe("4px 4px 0 var(--ink)");
-    // One gradient on the site outside the hero: the sweep's fade.
-    const all = declarations(sheets()).filter((d) => /gradient\(/.test(d.value));
-    const gradients = all.filter((d) => !isHero(d));
-    expect(gradients.map((d) => `${d.selector} ${d.prop}`)).toEqual([".scope-sweep background"]);
-    expect(gradients[0].value).toMatch(/^conic-gradient\(transparent 0deg \d+deg, var\(--sweep\) 360deg\)$/);
-    let rest = sheets().replace(gradients[0].value, "");
-    for (const d of all.filter(isHero)) rest = rest.replace(d.value, "");
+    // Gradients only in the scope's instrument: the sweep's fade, and the light on its body (the
+    // ground's shadow, the wall's side, the glass's gleam). Everything else is flat.
+    const gradients = declarations(sheets()).filter((d) => /gradient\(/.test(d.value));
+    expect(gradients.map((d) => `${d.selector} ${d.prop}`).sort()).toEqual([
+      ".dish-floor background",
+      ".dish-glass background",
+      ".dish-wall background",
+      ".scope-sweep background",
+    ]);
+    const sweep = gradients.find((d) => d.selector === ".scope-sweep")!;
+    expect(sweep.value).toMatch(/^conic-gradient\(transparent 0deg \d+deg, var\(--sweep\) 360deg\)$/);
+    let rest = sheets();
+    for (const d of gradients) rest = rest.replace(d.value, "");
     expect(rest).not.toMatch(/gradient\(|backdrop-filter|filter:\s*drop-shadow|text-shadow/);
-    // The hero's light: gradients only on its ground and its veil, soft shadows only on its jump
-    // control and its labels.
-    expect([...new Set(all.filter(isHero).map((d) => `${d.selector} ${d.prop}`))].sort()).toEqual([
-      ".hero background",
-      ".hero-copy::before background",
-    ]);
-    expect(declarations(sheets()).filter((d) => d.prop === "box-shadow" && isHero(d)).map((d) => d.selector).sort()).toEqual([
-      ".hero-jump",
-      ".hero-tag-in",
-    ]);
   });
 
   it("every animation and transition sits inside a reduced-motion or @supports guard", () => {
@@ -2018,7 +2085,6 @@ describe("built site", () => {
     // or slower. Each loops only with motion allowed, only with script (html.js: where the pause
     // button exists; without script the scope and the horizon stand still), and never once the
     // reader has paused (html.still). Stopped, each rests on its plain frame: no animation at all.
-    // (The home page's globe turns on a canvas, by script, under the same two conditions.)
     const LOOPED = [".blip-echo", ".hz-bird", ".hz-turn", ".readout-line", ".scope-sweep"];
     const GATE = "html.js:not(.still) ";
     expect(sheets()).not.toMatch(/alternate/);
@@ -2062,10 +2128,9 @@ describe("built site", () => {
       expect(rules.find((d) => d.prop === "opacity")?.value, selector).toBe("1");
       expect(rules.find((d) => d.prop === "transform")?.value, selector).toBe("none");
     }
-    // Faded or offset states live only in keyframes, never as an element's default; the one
-    // exception is the hero's labels, whose strength the script sets (--on).
-    for (const d of decls.filter((x) => x.prop === "opacity" && x.selector !== ".hero-tag")) expect(d.stack.join(" ")).toMatch(/@keyframes|@media print/);
-    expect(decls.filter((x) => x.prop === "opacity" && x.selector === ".hero-tag").map((x) => x.value)).toEqual(["var(--on, 0)"]);
+    // Faded or offset states live only in keyframes, never as an element's default (a topic
+    // filter greys the radar's other blips by colour, not by opacity).
+    for (const d of decls.filter((x) => x.prop === "opacity")) expect(d.stack.join(" ")).toMatch(/@keyframes|@media print/);
     // Where a timeline does not advance (a capture, a throttled view), an element sits at its
     // first keyframe: no keyframe fades a lit arc or a story below half strength.
     const keyframes = decls.filter((d) => d.stack[0]?.startsWith("@keyframes"));
@@ -2084,8 +2149,6 @@ describe("built site", () => {
         "@keyframes emblem-lift",
         "@keyframes dish-turn",
         "@keyframes hero-rise",
-        "@keyframes hero-draw",
-        "@keyframes hero-sink",
         "@keyframes bird-drift",
         "@keyframes vt-scan",
         "@keyframes ns-draw",

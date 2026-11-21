@@ -1,0 +1,45 @@
+---
+// An edition's one h1, reading "Sayı 4 · 20 Kasım 2026 Cuma · 5 haber · 22 kaynak · ~2 dk" in
+// order. On an edition page the stylesheet sets it as three rows; on the home page, at the top of
+// the hero, as the radar's dateline on one or two small lines.
+import { COPY } from "../lib/copy";
+import { readingMinutes, type Edition } from "../lib/editions";
+import { dayMonth, weekdayName, yearOf } from "../lib/format";
+import type { Lang } from "../lib/schema";
+
+interface Props {
+  lang: Lang;
+  edition: Edition;
+}
+
+const { lang, edition } = Astro.props;
+const copy = COPY[lang];
+const weekday = weekdayName(edition.date, lang);
+const sources = edition.stories.reduce((sum, story) => sum + story.source_count, 0);
+// Words ÷ 200, rounded up, counted at build.
+const minutes = readingMinutes(edition.stories, lang);
+---
+
+<h1 class="masthead">
+  <span class="mh-no label caps">{copy.issue(edition.number)}</span>
+  <span class="mh-sep">{" · "}</span>
+  <time datetime={edition.date}>
+    {
+      lang === "tr" ? (
+        <>
+          <span class="mh-big">{dayMonth(edition.date, lang)}</span>
+          <span class="mh-year label">{` ${yearOf(edition.date)}`}</span>
+          <span class="mh-big">{` ${weekday}`}</span>
+        </>
+      ) : (
+        <>
+          <span class="mh-big">{`${weekday}, ${dayMonth(edition.date, lang)}`}</span>
+          <span class="mh-year label">{` ${yearOf(edition.date)}`}</span>
+        </>
+      )
+    }
+  </time>
+  <span class="mh-rest label">
+    {` · ${copy.storyCount(edition.stories.length)} · ${copy.sources(sources)} · ${copy.minutes(minutes)}`}
+  </span>
+</h1>

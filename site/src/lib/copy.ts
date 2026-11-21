@@ -5,18 +5,29 @@ import type { Category, Lang } from "./schema";
 export interface Copy {
   siteName: string;
   tagline: string;
-  /** What Radar is, over the globe that fills the home page's first screen. */
+  /** What Radar is, beside the day's radar at the top of the home page. */
   hero: {
     label: string;
     /** The statement, in three parts: the middle one is underlined in the accent. */
     lead: [string, string, string];
     /** Its two promises, on one line. */
     promises: [string, string];
-    /** The control that jumps to the day's edition, and the one to the About page. */
-    jump: string;
+    /** The quiet link to the About page. */
     more: string;
-    /** The instrument's readout under the globe: where Radar listens from. */
-    place: string;
+  };
+  /** The home page's toolbar over the day's stories: the search and the topic chips. */
+  desk: {
+    /** The search field's label and placeholder, its button, and the link that stands in without script. */
+    search: string;
+    placeholder: string;
+    go: string;
+    fallback: string;
+    /** The chips' group name and the chip for every topic. */
+    topics: string;
+    all: string;
+    /** A chosen topic with no story today, and the link to that topic's page. */
+    none: string;
+    more(topic: string): string;
   };
   nav: { today: string; archive: string; week: string; about: string };
   /** The name of the dial that holds those four links. */
@@ -205,12 +216,20 @@ export const COPY: Record<Lang, Copy> = {
     siteName: "Radar",
     tagline: "Günün teknoloji ve yapay zekâ haberleri. Beş dakika, gürültü yok.",
     hero: {
-      label: "Radar nedir?",
-      lead: ["Teknoloji ve yapay zekâda bugün ", "gerçekten önemli", " olan birkaç haber."],
+      label: "Günlük bülten",
+      lead: ["Günün teknoloji ve ", "yapay zekâ", " haberleri."],
       promises: ["Her sabah", "Kısa ve öz"],
-      jump: "Bugünün baskısı",
       more: "Nasıl çalışır",
-      place: "41.01°K 28.98°D · İstanbul",
+    },
+    desk: {
+      search: "Tüm haberlerde ara",
+      placeholder: "Tüm haberlerde ara…",
+      go: "Ara",
+      fallback: "Arşivde ara",
+      topics: "Konular",
+      all: "Tümü",
+      none: "Bugün bu konuda haber yok.",
+      more: (topic) => `Tüm ${topic} haberleri`,
     },
     nav: { today: "Bugün", archive: "Arşiv", week: "Hafta", about: "Künye" },
     navLabel: "Bölümler",
@@ -433,7 +452,7 @@ export const COPY: Record<Lang, Copy> = {
           heading: "Gizlilik",
           paragraphs: [
             "Bu site çerez kullanmaz, seni izlemez ve üçüncü taraflardan hiçbir şey yüklemez: analitik, reklam ya da dış yazı tipi yok. Her sayfa statik bir HTML dosyasıdır ve betik olmadan da eksiksiz çalışır.",
-            "Sitenin kendi küçük betiği yalnızca bir kolaylık ekler: arşivde arama ve komut paleti (arama verisi bu siteden gelir), klavye kısayolları, kopyalama düğmeleri (panoya yalnızca sen bastığında yazar), radar ekranının eğimi ve okunan haberlerin işareti, ana sayfanın başındaki dönen radar küresi (fareyle biraz çevrilir, sayfa kayınca geri çekilir), “Neden önemli” satırının belirişi, baskının tarihinin ve sayılarının bir kalkış tabelası gibi yerine oturması, abone ol düğmesinin yazısının üzerine gelince çözülmesi, komut paletine “ping” yazınca radarın bir kez atması, siteye her girişte oynayan kısa açılış ve dönen hareketi durduran düğme. Sayfanın altındaki ufuk çizimi akşamdan sabaha gece hâline geçer: saati senin cihazının saatinden İstanbul saatine göre hesaplar, hiçbir yere sormaz. Hareketi azaltmayı seçtiysen hareketlerin hiçbiri oynamaz.",
+            "Sitenin kendi küçük betiği yalnızca bir kolaylık ekler: arşivde arama ve komut paleti (arama verisi bu siteden gelir), klavye kısayolları, kopyalama düğmeleri (panoya yalnızca sen bastığında yazar), radar ekranının eğimi ve okunan haberlerin işareti, ana sayfadaki arama kutusu (yazdığın sözcükleri arşivin aramasına, yani o sayfanın adresine taşır), ana sayfanın başındaki yazının ve radarın açılıştan sonra bir kez yerine oturması, “Neden önemli” satırının belirişi, baskının tarihinin ve sayılarının bir kalkış tabelası gibi yerine oturması, abone ol düğmesinin yazısının üzerine gelince çözülmesi, komut paletine “ping” yazınca radarın bir kez atması, siteye her girişte oynayan kısa açılış ve dönen hareketi durduran düğme. Sayfanın altındaki ufuk çizimi akşamdan sabaha gece hâline geçer: saati senin cihazının saatinden İstanbul saatine göre hesaplar, hiçbir yere sormaz. Hareketi azaltmayı seçtiysen hareketlerin hiçbiri oynamaz.",
             "Arşivde aradığın sözcükler tarayıcında ve sayfanın adresinde kalır; adres de tarayıcı geçmişine yazılır. Sayfayı yenilediğinde ya da bir sonuca tıkladığında adres yalnızca bu siteye gider; başka kimseye gönderilmez.",
             "Tarayıcının oturum belleğine en çok bir anahtar yazılır: hareketi durdurduysan bunu hatırlayan radar:still. Sekme kapanınca silinir. Başka hiçbir şey saklanmaz.",
           ],
@@ -465,12 +484,20 @@ export const COPY: Record<Lang, Copy> = {
     siteName: "Radar",
     tagline: "The day's tech and AI news. Five minutes, no noise.",
     hero: {
-      label: "What is Radar?",
-      lead: ["The few tech and AI stories that ", "really matter", " today."],
+      label: "Daily briefing",
+      lead: ["The day's tech and ", "AI", " news."],
       promises: ["Every morning", "Short and to the point"],
-      jump: "Today's edition",
       more: "How it works",
-      place: "41.01°N 28.98°E · Istanbul",
+    },
+    desk: {
+      search: "Search all stories",
+      placeholder: "Search all stories…",
+      go: "Search",
+      fallback: "Search the archive",
+      topics: "Topics",
+      all: "All",
+      none: "No story on this topic today.",
+      more: (topic) => `All ${topic} stories`,
     },
     nav: { today: "Today", archive: "Archive", week: "Week", about: "About" },
     navLabel: "Sections",
@@ -695,7 +722,7 @@ export const COPY: Record<Lang, Copy> = {
           heading: "Privacy",
           paragraphs: [
             "This site sets no cookies, does not track you and loads nothing from third parties: no analytics, no ads, no outside fonts. Every page is a static HTML file and is complete without scripts.",
-            "The site's own small script only adds conveniences: the archive search and the command palette (their data comes from this site), keyboard shortcuts, copy buttons (they write to your clipboard only when you press them), the radar's tilt and the marks on stories you have read, the turning radar globe at the top of the home page (a mouse turns it a little, and it sinks back as you scroll), the way the “Why it matters” line appears, the edition's date and counts settling in like a departure board, the subscribe button's label decoding when you point at it, the radar's single pulse when you type “ping” in the command palette, a short opening each time you enter the site, and the button that pauses the looping motion. The horizon at the foot of each page turns to night from evening to morning: it works out Istanbul's time from your own device's clock and asks nothing of anyone. If you have asked for less motion, none of it moves.",
+            "The site's own small script only adds conveniences: the archive search and the command palette (their data comes from this site), keyboard shortcuts, copy buttons (they write to your clipboard only when you press them), the radar's tilt and the marks on stories you have read, the home page's search field (it takes your words to the archive search, that is, into that page's address), the home page's words and radar rising into place once after the opening, the way the “Why it matters” line appears, the edition's date and counts settling in like a departure board, the subscribe button's label decoding when you point at it, the radar's single pulse when you type “ping” in the command palette, a short opening each time you enter the site, and the button that pauses the looping motion. The horizon at the foot of each page turns to night from evening to morning: it works out Istanbul's time from your own device's clock and asks nothing of anyone. If you have asked for less motion, none of it moves.",
             "What you type in the archive search stays in your browser and in the page's address, so it is also in your browser history. When you reload the page or click a result, that address goes to this site only; it is sent to no one else.",
             "At most one key is written to the browser's session storage: radar:still, which remembers that you paused the motion. It is gone when the tab closes. Nothing else is stored.",
           ],
