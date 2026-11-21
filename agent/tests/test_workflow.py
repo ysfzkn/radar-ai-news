@@ -1,8 +1,12 @@
 """The scheduled workflow is checked by reading the file; it cannot be run here."""
 
+import os
 import re
+import shutil
+import subprocess
 from pathlib import Path
 
+import pytest
 import yaml
 
 WORKFLOWS = Path(__file__).resolve().parents[2] / ".github" / "workflows"
@@ -54,7 +58,7 @@ def test_schedule_and_manual_trigger():
     on = triggers(load("daily.yml"))
     assert on["schedule"] == [{"cron": "15 4 * * *"}]
     inputs = on["workflow_dispatch"]["inputs"]
-    assert list(inputs) == ["max_stories"]
+    assert list(inputs) == ["max_stories", "mode"]
     assert inputs["max_stories"]["type"] == "string"
     assert inputs["max_stories"]["default"] == ""
 
@@ -221,6 +225,55 @@ def test_dispatch_input_goes_through_env_and_is_checked():
     assert "MAX_STORIES" in run["env"]
     assert "inputs.max_stories" in run["env"]["MAX_STORIES"]
     assert "0-9" in run["run"] and "--max-stories" in run["run"]
+    assert run["env"]["RUN_MODE"] == "${{ inputs.mode }}"
+    assert "inputs." not in run["run"]  # inputs reach the script only through env
+
+
+def run_step_args(max_stories: str, mode: str) -> tuple[int, list[str]]:
+    """Runs the run step's script with `uv` replaced by a function that prints its words."""
+    bash = shutil.which("bash")
+    if bash is None:
+        pytest.skip("bash is not available")
+    script = "uv() { printf '%s\\n' \"$@\"; }\n" + steps()[step_index("daily")]["run"]
+    env = {**os.environ, "MAX_STORIES": max_stories, "RUN_MODE": mode}
+    done = subprocess.run([bash, "-c", script], env=env, capture_output=True, text=True)
+    return done.returncode, done.stdout.splitlines()
+
+
+@pytest.mark.parametrize(
+    ("max_stories", "mode", "words"),
+    [
+        ("", "", ["run", "radar", "daily"]),  # the schedule passes no inputs
+        ("", "normal", ["run", "radar", "daily"]),
+        ("3", "normal", ["run", "radar", "daily", "--max-stories", "3"]),
+        ("2", "review_all", ["run", "radar", "daily", "--max-stories", "2", "--review-all"]),
+        ("", "collect_only", ["run", "radar", "daily", "--collect-only"]),
+    ],
+)
+def test_the_run_step_maps_the_inputs_to_flags(max_stories, mode, words):
+    assert run_step_args(max_stories, mode) == (0, words)
+
+
+@pytest.mark.parametrize(
+    ("max_stories", "mode"),
+    [("2x", "normal"), ("", "everything"), ("", "--review-all"), ("", "normal; rm -rf /")],
+)
+def test_the_run_step_refuses_anything_else(max_stories, mode):
+    code, words = run_step_args(max_stories, mode)
+    assert code == 1 and "radar" not in words
+
+
+def test_the_mode_input_is_a_closed_choice_and_names_the_run():
+    data = load("daily.yml")
+    mode = triggers(data)["workflow_dispatch"]["inputs"]["mode"]
+    assert mode["type"] == "choice"
+    assert mode["options"] == ["normal", "review_all", "collect_only"]
+    assert mode["default"] == "normal"
+    # The run's title says how it was started, so the admin's run list can show it.
+    assert data["run-name"] == (
+        "${{ format('Daily · {0}{1}', inputs.mode || 'normal', "
+        "inputs.max_stories && format(' · {0}', inputs.max_stories) || '') }}"
+    )
 
 
 def test_no_token_in_a_url_or_argument():

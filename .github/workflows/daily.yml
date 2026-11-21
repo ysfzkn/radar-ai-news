@@ -13,6 +13,17 @@ on:
         description: "Most stories to write in this run (empty: the default)"
         type: string
         default: ""
+      mode:
+        description: "normal; review_all (publish nothing, every story waits for review); collect_only (collect sources only: no model call, no story, no push)"
+        type: choice
+        options:
+          - normal
+          - review_all
+          - collect_only
+        default: normal
+
+# The run's title names how it was started (the admin's run list shows it).
+run-name: ${{ format('Daily · {0}{1}', inputs.mode || 'normal', inputs.max_stories && format(' · {0}', inputs.max_stories) || '') }}
 
 # Read-only by default. Only the push job, which runs git and two first-party actions
 # and nothing else, gets write access.
@@ -95,6 +106,7 @@ jobs:
           RADAR_ADMIN_URL: ${{ vars.RADAR_ADMIN_URL }}
           RADAR_DAILY_CAP_USD: ${{ vars.RADAR_DAILY_CAP_USD }}
           MAX_STORIES: ${{ inputs.max_stories }}
+          RUN_MODE: ${{ inputs.mode }}
         run: |
           args=()
           if [ -n "$MAX_STORIES" ]; then
@@ -103,6 +115,13 @@ jobs:
             esac
             args=(--max-stories "$MAX_STORIES")
           fi
+          # A scheduled run has no inputs: an empty mode is the normal run.
+          case "$RUN_MODE" in
+            "" | normal) ;;
+            review_all) args+=(--review-all) ;;
+            collect_only) args+=(--collect-only) ;;
+            *) echo "mode must be normal, review_all or collect_only."; exit 1 ;;
+          esac
           uv run radar daily "${args[@]}"
 
       - name: Save state
