@@ -10,6 +10,7 @@ from radar.models import (
     Cluster,
     Draft,
     FactCard,
+    Lane,
     Outcome,
     RawItem,
     Score,
@@ -207,16 +208,22 @@ class SqliteStore:
             "stats": json.loads(row["stats"]) if row["stats"] else None,
         }
 
-    def save_scores(self, scores: list[Score], at: datetime) -> None:
+    def save_scores(
+        self, scores: list[Score], at: datetime, lens: Lane = "fresh", watermark: int = 0
+    ) -> None:
+        """Keep the latest score of each cluster, with the question it answered (`lens`) and
+        the highest story id when it was asked (`watermark`, see `story_watermark`)."""
         with self._conn:
             self._conn.executemany(
                 "INSERT INTO cluster_scores "
-                "(cluster_id, relevance, novelty, usefulness, category, risk_flags, scored_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?) "
+                "(cluster_id, relevance, novelty, usefulness, category, risk_flags, scored_at, "
+                "lens, repeat, watermark) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
                 "ON CONFLICT(cluster_id) DO UPDATE SET relevance=excluded.relevance, "
                 "novelty=excluded.novelty, usefulness=excluded.usefulness, "
                 "category=excluded.category, risk_flags=excluded.risk_flags, "
-                "scored_at=excluded.scored_at",
+                "scored_at=excluded.scored_at, lens=excluded.lens, repeat=excluded.repeat, "
+                "watermark=excluded.watermark",
                 [
                     (
                         s.cluster_id,
@@ -226,18 +233,38 @@ class SqliteStore:
                         s.category,
                         json.dumps(s.risk_flags, ensure_ascii=False),
                         _iso(at),
+                        lens,
+                        int(s.repeat),
+                        watermark,
                     )
                     for s in scores
                 ],
             )
 
-    def scores_for(self, cluster_ids: list[int]) -> dict[int, Score]:
+    def scores_for(
+        self,
+        cluster_ids: list[int],
+        *,
+        lens: Lane | None = None,
+        watermark: int | None = None,
+        scored_since: datetime | None = None,
+    ) -> dict[int, Score]:
+        """Stored scores; with `lens`, `watermark` or `scored_since`, only those asked that
+        question, at that watermark, or since that time."""
         if not cluster_ids:
             return {}
         marks = ",".join("?" * len(cluster_ids))
-        rows = self._conn.execute(
-            f"SELECT * FROM cluster_scores WHERE cluster_id IN ({marks})", cluster_ids
-        )
+        sql = f"SELECT * FROM cluster_scores WHERE cluster_id IN ({marks})"
+        params: list = list(cluster_ids)
+        if lens is not None:
+            sql += " AND lens = ?"
+            params.append(lens)
+        if watermark is not None:
+            sql += " AND watermark = ?"
+            params.append(watermark)
+        if scored_since is not None:
+            sql += " AND scored_at >= ?"
+            params.append(_iso(scored_since))
         return {
             r["cluster_id"]: Score(
                 cluster_id=r["cluster_id"],
@@ -246,9 +273,44 @@ class SqliteStore:
                 usefulness=r["usefulness"],
                 category=r["category"],
                 risk_flags=json.loads(r["risk_flags"]),
+                repeat=bool(r["repeat"]),
             )
-            for r in rows
+            for r in self._conn.execute(sql, params)
         }
+
+    def story_watermark(self) -> int:
+        """The highest story id (0 for none): a score asked at a lower watermark has not
+        seen every story written since."""
+        row = self._conn.execute("SELECT COALESCE(MAX(id), 0) AS top FROM stories").fetchone()
+        return row["top"]
+
+    def written_refs(self, since: datetime) -> list[dict]:
+        """Every story created since `since`, newest first, as the duplicate check needs it:
+        its links (the story's source URL and every item URL of its cluster), its titles
+        (every item title of its cluster and both written titles) and its English title."""
+        stories = self._conn.execute(
+            "SELECT s.id AS id, s.cluster_id AS cluster_id, s.source_url AS source_url, "
+            "s.created_at AS created_at, en.title AS en_title, tr.title AS tr_title "
+            "FROM stories s "
+            "JOIN story_texts en ON en.story_id = s.id AND en.lang = 'en' "
+            "JOIN story_texts tr ON tr.story_id = s.id AND tr.lang = 'tr' "
+            "WHERE s.created_at >= ? ORDER BY s.created_at DESC, s.id DESC",
+            (_iso(since),),
+        ).fetchall()
+        refs = []
+        for r in stories:
+            items = self._conn.execute(
+                "SELECT url, title FROM items WHERE cluster_id = ? ORDER BY id", (r["cluster_id"],)
+            ).fetchall()
+            refs.append(
+                {
+                    "created_at": _parse(r["created_at"]),
+                    "urls": {r["source_url"], *(i["url"] for i in items)},
+                    "titles": [i["title"] for i in items] + [r["en_title"], r["tr_title"]],
+                    "title": r["en_title"],
+                }
+            )
+        return refs
 
     def story_cluster_ids(self, cluster_ids: list[int]) -> set[int]:
         if not cluster_ids:
@@ -271,13 +333,15 @@ class SqliteStore:
         source_url: str,
         source_count: int,
         created_at: datetime,
+        reported_at: datetime | None = None,
+        lane: Lane = "fresh",
     ) -> int:
         published_at = _iso(created_at) if status == "published" else None
         with self._conn:
             cur = self._conn.execute(
                 "INSERT INTO stories (cluster_id, run_id, category, status, reasons, score, "
-                "fact_card, source_url, source_count, created_at, published_at, uid) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "fact_card, source_url, source_count, created_at, published_at, uid, "
+                "reported_at, lane) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     cluster_id,
                     run_id,
@@ -291,6 +355,8 @@ class SqliteStore:
                     _iso(created_at),
                     published_at,
                     uuid.uuid4().hex,
+                    _iso(reported_at) if reported_at else None,
+                    lane,
                 ),
             )
             story_id = cur.lastrowid
@@ -430,6 +496,8 @@ class SqliteStore:
                     pushed_at=_parse(r["pushed_at"]) if r["pushed_at"] else None,
                     refused_at=_parse(r["refused_at"]) if r["refused_at"] else None,
                     refused_path=r["refused_path"],
+                    reported_at=_parse(r["reported_at"]) if r["reported_at"] else None,
+                    lane=r["lane"],
                 )
             )
         return stories

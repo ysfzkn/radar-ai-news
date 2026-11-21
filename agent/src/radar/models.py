@@ -1,3 +1,4 @@
+from datetime import date
 from enum import IntEnum
 from typing import Literal
 
@@ -43,6 +44,10 @@ class Cluster(BaseModel):
     items: list[StoredItem]
 
 
+# "fresh": first reported within prefilter.FRESH; "backlog": older, up to prefilter.LOOKBACK.
+Lane = Literal["fresh", "backlog"]
+
+
 class Candidate(BaseModel):
     cluster_id: int
     title: str
@@ -52,6 +57,10 @@ class Candidate(BaseModel):
     has_primary: bool
     is_turkey: bool
     score: float
+    # The earliest date any source gave the event (an item's published date, or the time
+    # the store first saw an undated item). None only for candidates built by hand.
+    first_reported: AwareDatetime | None = None
+    lane: Lane = "fresh"
 
 
 Category = Literal[
@@ -71,6 +80,8 @@ class Score(BaseModel):
     usefulness: int = Field(ge=0, le=5)
     category: Category
     risk_flags: list[RiskFlag] = []
+    # The scorer's answer to "is this the same event as a story Radar already wrote?"
+    repeat: bool = False
 
     @property
     def total(self) -> float:
@@ -103,6 +114,10 @@ class SourceDoc(BaseModel):
     links: list[str]  # article links plus cluster item URLs, shown to the writer
     article_links: list[str] = []  # links found in the fetched primary article only
     source_urls: list[str] = []  # the primary URL and the cluster items' URLs
+    # Istanbul calendar days: when the event was first reported, and the edition's day.
+    # Set by the agent, never taken from the page; the writer and the verifier use them.
+    reported_on: date | None = None
+    edition_on: date | None = None
 
 
 class Story(BaseModel):
@@ -122,3 +137,5 @@ class Story(BaseModel):
     pushed_at: AwareDatetime | None = None
     refused_at: AwareDatetime | None = None
     refused_path: str | None = None  # the field the admin service named, e.g. "texts.tr.title"
+    reported_at: AwareDatetime | None = None  # when the event was first reported (agent only)
+    lane: Lane = "fresh"
