@@ -7,7 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Site: the navigation is a frequency dial, a tuning scale with the four sections as stations and an accent needle on the current one (pure CSS from `aria-current`; it follows the pointer and the focus and glides between pages with view transitions). On a phone it is fixed to the foot of the window.
+- Site: a readout panel beside the scope from 48rem, one row per story (number, bearing, sources, topic, title), linked both ways with its blip; and ghost blips for a thin edition: up to eight stories of the previous seven days, small and faint, linking to their editions.
+- Site: the masthead's date and counts settle in like a departure board, once per view; the subscribe label decodes on hover.
+- Site: signal bars on each story (1, 2–3, 4+ sources); the horizon follows Istanbul's time (sun and gulls by day, moon and lit windows at night); `ping` in the command palette pulses the scope.
+
 ### Changed
+
+- Site: buttons sink into their shadow on press and fill with the accent from the left on hover; the TR / EN switch is a two-position slider; copy buttons turn into a check after copying. The language switch moved to the first row of the top strip.
 
 - Site: the loading screen plays every time the site is entered (a new visit, a link from elsewhere, a reload), not once per browser session, and not when moving between the site's pages. The session key `radar:intro` is gone; `radar:still` is the only key the site stores.
 
