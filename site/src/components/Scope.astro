@@ -34,7 +34,6 @@ const blips = edition.stories.map((story, i) => {
   const { ring, angle } = placed[i];
   const { x, y } = blipPoint(ring, angle);
   const shade = shadowPoint(ring, angle);
-  const foot = { x, y };
   const no = String(i + 1).padStart(2, "0");
   const title = story.texts[lang]!.title;
   return {
@@ -43,7 +42,6 @@ const blips = edition.stories.map((story, i) => {
     title,
     ring,
     shade,
-    foot,
     href: `#${anchorId(story.uid)}`,
     cat: categoryClass(story.category),
     category: copy.categories[story.category],
@@ -136,7 +134,6 @@ const rings: Ring[] = [3, 2, 1];
           <path class="plate-minor" d={minor}></path>
           <path class="plate-major" d={major}></path>
           {blips.map((blip) => <circle class={`blip-shade ${blip.cat}`} cx={blip.shade.x} cy={blip.shade.y} r="9"></circle>)}
-          {blips.map((blip) => <circle class={`blip-foot ${blip.cat}`} cx={blip.foot.x} cy={blip.foot.y} r="1.4"></circle>)}
         </svg>
         <div class="scope-sweep" aria-hidden="true"></div>
         <i class="dish-glass"></i>

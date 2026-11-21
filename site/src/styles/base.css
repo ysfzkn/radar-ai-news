@@ -646,15 +646,17 @@ a.lang-part:focus-visible {
   margin: 0;
 }
 
-/* A phone: the radar is as wide as the column and tipped back to 63°, so it is wide and low; its
-   readout keeps one line, and the caption goes (the pause stays under it). */
+/* A phone: the words first, then the radar nearly as wide as the column and tipped back to 63°,
+   so it is wide and low and its blips stay 32px targets for a thumb; its readout keeps one line
+   with the pause at its end, and the caption goes. The stems follow the steeper tip and the dish's
+   92% of the stage (each ring's height is 1 / 0.92 as many drawing units). */
 @media (max-width: 47.99rem) {
   .hero .scope {
     --tip: 63deg;
     --up: 2.2;
-    --stem-1: 72;
-    --stem-2: 51;
-    --stem-3: 31;
+    --stem-1: 68;
+    --stem-2: 49;
+    --stem-3: 29;
   }
 
   .hero {
@@ -715,9 +717,13 @@ a.lang-part:focus-visible {
 
   .hero .scope-dish {
     top: 47%;
-    left: 6%;
-    width: 88%;
-    margin-top: -44%;
+    left: 4%;
+    width: 92%;
+    margin-top: -46%;
+  }
+
+  .hero .dish-floor {
+    transform: translate3d(2%, 1%, -6cqi) scale(1.02);
   }
 
   /* The readout keeps one line, with the pause at its end; the caption goes. */
@@ -798,6 +804,18 @@ a.lang-part:focus-visible {
 
   .hero .scope-caption {
     font-size: 0.6875rem;
+  }
+}
+
+/* A tablet: the radar a little smaller, so the words keep their room. */
+@media (min-width: 48rem) and (max-width: 63.99rem) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 20rem);
+    column-gap: var(--space-5);
+  }
+
+  .hero-lead {
+    font-size: 1.125rem;
   }
 }
 
@@ -1074,14 +1092,14 @@ a.lang-part:focus-visible {
   --blip-ink: var(--muted);
 }
 
-.home:has(#topic-protocol:checked) :is(.blip-shade, .blip-foot):not(.cat-protocol),
-.home:has(#topic-model:checked) :is(.blip-shade, .blip-foot):not(.cat-model),
-.home:has(#topic-framework:checked) :is(.blip-shade, .blip-foot):not(.cat-framework),
-.home:has(#topic-tooling:checked) :is(.blip-shade, .blip-foot):not(.cat-tooling),
-.home:has(#topic-research:checked) :is(.blip-shade, .blip-foot):not(.cat-research),
-.home:has(#topic-security:checked) :is(.blip-shade, .blip-foot):not(.cat-security),
-.home:has(#topic-industry:checked) :is(.blip-shade, .blip-foot):not(.cat-industry),
-.home:has(#topic-policy:checked) :is(.blip-shade, .blip-foot):not(.cat-policy) {
+.home:has(#topic-protocol:checked) .blip-shade:not(.cat-protocol),
+.home:has(#topic-model:checked) .blip-shade:not(.cat-model),
+.home:has(#topic-framework:checked) .blip-shade:not(.cat-framework),
+.home:has(#topic-tooling:checked) .blip-shade:not(.cat-tooling),
+.home:has(#topic-research:checked) .blip-shade:not(.cat-research),
+.home:has(#topic-security:checked) .blip-shade:not(.cat-security),
+.home:has(#topic-industry:checked) .blip-shade:not(.cat-industry),
+.home:has(#topic-policy:checked) .blip-shade:not(.cat-policy) {
   display: none;
 }
 
@@ -1409,7 +1427,7 @@ a.lang-part:focus-visible {
 .dish-floor {
   border-radius: 50%;
   background: radial-gradient(closest-side, rgb(58 44 26 / 0.38), rgb(58 44 26 / 0.14) 60%, rgb(58 44 26 / 0));
-  transform: translate3d(3%, 5%, -9cqi) scale(1.12);
+  transform: translate3d(3%, 3%, -6cqi) scale(1.08);
 }
 
 /* The body's wall: six slices, each a little lower, lit from the left. */
@@ -1564,10 +1582,6 @@ a.lang-part:focus-visible {
 
 .blip-shade {
   fill: url(#scope-shade);
-}
-
-.blip-foot {
-  fill: var(--cat);
 }
 
 /* The sweep turns once in 6 s (clockwise from straight up): a fading wedge behind an accent edge. */

@@ -1966,7 +1966,7 @@ describe("built site", () => {
     const users = decls.filter((d) => /var\(--cat(-soft)?[,)]/.test(d.value)).map((d) => d.selector);
     for (const selector of users) {
       expect(selector).toMatch(
-        /^(a\.story-cat, \.topic-tag, \.result-cat|\.story-cat|\.story-no|\.story:target::before|\.chip|\.chip\[aria-checked="true"\]|\.blip-(dot|echo|stem|foot)|\.blip\.is-read \.blip-(dot|no)|\.readout-no|\.emblem|\.em-tile|\.em-top \.em-face|\.topic-chip(::before|:hover)|\.topic-pick:checked \+ \.topic-chip( \.topic-n)?|\.group-head)$/,
+        /^(a\.story-cat, \.topic-tag, \.result-cat|\.story-cat|\.story-no|\.story:target::before|\.chip|\.chip\[aria-checked="true"\]|\.blip-(dot|echo|stem)|\.blip\.is-read \.blip-(dot|no)|\.readout-no|\.emblem|\.em-tile|\.em-top \.em-face|\.topic-chip(::before|:hover)|\.topic-pick:checked \+ \.topic-chip( \.topic-n)?|\.group-head)$/,
       );
     }
     expect(new Set(users)).toEqual(
@@ -1980,7 +1980,6 @@ describe("built site", () => {
         ".blip-dot",
         ".blip-echo",
         ".blip-stem",
-        ".blip-foot",
         ".blip.is-read .blip-dot",
         ".blip.is-read .blip-no",
         ".readout-no",
