@@ -35,6 +35,9 @@ const subscribe = routes[lang].subscribe;
     <a class="by label" href={OWNER.site} {...EXTERNAL}>{copy.by}</a>
   </div>
   <div class="top-act">
+    <button class="pal-open label" type="button" data-palette-open hidden aria-label={copy.palette.open}>
+      <kbd>⌘K</kbd><span class="pal-open-word">{copy.palette.hint}</span>
+    </button>
     <a class="subscribe label" href={subscribe} aria-current={subscribe === path ? "page" : undefined}>
       {copy.subscribeFree}
     </a>

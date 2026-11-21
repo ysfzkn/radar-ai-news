@@ -1,0 +1,110 @@
+---
+import Mark from "./Mark.astro";
+import { COPY } from "../lib/copy";
+import { routes } from "../lib/routes";
+import { CATEGORIES, type Category, type Lang } from "../lib/schema";
+
+interface Props {
+  lang: Lang;
+  /** The same page in the other language, or null to point at its home. */
+  alternate: string | null;
+}
+
+const { lang, alternate } = Astro.props;
+const copy = COPY[lang];
+const p = copy.palette;
+const other: Lang = lang === "tr" ? "en" : "tr";
+const r = routes[lang];
+// Each item: what it is (shown in the label voice), its name, its address, and words that also
+// find it, in both languages, so "archive" finds the Arşiv and "bugün" finds Today.
+const items: { kind: string; text: string; href: string; keys: string; category?: Category }[] = [
+  { kind: "→", text: copy.nav.today, href: r.home, keys: "bugün today home ana sayfa" },
+  { kind: "→", text: copy.nav.archive, href: r.archive, keys: "arşiv archive search ara" },
+  { kind: "→", text: copy.nav.week, href: r.weekIndex, keys: "hafta week digest özet" },
+  { kind: "→", text: copy.nav.about, href: r.about, keys: "künye about hakkında privacy gizlilik" },
+  { kind: "→", text: copy.subscribeFree, href: r.subscribe, keys: "abone subscribe follow takip" },
+  { kind: "rss", text: p.rss, href: r.rss, keys: "rss feed akış xml" },
+  { kind: COPY[other].langShort, text: p.other, href: alternate ?? routes[other].home, keys: "english türkçe language dil" },
+  ...CATEGORIES.map((category) => ({
+    kind: "#",
+    text: copy.topicTitle(copy.categories[category]),
+    href: r.topic(category),
+    keys: `konu topic ${COPY.tr.categories[category]} ${COPY.en.categories[category]}`,
+    category,
+  })),
+];
+---
+
+{/*
+  The command palette and the shortcut sheet. Without script neither is ever opened, and the strip's
+  button that opens the palette stays hidden; scripts/palette.ts opens them (Ctrl K, ⌘K, / and ?),
+  filters the pages below and adds stories from the search data as text.
+*/}
+<dialog
+  class="palette"
+  data-palette
+  aria-label={p.title}
+  data-src={`/search-${lang}.json`}
+  data-none={p.none}
+  data-loading={p.loading}
+  data-copy-label={copy.copy.code}
+  data-done={copy.copy.done}
+  data-link={copy.copy.link}
+  data-link-name={copy.copy.linkName("{n}")}
+>
+  <div class="pal-box">
+    <Mark size={22} />
+    <input
+      class="pal-input"
+      type="text"
+      role="combobox"
+      aria-expanded="true"
+      aria-controls="pal-list"
+      aria-autocomplete="list"
+      aria-label={p.placeholder}
+      placeholder={p.placeholder}
+      autocomplete="off"
+      spellcheck="false"
+    />
+    <kbd class="pal-esc label">esc</kbd>
+  </div>
+  <ul class="pal-list" id="pal-list" role="listbox" aria-label={p.title}>
+    <li class="pal-group label caps" role="presentation" data-group="pages">{p.pages}</li>
+    {
+      items.map((item, i) => (
+        <li class="pal-item" role="option" id={`pal-o-${i}`} aria-selected="false" data-find={item.keys} data-category={item.category}>
+          <a href={item.href} tabindex="-1">
+            <span class="pal-kind label">{item.kind}</span>
+            <span class="pal-text">{item.text}</span>
+            <span class="pal-path label">{item.href}</span>
+          </a>
+        </li>
+      ))
+    }
+    <li class="pal-group label caps" role="presentation" data-group="stories" hidden>{p.stories}</li>
+  </ul>
+  <p class="pal-note label" data-note hidden></p>
+  <p class="pal-foot label">{p.foot}</p>
+</dialog>
+
+<dialog class="keys" data-keys aria-labelledby="keys-title">
+  <p class="keys-title label caps" id="keys-title">{p.keysTitle}</p>
+  <dl class="keys-list">
+    {
+      p.keys.map(([key, what]) => (
+        <div class="keys-row">
+          <dt>
+            {key.split(" · ").map((k, i) => (
+              <>
+                {i > 0 && " "}
+                <kbd class="label">{k}</kbd>
+              </>
+            ))}
+          </dt>
+          <dd>{what}</dd>
+        </div>
+      ))
+    }
+  </dl>
+  <button class="keys-close label" type="button" data-close>{p.close}</button>
+</dialog>

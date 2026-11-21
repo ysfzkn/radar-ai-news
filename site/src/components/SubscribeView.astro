@@ -15,6 +15,8 @@ if (!Astro.site) throw new Error("the subscribe page needs `site` in astro.confi
 // The feed's absolute address on the configured site is the text a reader copies into a feed
 // reader; the links are site-relative, so they also work on a local preview.
 const feed = new URL(routes[lang].rss, Astro.site).href;
+// The latest headlines in a terminal: the feed's titles, one per line (the first is the feed's own).
+const command = `curl -s ${feed} | grep -o '<title>[^<]*' | cut -d'>' -f2`;
 ---
 
 <h1 class="kunye label"><span class="kunye-no">{copy.subscribeFree}</span></h1>
@@ -42,5 +44,14 @@ const feed = new URL(routes[lang].rss, Astro.site).href;
       <a href={routes[other].rss} type="application/rss+xml" hreflang={other}>{page.otherFeedLink}</a>
     </p>
     <p>{page.noNewsletter}</p>
+  </section>
+  <section>
+    <h2>{page.terminalHeading}</h2>
+    <p>{page.terminalText}</p>
+    {/* A command to copy; with script a copy button follows it. */}
+    <div class="term">
+      <p class="term-bar label" aria-hidden="true"><span class="term-dots"></span>{page.terminalTitles}</p>
+      <pre class="term-body"><span class="term-prompt" aria-hidden="true">$ </span><code data-copy>{command}</code></pre>
+    </div>
   </section>
 </div>
