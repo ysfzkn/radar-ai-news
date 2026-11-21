@@ -3,15 +3,16 @@
 // 1. The pause: the class `still` on <html> stops every looping motion. The buttons marked
 //    `data-still` (on the scope and in the footer) toggle it; it is remembered for the browser
 //    session under `radar:still`.
-// 2. The opening: the first page of a browser session, whichever page it is; never for a reader
-//    who asked for less motion, on back/forward or in a hidden tab. It is the class `intro` on
+// 2. The opening: every time the site is entered (a new visit, a typed address, a link from
+//    elsewhere, a reload), on whichever page; not when the reader moves between pages of the
+//    site, never for a reader who asked for less motion, on back/forward or in a hidden tab.
+//    Nothing is stored for it. It is the class `intro` on
 //    <html>, which the stylesheet paints as an ink cover before the first paint; the loader
 //    (scripts/intro.ts) draws over it. Anything that removes the class ends the opening at once,
 //    and this file removes it at the hard cap of 3500 ms whatever the loader does. The press or key
 //    that skips it is consumed, and so is the click that follows a press, so nothing under the
 //    opening is activated.
-// Storage is only ever touched inside try/catch: when it fails, motion stays on and the opening
-// is skipped.
+// Storage is only ever touched inside try/catch: when it fails, motion stays on.
 (function () {
   var d = document.documentElement;
   d.classList.add("js");
@@ -32,14 +33,16 @@
 
   try {
     var nav = performance.getEntriesByType("navigation")[0];
+    var type = nav ? nav.type : "navigate";
+    // Reached from another page of this site: no opening. A reload keeps its first referrer.
+    var inside = type !== "reload" && (document.referrer || "").indexOf(location.origin + "/") === 0;
     if (
       matchMedia("(prefers-reduced-motion: reduce)").matches ||
       document.visibilityState === "hidden" ||
-      (nav && nav.type === "back_forward") ||
-      sessionStorage.getItem("radar:intro")
+      type === "back_forward" ||
+      inside
     )
       return;
-    sessionStorage.setItem("radar:intro", "1");
   } catch (e) {
     return;
   }

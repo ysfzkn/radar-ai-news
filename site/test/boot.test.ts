@@ -11,6 +11,8 @@ interface Options {
   reduce?: boolean;
   hidden?: boolean;
   navType?: string;
+  /** `document.referrer`; the site itself is https://radar.example. */
+  referrer?: string;
   stored?: Record<string, string>;
   storageThrows?: boolean;
 }
@@ -60,9 +62,11 @@ function boot(options: Options = {}) {
     document: {
       documentElement,
       visibilityState: options.hidden ? "hidden" : "visible",
+      referrer: options.referrer ?? "",
       querySelectorAll: (sel: string) => (sel === "[data-still]" ? buttons : []),
       addEventListener: (type: string, fn: Listener) => documentListeners.push({ type, fn }),
     },
+    location: { origin: "https://radar.example" },
     performance: { getEntriesByType: () => [{ type: options.navType ?? "navigate" }] },
     matchMedia: (q: string) => ({ matches: q === "(prefers-reduced-motion: reduce)" && !!options.reduce }),
     sessionStorage: {
@@ -108,19 +112,29 @@ function boot(options: Options = {}) {
   };
 }
 
-describe("boot.js: the opening", () => {
-  it("marks every page as scripted, and opens the first page of a session, whichever it is", () => {
-    const first = boot();
-    expect(first.classes.has("js")).toBe(true);
-    expect(first.classes.has("intro")).toBe(true);
-    expect(first.store.get("radar:intro")).toBe("1");
+/** A page of this site, as the referrer of a move between its pages. */
+const INSIDE = "https://radar.example/arsiv/";
 
-    const again = boot({ stored: { "radar:intro": "1" } });
-    expect([...again.classes]).toEqual(["js"]);
+describe("boot.js: the opening", () => {
+  it("marks every page as scripted, and opens on every entry to the site, storing nothing", () => {
+    for (const options of [
+      {},
+      { referrer: "https://elsewhere.example/a" },
+      // A look-alike host is not this site.
+      { referrer: "https://radar.example.evil.test/" },
+      // A reload plays it again, though the page keeps its first referrer.
+      { navType: "reload", referrer: INSIDE },
+      { storageThrows: true },
+    ]) {
+      const page = boot(options);
+      expect(page.classes.has("js"), JSON.stringify(options)).toBe(true);
+      expect(page.classes.has("intro"), JSON.stringify(options)).toBe(true);
+      expect(page.store.size, JSON.stringify(options)).toBe(0);
+    }
   });
 
-  it("skips it for reduced motion, a hidden tab, back/forward, and when storage fails", () => {
-    for (const options of [{ reduce: true }, { hidden: true }, { navType: "back_forward" }, { storageThrows: true }]) {
+  it("skips it between pages of the site, for reduced motion, a hidden tab and back/forward", () => {
+    for (const options of [{ referrer: INSIDE }, { reduce: true }, { hidden: true }, { navType: "back_forward" }]) {
       const page = boot(options);
       expect(page.classes.has("intro"), JSON.stringify(options)).toBe(false);
       expect(page.classes.has("js"), JSON.stringify(options)).toBe(true);
@@ -170,8 +184,8 @@ describe("boot.js: the opening", () => {
     expect(page.fire("click").prevented).toBe(false);
   });
 
-  it("does not touch presses once the opening has been seen", () => {
-    const page = boot({ stored: { "radar:intro": "1" } });
+  it("does not touch presses on a page that did not open", () => {
+    const page = boot({ referrer: INSIDE });
     for (const type of ["pointerdown", "keydown", "click"]) {
       const e = page.fire(type);
       expect(e.prevented || e.stopped, type).toBe(false);
@@ -190,8 +204,8 @@ describe("boot.js: the reader's pause", () => {
   });
 
   it("toggles the pause from either button, and remembers it for the session", () => {
-    // After the opening: while it is up, the opening takes every press.
-    const page = boot({ stored: { "radar:intro": "1" } });
+    // On a page without the opening: while it is up, the opening takes every press.
+    const page = boot({ referrer: INSIDE });
     page.fire("click", page.buttons[0]);
     expect(page.classes.has("still")).toBe(true);
     expect(page.store.get("radar:still")).toBe("1");
@@ -204,14 +218,14 @@ describe("boot.js: the reader's pause", () => {
   });
 
   it("still toggles when storage fails", () => {
-    const page = boot({ storageThrows: true });
+    const page = boot({ storageThrows: true, referrer: INSIDE });
     page.fire("click", page.buttons[0]);
     expect(page.classes.has("still")).toBe(true);
   });
 
-  it("keeps no storage but its two session keys", () => {
+  it("keeps no storage but its one session key", () => {
     expect(source).not.toMatch(/localStorage|cookie/);
     const keys = [...source.matchAll(/"(radar:[a-z]+)"/g)].map((m) => m[1]);
-    expect([...new Set(keys)].sort()).toEqual(["radar:intro", "radar:still"]);
+    expect([...new Set(keys)].sort()).toEqual(["radar:still"]);
   });
 });

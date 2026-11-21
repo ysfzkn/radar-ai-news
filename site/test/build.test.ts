@@ -1084,7 +1084,7 @@ describe("built site", () => {
           : "What you type in the archive search stays in your browser and in the page's address, so it is also in your browser history.",
       );
       expect(body).toContain(lang === "tr" ? "başka kimseye gönderilmez" : "it is sent to no one else");
-      expect(body).toContain("radar:intro");
+      expect(body).not.toContain("radar:intro");
       expect(body).toContain("radar:still");
       expect(body).toContain(lang === "tr" ? "betik olmadan da eksiksiz çalışır" : "complete without scripts");
       expect(body).toContain(lang === "tr" ? "seni izlemez" : "does not track you");

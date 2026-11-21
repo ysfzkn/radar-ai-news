@@ -398,9 +398,9 @@ export const COPY: Record<Lang, Copy> = {
           heading: "Gizlilik",
           paragraphs: [
             "Bu site çerez kullanmaz, seni izlemez ve üçüncü taraflardan hiçbir şey yüklemez: analitik, reklam ya da dış yazı tipi yok. Her sayfa statik bir HTML dosyasıdır ve betik olmadan da eksiksiz çalışır.",
-            "Sitenin kendi küçük betiği yalnızca bir kolaylık ekler: arşivde arama ve komut paleti (arama verisi bu siteden gelir), klavye kısayolları, kopyalama düğmeleri (panoya yalnızca sen bastığında yazar), radar ekranının eğimi ve okunan haberlerin işareti, “Neden önemli” satırının belirişi, bir ziyaretin ilk sayfasındaki kısa açılış ve dönen hareketi durduran düğme. Hareketi azaltmayı seçtiysen hareketlerin hiçbiri oynamaz.",
+            "Sitenin kendi küçük betiği yalnızca bir kolaylık ekler: arşivde arama ve komut paleti (arama verisi bu siteden gelir), klavye kısayolları, kopyalama düğmeleri (panoya yalnızca sen bastığında yazar), radar ekranının eğimi ve okunan haberlerin işareti, “Neden önemli” satırının belirişi, siteye her girişte oynayan kısa açılış ve dönen hareketi durduran düğme. Hareketi azaltmayı seçtiysen hareketlerin hiçbiri oynamaz.",
             "Arşivde aradığın sözcükler tarayıcında ve sayfanın adresinde kalır; adres de tarayıcı geçmişine yazılır. Sayfayı yenilediğinde ya da bir sonuca tıkladığında adres yalnızca bu siteye gider; başka kimseye gönderilmez.",
-            "Tarayıcının oturum belleğine en çok iki anahtar yazılır: açılışın bir kez gösterildiğini hatırlayan radar:intro ve hareketi durdurduysan bunu hatırlayan radar:still. İkisi de sekme kapanınca silinir. Başka hiçbir şey saklanmaz.",
+            "Tarayıcının oturum belleğine en çok bir anahtar yazılır: hareketi durdurduysan bunu hatırlayan radar:still. Sekme kapanınca silinir. Başka hiçbir şey saklanmaz.",
           ],
         },
       ],
@@ -647,9 +647,9 @@ export const COPY: Record<Lang, Copy> = {
           heading: "Privacy",
           paragraphs: [
             "This site sets no cookies, does not track you and loads nothing from third parties: no analytics, no ads, no outside fonts. Every page is a static HTML file and is complete without scripts.",
-            "The site's own small script only adds conveniences: the archive search and the command palette (their data comes from this site), keyboard shortcuts, copy buttons (they write to your clipboard only when you press them), the radar's tilt and the marks on stories you have read, the way the “Why it matters” line appears, a short opening on the first page of a visit, and the button that pauses the looping motion. If you have asked for less motion, none of it moves.",
+            "The site's own small script only adds conveniences: the archive search and the command palette (their data comes from this site), keyboard shortcuts, copy buttons (they write to your clipboard only when you press them), the radar's tilt and the marks on stories you have read, the way the “Why it matters” line appears, a short opening each time you enter the site, and the button that pauses the looping motion. If you have asked for less motion, none of it moves.",
             "What you type in the archive search stays in your browser and in the page's address, so it is also in your browser history. When you reload the page or click a result, that address goes to this site only; it is sent to no one else.",
-            "At most two keys are written to the browser's session storage: radar:intro, which remembers that the opening has been shown, and radar:still, which remembers that you paused the motion. Both are gone when the tab closes. Nothing else is stored.",
+            "At most one key is written to the browser's session storage: radar:still, which remembers that you paused the motion. It is gone when the tab closes. Nothing else is stored.",
           ],
         },
       ],

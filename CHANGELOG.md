@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Site: the loading screen plays every time the site is entered (a new visit, a link from elsewhere, a reload), not once per browser session, and not when moving between the site's pages. The session key `radar:intro` is gone; `radar:still` is the only key the site stores.
+
 ## [1.0.0] - 2026-11-21
 
 The first public release: the site is live at radar.ozkanyusuf.com, the admin service runs on Cloudflare behind Access, and the daily workflow has run on GitHub.
