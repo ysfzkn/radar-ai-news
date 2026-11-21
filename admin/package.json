@@ -6,7 +6,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "db:migrate:local": "wrangler d1 migrations apply radar --local",
-    "deploy": "wrangler deploy --var ACCESS_TEAM_DOMAIN:rough-violet-d4e6.cloudflareaccess.com --var ACCESS_AUD:592cc7e38e354f5b7ba07bba79de3246b798f9ba13d9102694a3c0697c1f5ed9",
+    "deploy": "wrangler deploy --var ACCESS_TEAM_DOMAIN:rough-violet-d4e6.cloudflareaccess.com --var ACCESS_AUD:592cc7e38e354f5b7ba07bba79de3246b798f9ba13d9102694a3c0697c1f5ed9 --var GITHUB_REPO:ysfzkn/radar-ai-news",
     "seed": "node scripts/seed.mjs"
   },
   "dependencies": {

@@ -1,4 +1,6 @@
 // Every piece of Turkish text on the admin screen lives here.
+import type { GithubFailure, RunEvent, RunMode, RunState } from "./github";
+import type { DispatchOutcome } from "./runs";
 import type { Failure, Tab } from "./stories";
 import type { Lang, RISK_FLAGS, Status } from "./schema";
 
@@ -125,6 +127,8 @@ export const COPY = {
   hasHandleReason: (where: string, handle: string) => `${where}: kullanıcı adı içeriyor (${handle})`,
   hasBackticksReason: (where: string) => `${where}: ters tırnak içeriyor`,
   hasCommandReason: (where: string, fragment: string) => `${where}: komut benzeri metin içeriyor (${fragment})`,
+  // The agent's reason for a story of a "Hepsi onaya" run (radar daily --review-all).
+  reviewAllReason: "Hepsi onaya istenen bir çalıştırmadan: kendiliğinden yayınlanmadı.",
   foreignTryHostReason: (host: string) => `“Dene” bağlantısı kaynakların dışında bir siteye gidiyor (${host})`,
 
   // Said after a successful action, from the redirect's `done` hint.
@@ -136,6 +140,85 @@ export const COPY = {
     restored: "Haber kuyruğa döndü.",
     next_approved: "Onaylandı. Sıradaki haber.",
     next_rejected: "Reddedildi. Sıradaki haber.",
+    dispatched: "Çalıştırma başlatıldı. GitHub'ın listesinde görünmesi birkaç saniye sürebilir; Yenile ile bak.",
+  },
+
+  // The header.
+  siteLink: "Site",
+  siteLinkLabel: "Yayındaki siteyi yeni sekmede aç",
+  signedInAs: "Oturum:",
+  mainNav: "Ana menü",
+
+  // Starting the agent from here (/admin/run).
+  run: {
+    tab: "Çalıştır",
+    title: "Ajanı çalıştır",
+    intro:
+      "Günlük işi GitHub Actions'ta şimdi başlatır: her sabah 07:15'te kendiliğinden çalışan işin aynısı. Nasıl çalışacağını aşağıdan seç.",
+    notSetUpTitle: "Buradan çalıştırma kurulu değil.",
+    notSetUp:
+      "Worker'da GITHUB_DISPATCH_TOKEN (gizli) ve GITHUB_REPO ayarlanınca bu sayfa işi başlatabilir. O zamana kadar iş sabah kendiliğinden ya da GitHub'daki Actions sekmesinden başlar.",
+    formHeading: "Yeni çalıştırma",
+    modeLegend: "Nasıl çalışsın?",
+    modes: {
+      normal: {
+        label: "Normal",
+        desc: "Sabahki iş gibi: kaynakları toplar, haber yazar, temiz olanları kendiliğinden yayınlar, gerisini onaya gönderir.",
+      },
+      review_all: {
+        label: "Hepsi onaya",
+        desc: "Haber yazar ama hiçbirini kendiliğinden yayınlamaz: her yeni haber Bekleyen listesine düşer.",
+      },
+      collect_only: {
+        label: "Yalnızca topla",
+        desc: "Kaynakları okur ve saklar. Haber yazmaz, model çağırmaz, para harcamaz, bir şey göndermez.",
+      },
+    } satisfies Record<RunMode, { label: string; desc: string }>,
+    storiesLabel: "Haber sayısı",
+    storiesDefault: "Varsayılan (8)",
+    storiesHint:
+      "Günün baskısı için üst sınır: bugün yazılmış haberler de sayılır. Yalnızca toplamada kullanılmaz.",
+    costHint: "Normal ve Hepsi onaya model çağırır; harcama günlük sınırın içinde kalır.",
+    submit: "Çalıştır",
+    refresh: "Yenile",
+    busy: (state: string, at: string) => `Şu an bir çalıştırma sürüyor (${state}, ${at}). Bitince yenisini başlatabilirsin.`,
+    cooldown: (left: string) => `Az önce buradan bir çalıştırma başlatıldı; yenisi ${left} sonra başlatılabilir.`,
+    unknownState:
+      "GitHub'a ulaşılamadığı için süren bir çalıştırma olup olmadığı bilinmiyor; şimdilik başlatılamaz.",
+    ready: "Şu an süren bir çalıştırma yok; başlatılabilir.",
+    runsHeading: "Son çalıştırmalar",
+    runsEmpty: "GitHub'da bu işin henüz bir çalıştırması yok.",
+    runsUnavailable: (why: string) => `Son çalıştırmalar alınamadı. ${why}`,
+    openRun: "GitHub'da aç ↗",
+    states: {
+      queued: "Kuyrukta",
+      in_progress: "Çalışıyor",
+      success: "Başarılı",
+      failure: "Başarısız",
+      cancelled: "İptal edildi",
+      skipped: "Atlandı",
+      timed_out: "Süre aşıldı",
+      other: "Bitti",
+    } satisfies Record<RunState, string>,
+    events: { schedule: "Zamanlanmış", workflow_dispatch: "Elle", other: "Diğer" } satisfies Record<RunEvent, string>,
+    skippedHint: "Atlanan çalıştırma çoğunlukla RADAR_ENABLED değişkeninin true olmadığını gösterir.",
+    took: (d: string) => `${d} sürdü`,
+    stories: (n: number) => `en çok ${n} haber`,
+    historyHeading: "Buradan başlatılanlar",
+    historyEmpty: "Buradan henüz bir çalıştırma başlatılmadı.",
+    outcomes: { dispatched: "Başlatıldı", failed: "Başlatılamadı", pending: "Sonuç bilinmiyor" } satisfies Record<
+      DispatchOutcome,
+      string
+    >,
+    failures: {
+      unauthorized: "GitHub anahtarı kabul etmedi ya da anahtarın yetkisi yetmiyor.",
+      not_found: "Depo ya da iş akışı bulunamadı: GITHUB_REPO ve anahtarın erişimi doğru mu?",
+      invalid: "GitHub isteği kabul etmedi; main dalındaki iş akışı bu seçenekleri tanımıyor olabilir.",
+      rate_limited: "GitHub istek sınırına ulaşıldı; biraz sonra tekrar dene.",
+      unavailable: "GitHub'a ulaşılamadı ya da zamanında yanıt vermedi.",
+    } satisfies Record<GithubFailure, string>,
+    dispatchFailed: (why: string) => `Çalıştırma başlatılamadı. ${why}`,
+    invalid: "Geçersiz seçim: üç çalışma biçiminden birini ve 1 ile 8 arasında bir sayı seç.",
   },
   previewHeading: "Sitede görünüm",
 

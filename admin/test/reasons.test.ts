@@ -18,6 +18,12 @@ describe("reasonView", () => {
       { kind: "verify", label: "Doğrulama", text: "fact_card.numbers: number '3' not in source", raw: true },
     ],
     ["plain note", { kind: "other", label: "Not", text: "plain note", raw: true }],
+    // radar daily --review-all (the agent's REVIEW_ALL_REASON)
+    [
+      "manual run: review requested",
+      { kind: "other", label: "Not", text: "Hepsi onaya istenen bir çalıştırmadan: kendiliğinden yayınlanmadı.", raw: false },
+    ],
+    ["manual run: review requested!", { kind: "other", label: "Not", text: "manual run: review requested!", raw: true }],
   ])("turns %s into %o", (reason, expected) => {
     expect(reasonView(reason)).toEqual(expected);
   });

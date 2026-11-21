@@ -2,12 +2,15 @@ import { Hono, type Context } from "hono";
 import { html } from "hono/html";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { authenticate, sameOrigin, type Identity } from "./auth";
+import { z } from "zod";
 import { COPY, failureMessage } from "./copy";
 import type { Env } from "./env";
+import { RUN_MODES, dispatchRun, githubConfig, isActive, listRuns, type RunInputs, type RunsResult } from "./github";
 import { ingest } from "./ingest";
 import { notifySite, waiter } from "./notify";
 import { publicApi } from "./public";
 import type { Lang, Status } from "./schema";
+import { cooldownLeft, finishDispatch, recentDispatches, reserveDispatch } from "./runs";
 import {
   approveStory,
   counts,
@@ -34,8 +37,9 @@ import {
 } from "./stories";
 import { CSS, JS } from "./views/assets";
 import { editionView } from "./views/edition";
-import { STATUSES, formatDay, layout, listHref, storyPath, type View } from "./views/layout";
+import { STATUSES, formatDay, layout, listHref, storyPath, type Page, type View } from "./views/layout";
 import { queueView, type QueueStrip } from "./views/queue";
+import { busyMessage, minutesLeft, runView } from "./views/run";
 import { draftFrom, notFoundView, storyView, type Draft } from "./views/story";
 
 type AppEnv = { Bindings: Env; Variables: { identity: Identity } };
@@ -80,7 +84,7 @@ app.get("/admin/app.css", (c) => c.body(CSS, 200, { "Content-Type": "text/css; c
 app.get("/admin/app.js", (c) => c.body(JS, 200, { "Content-Type": "text/javascript; charset=utf-8" }));
 
 // The confirmations a redirect may ask for with ?done=; any other value says nothing.
-const DONE = ["saved", "approved", "rejected", "unpublished", "restored", "next_approved", "next_rejected"] as const;
+const DONE = ["saved", "approved", "rejected", "unpublished", "restored", "next_approved", "next_rejected", "dispatched"] as const;
 type Done = (typeof DONE)[number];
 
 function doneMessage(c: Ctx): string | undefined {
@@ -95,7 +99,7 @@ async function page(
   c: Ctx,
   p: {
     title: string;
-    active: Tab | null;
+    active: Page | null;
     body: View;
     message?: string;
     done?: string | undefined;
@@ -396,6 +400,75 @@ app.post("/admin/stories/:uid/restore", async (c) => {
   const result = await restoreStory(c.env.DB, uid, form.version, c.get("identity").email, new Date());
   if (!result.ok && result.error === "expired") return storyPage(c, uid, FAILURE_STATUS.expired, COPY.restoreExpired);
   return afterResult(c, uid, result, withDone(storyPath(uid), "restored"));
+});
+
+// ---------------------------------------------------------------------------
+// "Çalıştır": starting the daily workflow on GitHub Actions (see src/github.ts, src/runs.ts).
+// ---------------------------------------------------------------------------
+
+// The run page. `runs` is GitHub's list when the caller already has it, so a refusal does not ask
+// GitHub twice; otherwise it is read here (when running from here is set up at all).
+async function runPage(
+  c: Ctx,
+  p: { status?: ContentfulStatusCode; message?: string; runs?: RunsResult; form?: RunInputs } = {},
+): Promise<Response> {
+  const cfg = githubConfig(c.env);
+  const now = new Date();
+  const runs = cfg ? (p.runs ?? (await listRuns(cfg))) : null;
+  const cooldownMs = await cooldownLeft(c.env.DB, now);
+  const history = await recentDispatches(c.env.DB);
+  const body = runView({ configured: cfg !== null, runs, cooldownMs, history, form: p.form, hasMessage: p.message !== undefined });
+  return page(
+    c,
+    { title: COPY.run.title, active: "run", body, done: doneMessage(c), ...(p.message ? { message: p.message } : {}) },
+    p.status ?? 200,
+  );
+}
+
+app.get("/admin/run", (c) => runPage(c));
+
+// The form's two fields, each from a closed list; nothing typed is passed on. The story count is
+// "" (the agent's default) or 1 to 8, and is dropped for "collect only", which writes no story.
+const runForm = z.object({
+  mode: z.enum(RUN_MODES),
+  stories: z.union([z.literal(""), z.string().regex(/^[1-8]$/)]),
+});
+
+async function readRunForm(request: Request): Promise<RunInputs | null> {
+  let data: FormData;
+  try {
+    data = await request.formData();
+  } catch {
+    return null;
+  }
+  const parsed = runForm.safeParse({ mode: data.get("mode"), stories: data.get("stories") ?? "" });
+  if (!parsed.success) return null;
+  const { mode, stories } = parsed.data;
+  return { mode, stories: mode === "collect_only" || stories === "" ? null : Number(stories) };
+}
+
+// Checks, in order: set up; a valid choice; GitHub's list readable and no run queued or running;
+// the cool-down (with the row that records this start, written in the same statement); then the
+// start itself, whose answer completes the row. Only a start GitHub accepted redirects.
+app.post("/admin/run", async (c) => {
+  const cfg = githubConfig(c.env);
+  if (!cfg) return runPage(c, { status: 503 });
+  const inputs = await readRunForm(c.req.raw);
+  if (!inputs) return runPage(c, { status: 400, message: COPY.run.invalid });
+  const runs = await listRuns(cfg);
+  if (!runs.ok) return runPage(c, { status: 502, message: COPY.run.unknownState, runs, form: inputs });
+  const active = runs.runs.find(isActive);
+  if (active) return runPage(c, { status: 409, message: busyMessage(active), runs, form: inputs });
+  const now = new Date();
+  const id = await reserveDispatch(c.env.DB, c.get("identity").email, inputs, now);
+  if (id === null) {
+    const left = await cooldownLeft(c.env.DB, now);
+    return runPage(c, { status: 409, message: COPY.run.cooldown(minutesLeft(left)), runs, form: inputs });
+  }
+  const result = await dispatchRun(cfg, inputs);
+  await finishDispatch(c.env.DB, id, result, new Date());
+  if (result.ok) return c.redirect(withDone("/admin/run", "dispatched"), 303);
+  return runPage(c, { status: 502, message: COPY.run.dispatchFailed(COPY.run.failures[result.error]), runs, form: inputs });
 });
 
 // An error thrown on an admin page (for example a decision whose history row the database refused,

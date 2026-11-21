@@ -93,12 +93,18 @@ export const RADAR_MARK = html`<svg class="mark" viewBox="0 0 24 24" width="18" 
   (x) => html`<path class="mark-arc" d="M${x} 4A13 13 0 0 1 ${x} 20"/>`,
 )}</svg>`;
 
+// The live site, linked from the header.
+export const SITE_URL = "https://radar.ozkanyusuf.com";
+
+// A page of the admin: one of the list tabs, or the run page ("Çalıştır", in the header).
+export type Page = Tab | "run";
+
 export interface Shell {
   title: string;
   email: string;
   // The edition tab's number is today's published count; without it the tab shows none.
   counts: Record<Status, number> & { edition?: number };
-  active: Tab | null;
+  active: Page | null;
   message?: string | undefined;
   // A confirmation of what just happened; an error message wins over it.
   done?: string | undefined;
@@ -127,7 +133,7 @@ function shortcutSheet(): View {
 
 export function layout(p: Shell): View {
   const filter = p.filter ?? NO_FILTER;
-  const tabs = TABS.map((t) => {
+  const tabs: View[] = TABS.map((t) => {
     const count = t === "edition" ? p.counts.edition : p.counts[t];
     return html`<li><a href="${listHref(t, filter)}"${p.active === t ? html` aria-current="page"` : ""}>${COPY.tabs[t]}${count === undefined ? "" : html` <span class="tab-count">${count}</span>`}</a></li>`;
   });
@@ -145,7 +151,11 @@ export function layout(p: Shell): View {
 <header class="top">
 <div class="top-inner">
 <a class="brand" href="/admin">${RADAR_MARK}<span class="wordmark">${COPY.brand}</span> <span class="brand-suffix">${COPY.brandSuffix}</span></a>
-<span class="who">${p.email}</span>
+<nav class="top-links" aria-label="${COPY.mainNav}">
+<a class="top-link run-link" href="/admin/run"${p.active === "run" ? html` aria-current="page"` : ""}>${COPY.run.tab}</a>
+<a class="top-link site-link" href="${SITE_URL}" target="_blank" rel="noopener noreferrer" aria-label="${COPY.siteLinkLabel}">${COPY.siteLink} ↗</a>
+</nav>
+<p class="who"><span class="visually-hidden">${COPY.signedInAs} </span>${p.email}</p>
 </div>
 </header>
 <nav class="wrap tabs-wrap" aria-label="${COPY.queueHeading}"><ul class="tabs">${tabs}</ul></nav>

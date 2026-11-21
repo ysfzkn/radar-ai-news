@@ -23,6 +23,8 @@ const HANDLE = /^handle '(.*)'$/;
 const COMMAND = /^command-like text '(.*)'$/;
 const FOREIGN_TRY = /^fact_card\.try_url: host '(.*)' is not a source host$/;
 const FACT_WHAT = /^fact_card\.what:\s*/;
+// The agent's reason for a story of a run started with --review-all (agent/src/radar/agent.py).
+const REVIEW_ALL = "manual run: review requested";
 
 // The injection checks' wording after the path, in Turkish; undefined for anything else.
 function injectionText(where: string, tail: string): string | undefined {
@@ -50,6 +52,7 @@ const isRiskFlag = (value: string): value is (typeof RISK_FLAGS)[number] =>
 // anything else (a known prefix with nothing after it too) is shown as written. Never throws.
 export function reasonView(reason: string): ReasonView {
   const other: ReasonView = { kind: "other", label: COPY.reasonKinds.other, text: reason, raw: true };
+  if (reason === REVIEW_ALL) return { ...other, text: COPY.reviewAllReason, raw: false };
   if (RISK.test(reason)) {
     const flag = reason.replace(RISK, "").trim();
     if (flag === "") return other;
