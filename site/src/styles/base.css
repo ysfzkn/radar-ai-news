@@ -646,10 +646,13 @@ a.lang-part:focus-visible {
   margin: 0;
 }
 
-/* A phone: the words first, then the radar nearly as wide as the column and tipped back to 63°,
-   so it is wide and low and its blips stay 32px targets for a thumb; its readout keeps one line
-   with the pause at its end, and the caption goes. The stems follow the steeper tip and the dish's
-   92% of the stage (each ring's height is 1 / 0.92 as many drawing units). */
+/* A phone: one calm column with a clear rhythm. The dateline as a two-part block (the issue and
+   the date, then the counts), the slogan, the line, the quiet link on its own row; then the
+   radar in a band of its own, with headroom for the blips that stand above its far rim and room
+   under it for its ground shadow, not edge to edge but at least 297px across so its blips stay
+   32px targets for a thumb; its readout one centred line clear under the instrument; the caption
+   goes. The dish is tipped back to 63deg, so it is wide and low; the stems follow the steeper tip
+   and the dish's 92% of the stage (each ring's height is 1 / 0.92 as many drawing units). */
 @media (max-width: 47.99rem) {
   .hero .scope {
     --tip: 63deg;
@@ -661,49 +664,54 @@ a.lang-part:focus-visible {
 
   .hero {
     gap: 0;
-    padding-top: var(--space-2);
+    padding-block: var(--space-5) 0;
   }
 
-  /* The words: the dateline, the slogan with the quiet link at its foot on the right, the line. */
-  .hero-copy {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: end;
-  }
-
-  .hero-copy > * {
-    grid-column: 1 / -1;
-  }
-
+  /* The dateline: the pill and the date on the first row, the counts under them (their leading
+     separator, two mono cells, is indented out of sight: the row break separates them). */
   .hero .masthead {
-    row-gap: 0;
-    margin-bottom: var(--space-2);
-    line-height: 1.5;
+    row-gap: var(--space-1);
+    margin-bottom: var(--space-5);
+    line-height: 1.4;
   }
 
   .hero .mh-big {
-    font-size: 0.875rem;
+    font-size: 0.9375rem;
   }
 
-  .hero .mh-rest,
   .hero .mh-year {
-    font-size: 0.6875rem;
+    font-size: 0.75rem;
+  }
+
+  .hero .mh-rest {
+    flex-basis: 100%;
+    overflow: hidden;
+    font-size: 0.75rem;
+    text-indent: -2ch;
+    white-space: nowrap;
   }
 
   .hero-slogan {
-    grid-column: 1;
-    font-size: clamp(1.75rem, 8.4vw, 2.125rem);
-  }
-
-  .hero-more {
-    grid-row: 2;
-    grid-column: 2;
-    margin-top: 0;
+    font-size: clamp(2.125rem, 10.5vw, 2.625rem);
   }
 
   .hero-lead {
-    margin-top: var(--space-1);
+    margin-top: var(--space-3);
     font-size: 1.0625rem;
+  }
+
+  .hero-more {
+    margin-top: var(--space-2);
+  }
+
+  .hero-radar {
+    margin-top: 2rem;
+  }
+
+  .hero .scope {
+    width: clamp(20.5rem, 90%, 21rem);
+    max-width: 100%;
+    margin-inline: auto;
   }
 
   .hero .scope-stage {
@@ -722,21 +730,11 @@ a.lang-part:focus-visible {
     transform: translate3d(2%, 1%, -6cqi) scale(1.02);
   }
 
-  /* The readout keeps one line, with the pause at its end; the caption goes. */
-  .hero .scope {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    column-gap: var(--space-3);
-  }
-
-  .hero .scope-stage {
-    grid-column: 1 / -1;
-  }
-
+  /* The readout: one centred line, clear of the ground shadow. */
   .hero .scope-readout {
     height: calc(1.35em + var(--space-2));
-    margin-top: 0;
+    margin-top: var(--space-5);
+    text-align: center;
   }
 
   .hero :is(.readout-idle, .readout-line, .readout-ghost) {
@@ -1028,23 +1026,47 @@ a.lang-part:focus-visible {
   margin-top: 0;
 }
 
-/* On a phone the toolbar and the first heading are pulled up, so the first story's headline is
-   on the first screen above the dial. */
+/* On a phone the toolbar is one block under a hairline, well clear of the radar: the search
+   field, then the chips at 40px for a thumb in a row that scrolls sideways, its far end fading
+   out so the next chip shows there is more. The groups and their headings get air. */
 @media (max-width: 47.99rem) {
   .desk {
-    gap: var(--space-2);
+    gap: var(--space-3);
+    margin-top: var(--space-5);
+    padding-top: var(--space-5);
+    border-top: 1px solid var(--line);
   }
 
   .desk-input {
-    min-height: 2.25rem;
+    min-height: 2.75rem;
+  }
+
+  .topic-chip {
+    min-height: 2.5rem;
+    padding: 0 0.875rem;
+    font-size: 0.8125rem;
   }
 
   .topic-groups {
-    margin-top: var(--space-3);
+    margin-top: var(--space-6);
+  }
+
+  .topic-group + .topic-group {
+    margin-top: var(--space-7);
   }
 
   .group-head {
-    margin-bottom: var(--space-3);
+    margin-bottom: var(--space-4);
+  }
+}
+
+/* Where the chips scroll (under 40em), the row's far end fades out over the last 3rem, and the
+   row ends in padding as wide, so the last chip, scrolled to, stands clear of the fade. */
+@media (max-width: 39.99em) {
+  .desk-topics {
+    padding-block: 0.125rem;
+    padding-right: 3rem;
+    mask-image: linear-gradient(90deg, #000 calc(100% - 3rem), transparent);
   }
 }
 
@@ -2368,6 +2390,39 @@ a.story-cat:hover {
   align-items: baseline;
   margin-left: auto;
   white-space: nowrap;
+}
+
+/* On a phone the row reads from the left (number, topic, signal) with the copy button at its
+   far end; where it has to wrap, the second row starts at the left too, a little apart. */
+@media (max-width: 39.99em) {
+  .story-meta {
+    row-gap: var(--space-2);
+  }
+
+  .story-meta .signal {
+    margin-left: 0;
+  }
+
+  /* In the lead's card the number and the topic keep the first row, beside the emblem; the
+     signal and the copy button take the whole second row. */
+  .story-lead .story-meta {
+    row-gap: var(--space-1);
+    padding-right: 0;
+  }
+
+  .story-lead .story-meta::before {
+    content: "";
+    flex-basis: 100%;
+    order: 1;
+  }
+
+  .story-lead .story-meta .signal {
+    order: 2;
+  }
+
+  .story-lead .copy-link {
+    order: 3;
+  }
 }
 
 /* From 48rem the number leaves the label row and hangs in a 3rem gutter left of the story. */

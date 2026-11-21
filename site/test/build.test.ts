@@ -2037,9 +2037,11 @@ describe("built site", () => {
       shadows.find((d) => d.selector === ".scope" && d.stack[0] === "@media (min-width: 48rem)")?.value,
     ).toBe("4px 4px 0 var(--ink)");
     // Gradients only in the scope's instrument: the sweep's fade, and the light on its body (the
-    // ground's shadow, the wall's side, the glass's gleam). Everything else is flat.
+    // ground's shadow, the wall's side, the glass's gleam); and one mask: the phone's chip row
+    // fading out at its far end, the cue that it scrolls. Everything else is flat.
     const gradients = declarations(sheets()).filter((d) => /gradient\(/.test(d.value));
     expect(gradients.map((d) => `${d.selector} ${d.prop}`).sort()).toEqual([
+      ".desk-topics mask-image",
       ".dish-floor background",
       ".dish-glass background",
       ".dish-wall background",
