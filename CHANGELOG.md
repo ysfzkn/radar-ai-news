@@ -15,13 +15,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Site: a readout panel beside the scope from 48rem, one row per story (number, bearing, sources, topic, title), linked both ways with its blip; and ghost blips for a thin edition: up to eight stories of the previous seven days, small and faint, linking to their editions.
 - Site: the masthead's date and counts settle in like a departure board, once per view; the subscribe label decodes on hover.
 - Site: signal bars on each story (1, 2–3, 4+ sources); the horizon follows Istanbul's time (sun and gulls by day, moon and lit windows at night); `ping` in the command palette pulses the scope.
+- Site: a livelier horizon, redrawn in three depths with recognisable landmarks (the Süleymaniye with four minarets, the Galata Tower's gallery and cap, the medrese's fluted minarets, Sivas castle's towers and flag): a ferry crosses under the Bosphorus Bridge, the Eastern Express passes behind Sivas now and then, clouds drift, stars come out at night.
+- Site: a small game in the horizon, without script: open the line under the drawing and find its six landmarks; their names fill a list, a CSS counter keeps the tally, and with all six the radar sends one ring across the skyline and a Kangal comes to keep watch. Nothing is stored.
 
 ### Changed
 
 - Site: the scope is drawn as a three-dimensional radar instrument: a body with a wall and a ground shadow, a lit bezel with bearings, a glass face with a gleam, and blips standing on stems above their shadows, the louder the taller. On a phone an edition page's scope may be 352 px wide (it is tipped back, so no taller than before).
 - Site: buttons sink into their shadow on press and fill with the accent from the left on hover; the TR / EN switch is a two-position slider; copy buttons turn into a check after copying. The language switch moved to the first row of the top strip.
 
-- Site: the loading screen plays every time the site is entered (a new visit, a link from elsewhere, a reload), not once per browser session, and not when moving between the site's pages. The session key `radar:intro` is gone; `radar:still` is the only key the site stores.
+- Site: the loading screen plays every time the site is entered (a new visit, a link from elsewhere, a reload), not once per browser session, and not when moving between the site's pages. The session key `radar:intro` is gone.
+- Site: the pause button is gone ("Hareketi durdur" / "Pause motion", on the scope and in the footer), and with it the session key `radar:still`: the site stores nothing in the browser. The looping motion runs with or without script; the system setting for reduced motion still stops all of it.
+- Site: a calmer phone home page: the dateline as a two-part block, the slogan and the "Nasıl çalışır →" link on their own rows, the radar in a band of its own with room above its blips and under its shadow (never edge to edge, its blips still 32 px targets), the readout one centred line under it, the toolbar under a hairline with 40 px chips whose row fades at its far end, more air between groups; a story's label row reads from the left.
+- Site: the horizon is always drawn whole (on a phone across the whole window) instead of cropped to its middle.
 
 ## [1.0.0] - 2026-11-21
 
