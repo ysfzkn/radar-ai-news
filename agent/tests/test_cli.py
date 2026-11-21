@@ -1,7 +1,7 @@
 import io
 import json
 import sys
-from datetime import timedelta
+from datetime import datetime, timedelta
 from email.utils import format_datetime
 
 import httpx
@@ -11,6 +11,19 @@ from radar import cli
 from radar.cli import collect, main
 from radar.models import RawItem, Source, Tier
 from radar.store import SqliteStore
+
+
+@pytest.fixture(autouse=True)
+def cli_clock(monkeypatch, now):
+    """The commands read the wall clock, and the fake feeds are dated from `now`: without
+    this, the feeds' items fall out of the collection window a few days after `now`."""
+
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return now.astimezone(tz) if tz else now.replace(tzinfo=None)
+
+    monkeypatch.setattr(cli, "datetime", Clock)
 
 
 def src(id_: str) -> Source:
