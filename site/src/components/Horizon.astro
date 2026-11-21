@@ -4,17 +4,19 @@
 // Sivas's castle hill with its flag. In the middle, at the drawing's own weight: Istanbul (the
 // Maiden's Tower on its rock, the Süleymaniye with its four minarets and cascading domes, the
 // Galata Tower), plain roofs with a turning radar dish on the tallest, and Sivas (the Çifte
-// Minareli Medrese's portal between its two fluted minarets, poplars). Near, a little heavier: the
+// Minareli Medrese's portal between its two fluted minarets, poplars, and the Great Mosque of
+// Divriği: a long stone block, its tall carved portal, two pyramid caps and one stout minaret).
+// Near, a little heavier: the
 // water with a ferry crossing under the bridge, and the ground; now and then the Eastern Express
 // passes behind Sivas. Above: a sun or a moon, two clouds, gulls by day and
 // stars by night (scripts/sky.ts keeps Istanbul's hours; without it, the day).
 // Every motion is CSS and stops when the reader's system asks for less motion.
 //
-// The game: six of the landmarks hide a small blip. It is behind one line under the drawing (a
-// <details>), so it costs nothing to ignore. Opened, each landmark is a checkbox: tap, click or
-// Space finds it, its name comes into the list, the count goes up (a CSS counter), and once all six
-// are found the radar sends one ring across the skyline and a Kangal trots in to keep watch by the
-// dish. No script, nothing stored: a reload starts it afresh.
+// The names: nothing is written under the drawing. Each of the seven landmarks is a radio button
+// laid over it: a tap, a click or the arrow keys picks one, it is drawn in ink and its name shows
+// small under the ground line, one name at a time. The radar dish is a checkbox of its own: pressed,
+// it sends one ring across the skyline and a Kangal trots in to keep watch by it.
+// No script, nothing stored: a reload starts it afresh.
 // The drawing is 640 × 112 (the reading column at 1:1) and is always shown whole.
 import { COPY } from "../lib/copy";
 import type { Lang } from "../lib/schema";
@@ -141,6 +143,21 @@ const poplar = (x: number, top: number) =>
   `M${x} ${GROUND}V${GROUND - 5}C${x - 4.5} ${GROUND - 14} ${x - 2.5} ${top + 6} ${x} ${top}C${x + 2.5} ${top + 6} ${x + 4.5} ${GROUND - 14} ${x} ${GROUND - 5}`;
 const poplars = poplar(500, 58) + poplar(509, 66) + poplar(517, 74);
 
+// Middle: the Great Mosque and Hospital of Divriği, at the castle hill's foot. One long stone
+// block; the portal rising above the wall with its pointed arch; the hospital's low pyramid cap and
+// the taller ribbed one over the mihrab; the single stout minaret at the north-west corner.
+const WALL = 90;
+const divrigi =
+  `M526 ${GROUND}V${WALL}H540V79H558V${WALL}H606V${GROUND}` +
+  `M544 ${GROUND}V92Q544 86 549 82.5Q554 86 554 92V${GROUND}` +
+  `M562 ${WALL}L567 83L572 ${WALL}` +
+  `M576 ${WALL}V86H592V${WALL}M575 86H593L584 74ZM584 74V71.5` +
+  minaret(531, WALL, 60, 2.4, [71]);
+const divrigiFine =
+  `M542.5 81.5h13M546.5 84.6h5M580.5 86L584 74L587.5 86` +
+  [564, 572, 580, 588, 596].map((x) => `M${x} 95v5`).join("") +
+  `M531 76v4M531 83v3`;
+
 // The dish on the tallest roof: a mast, a tilted bowl and its feed. It turns about the mast.
 const [dx, dw, dh] = town[4];
 const mastX = dx + dw / 2;
@@ -209,15 +226,9 @@ const stars = [
   .map(([x, y]) => `M${x} ${y - 1.6}v3.2M${x - 1.6} ${y}h3.2`)
   .join("");
 
-// The game's six landmarks: where each one's blip sits in the drawing, and its name.
-const spots = [
-  { id: "bridge", x: 67, y: 72 },
-  { id: "maiden", x: 148, y: 84 },
-  { id: "mosque", x: 214, y: 64 },
-  { id: "galata", x: 288, y: 36 },
-  { id: "medrese", x: 464, y: 76 },
-  { id: "castle", x: 576, y: 64 },
-] as const;
+// The seven landmarks that tell their names, in the drawing's order (where each one's target sits
+// is in the stylesheet, beside its name's place).
+const spots = ["bridge", "maiden", "mosque", "galata", "medrese", "divrigi", "castle"] as const;
 ---
 
 <div class="hz">
@@ -264,6 +275,10 @@ const spots = [
       <path class="hz-line hz-fine" d={medreseFine}></path>
     </g>
     <path class="hz-line hz-solid" d={poplars}></path>
+    <g class="hz-mark hz-divrigi">
+      <path class="hz-line hz-solid" d={divrigi}></path>
+      <path class="hz-line hz-fine" d={divrigiFine}></path>
+    </g>
     <g class="hz-dish">
       <path class="hz-line" d={mast}></path>
       <g class="hz-turn">
@@ -290,35 +305,21 @@ const spots = [
     </g>
     {birds.map((d, i) => <path class={`hz-line hz-bird hz-bird-${i + 1}`} d={d}></path>)}
   </svg>
-  <details class="hz-game">
-    <summary class="hz-ask label">{horizon.ask}</summary>
-    <fieldset class="hz-finds">
-      <legend class="visually-hidden">{horizon.legend}</legend>
-      {
-        spots.map(({ id }) => (
-          <>
-            <input class={`hz-pick hz-p-${id}`} type="checkbox" id={`hz-p-${id}`} />
-            <label class={`hz-spot hz-s-${id}`} for={`hz-p-${id}`}>
-              <span class="visually-hidden">{horizon.names[id]}</span>
-            </label>
-          </>
-        ))
-      }
-      <p class="hz-tally label">
-        <span class="hz-count"></span>
-        {horizon.found}
-      </p>
-      <ol class="hz-list label" role="list" aria-hidden="true">
-        {
-          spots.map(({ id }) => (
-            <li class={`hz-n hz-n-${id}`}>
-              <span class="hz-q">?</span>
-              <span class="hz-t">{horizon.names[id]}</span>
-            </li>
-          ))
-        }
-      </ol>
-      <p class="hz-done label" role="status"><span>{horizon.done}</span></p>
-    </fieldset>
-  </details>
+  <fieldset class="hz-marks">
+    <legend class="visually-hidden">{horizon.legend}</legend>
+    {
+      spots.map((id) => (
+        <>
+          <input class={`hz-pick hz-p-${id}`} type="radio" name="hz" id={`hz-p-${id}`} />
+          <label class={`hz-spot hz-s-${id}`} for={`hz-p-${id}`}>
+            <span class="hz-name label">{horizon.names[id]}</span>
+          </label>
+        </>
+      ))
+    }
+    <input class="hz-call" type="checkbox" id="hz-call" />
+    <label class="hz-spot hz-s-dish" for="hz-call">
+      <span class="visually-hidden">{horizon.dish}</span>
+    </label>
+  </fieldset>
 </div>

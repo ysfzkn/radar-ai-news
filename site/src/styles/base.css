@@ -3228,7 +3228,7 @@ a.heat-day:hover {
 /* The horizon over the footer (Horizon.astro): a line drawing in three depths, low on contrast;
    its ground line is the footer's rule. Far lines are the lightest and thinnest, near ones a
    little heavier; the buildings are filled with the page's own colour, so what stands in front
-   hides what stands behind. The accent is kept for the dish's feed, the flag, and the game. It is
+   hides what stands behind. The accent is kept for the dish's feed, the flag, and a name's dot. It is
    always drawn whole: at the reading column's width 1:1, on a phone across the whole window. */
 .hz {
   position: relative;
@@ -3339,7 +3339,7 @@ html.night .hz-lamp {
   --to: 360px;
 }
 
-/* The game's reward: a ring the dish sends across the skyline, and the Kangal; both wait. */
+/* What the dish does when pressed: a ring it sends across the skyline, and the Kangal; both wait. */
 .hz-wave {
   stroke: var(--accent);
   visibility: hidden;
@@ -3356,59 +3356,21 @@ html.night .hz-lamp {
   visibility: hidden;
 }
 
-/* The game (Horizon.astro): one quiet line under the drawing, a <details>. Opened, each of the six
-   landmarks shows a blip, the label of a hidden checkbox placed on the drawing (in drawing units,
-   through the box's container width); a found blip lights, its landmark is drawn in ink and its
-   name comes into the list; a CSS counter keeps the tally. Nothing is stored. */
-.hz-game {
-  margin-top: var(--space-1);
-}
-
-.hz-ask {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  min-height: 2.75rem;
-  padding-inline: 0.25rem;
-  color: var(--muted);
-  font-size: 0.75rem;
-  list-style: none;
-  cursor: pointer;
-}
-
-.hz-ask::-webkit-details-marker {
-  display: none;
-}
-
-.hz-ask::before {
-  content: "";
-  flex: none;
-  width: 0.625rem;
-  height: 0.625rem;
-  border: 1.5px solid var(--accent);
-  border-radius: 50%;
-}
-
-.hz-ask:hover {
-  color: var(--ink);
-}
-
-.hz-game[open] .hz-ask::before {
-  background: var(--accent);
-}
-
-.hz-finds {
-  display: grid;
-  justify-items: center;
-  gap: var(--space-2);
+/* The landmarks' names (Horizon.astro). Nothing is written under the drawing: each of the seven
+   landmarks is the label of a hidden radio button placed on the drawing (in drawing units, through
+   the box's container width). The picked one is drawn in ink and its name shows small under the
+   ground line, one name at a time; a landmark under the pointer is drawn in ink too. The dish is
+   a checkbox of its own: pressed, it calls the Kangal. Nothing is stored. */
+.hz-marks {
   min-width: 0;
+  height: 1.5rem;
   margin: 0;
-  padding: 0 var(--gutter);
+  padding: 0;
   border: 0;
-  counter-reset: hz-found;
 }
 
-.hz-pick {
+.hz-pick,
+.hz-call {
   position: absolute;
   left: calc(var(--x) * 100cqw / 640);
   top: calc(var(--y) * 100cqw / 640);
@@ -3420,16 +3382,10 @@ html.night .hz-lamp {
   appearance: none;
 }
 
-.hz-pick:checked {
-  counter-increment: hz-found;
-}
-
 .hz-spot {
   position: absolute;
   left: calc(var(--x) * 100cqw / 640);
   top: calc(var(--y) * 100cqw / 640);
-  display: grid;
-  place-items: center;
   width: 2.25rem;
   height: 2.25rem;
   border-radius: 50%;
@@ -3437,32 +3393,54 @@ html.night .hz-lamp {
   cursor: pointer;
 }
 
-.hz-spot::before {
-  content: "";
-  width: 0.625rem;
-  height: 0.625rem;
-  border: 1.5px solid var(--accent);
-  border-radius: 50%;
-}
-
-.hz-spot:hover::before {
-  border-color: var(--ink);
-}
-
-.hz-pick:checked + .hz-spot::before {
-  border-color: var(--accent);
-  background: var(--accent);
-}
-
-.hz-pick:focus-visible + .hz-spot {
+.hz-pick:focus-visible + .hz-spot,
+.hz-call:focus-visible + .hz-spot {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
+}
+
+/* A name waits clipped to nothing (assistive tech still reads it as its landmark's name) and, once
+   its landmark is picked, stands just under the ground line at the landmark's place; the names at
+   the drawing's ends lean inward so they stay inside it. */
+.hz-name {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + (112 - var(--y)) * 100cqw / 640 + 0.3125rem);
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  color: var(--ink);
+  font-size: 0.6875rem;
+  line-height: 1;
+  white-space: nowrap;
+  translate: var(--shift, -50%) 0;
+  pointer-events: none;
+}
+
+.hz-name::before {
+  content: "";
+  display: inline-block;
+  width: 0.3125rem;
+  height: 0.3125rem;
+  margin-right: 0.375rem;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: 0.0625rem;
+}
+
+.hz-pick:checked + .hz-spot .hz-name {
+  width: auto;
+  height: auto;
+  overflow: visible;
+  clip-path: none;
 }
 
 .hz-p-bridge,
 .hz-s-bridge {
   --x: 67;
   --y: 72;
+  --shift: -20%;
 }
 
 .hz-p-maiden,
@@ -3489,87 +3467,38 @@ html.night .hz-lamp {
   --y: 76;
 }
 
+.hz-p-divrigi,
+.hz-s-divrigi {
+  --x: 536;
+  --y: 94;
+  --shift: -70%;
+}
+
 .hz-p-castle,
 .hz-s-castle {
-  --x: 576;
-  --y: 64;
+  --x: 592;
+  --y: 58;
+  --shift: -85%;
 }
 
-.hz-count::before {
-  content: counter(hz-found) " / 6 ";
-  color: var(--ink);
-  font-weight: 700;
+.hz-call,
+.hz-s-dish {
+  --x: 391;
+  --y: 38;
 }
 
-.hz-tally {
-  font-size: 0.75rem;
-}
-
-.hz-list {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--space-1) var(--space-4);
-  padding: 0;
-  font-size: 0.75rem;
-  list-style: none;
-}
-
-.hz-q {
-  display: inline-block;
-  min-width: 3rem;
-  border-bottom: 1px dashed var(--control-border);
-  color: var(--control-border);
-  text-align: center;
-}
-
-.hz-t,
-.hz-done > span {
-  display: none;
-}
-
-.hz-done {
-  max-width: 28rem;
-  color: var(--ink);
-  font-size: 0.75rem;
-}
-
-/* A found landmark: its name in the list, its lines in ink. */
-.hz-p-bridge:checked ~ .hz-list .hz-n-bridge .hz-t,
-.hz-p-maiden:checked ~ .hz-list .hz-n-maiden .hz-t,
-.hz-p-mosque:checked ~ .hz-list .hz-n-mosque .hz-t,
-.hz-p-galata:checked ~ .hz-list .hz-n-galata .hz-t,
-.hz-p-medrese:checked ~ .hz-list .hz-n-medrese .hz-t,
-.hz-p-castle:checked ~ .hz-list .hz-n-castle .hz-t {
-  display: inline;
-  color: var(--ink);
-}
-
-.hz-p-bridge:checked ~ .hz-list .hz-n-bridge .hz-q,
-.hz-p-maiden:checked ~ .hz-list .hz-n-maiden .hz-q,
-.hz-p-mosque:checked ~ .hz-list .hz-n-mosque .hz-q,
-.hz-p-galata:checked ~ .hz-list .hz-n-galata .hz-q,
-.hz-p-medrese:checked ~ .hz-list .hz-n-medrese .hz-q,
-.hz-p-castle:checked ~ .hz-list .hz-n-castle .hz-q {
-  display: none;
-}
-
-.hz:has(.hz-p-bridge:checked) .hz-bridge .hz-line,
-.hz:has(.hz-p-maiden:checked) .hz-maiden .hz-line,
-.hz:has(.hz-p-mosque:checked) .hz-mosque .hz-line,
-.hz:has(.hz-p-galata:checked) .hz-galata .hz-line,
-.hz:has(.hz-p-medrese:checked) .hz-medrese .hz-line,
-.hz:has(.hz-p-castle:checked) .hz-castle .hz-line {
+.hz:has(.hz-p-bridge:checked, .hz-s-bridge:hover) .hz-bridge .hz-line,
+.hz:has(.hz-p-maiden:checked, .hz-s-maiden:hover) .hz-maiden .hz-line,
+.hz:has(.hz-p-mosque:checked, .hz-s-mosque:hover) .hz-mosque .hz-line,
+.hz:has(.hz-p-galata:checked, .hz-s-galata:hover) .hz-galata .hz-line,
+.hz:has(.hz-p-medrese:checked, .hz-s-medrese:hover) .hz-medrese .hz-line,
+.hz:has(.hz-p-divrigi:checked, .hz-s-divrigi:hover) .hz-divrigi .hz-line,
+.hz:has(.hz-p-castle:checked, .hz-s-castle:hover) .hz-castle .hz-line {
   stroke: var(--ink);
 }
 
-/* All six found: the line that says so, and the Kangal by the dish (it trots in where motion is
-   allowed; see the motion rules). */
-.hz:not(:has(.hz-pick:not(:checked))) .hz-done > span {
-  display: inline;
-}
-
-.hz:not(:has(.hz-pick:not(:checked))) .hz-kangal {
+/* The dish pressed: the Kangal by it (it trots in where motion is allowed; see the motion rules). */
+.hz:has(.hz-call:checked) .hz-kangal {
   display: inline;
 }
 
@@ -4283,25 +4212,25 @@ kbd {
     animation-delay: -150s;
   }
 
-  /* All six landmarks found: the dish sends one ring across the skyline, and the Kangal trots in
+  /* The dish pressed: it sends one ring across the skyline, and the Kangal trots in
      from the east to stand by it, its legs swapping between two trotting poses on the way. */
-  .hz:not(:has(.hz-pick:not(:checked))) .hz-wave {
+  .hz:has(.hz-call:checked) .hz-wave {
     animation: dish-wave 2400ms ease-out 200ms both;
   }
 
-  .hz:not(:has(.hz-pick:not(:checked))) .hz-kangal {
+  .hz:has(.hz-call:checked) .hz-kangal {
     animation: kangal-trot 8800ms linear both;
   }
 
-  .hz:not(:has(.hz-pick:not(:checked))) .hz-legs-0 {
+  .hz:has(.hz-call:checked) .hz-legs-0 {
     animation: kangal-halt 8800ms steps(1, end) both;
   }
 
-  .hz:not(:has(.hz-pick:not(:checked))) .hz-legs-1 {
+  .hz:has(.hz-call:checked) .hz-legs-1 {
     animation: kangal-step 400ms steps(1, end) 22;
   }
 
-  .hz:not(:has(.hz-pick:not(:checked))) .hz-legs-2 {
+  .hz:has(.hz-call:checked) .hz-legs-2 {
     animation: kangal-step 400ms steps(1, end) -200ms 22;
   }
 
@@ -4527,7 +4456,7 @@ kbd {
   }
 }
 
-/* The reward's ring: from the dish's feed across the whole skyline, cooling from the accent. */
+/* The dish's ring: from its feed across the whole skyline, cooling from the accent. */
 @keyframes dish-wave {
   from {
     visibility: visible;
@@ -4646,11 +4575,11 @@ kbd {
   .hz-ferry,
   .hz-train,
   .hz-cloud,
-  .hz:not(:has(.hz-pick:not(:checked))) .hz-wave,
-  .hz:not(:has(.hz-pick:not(:checked))) .hz-kangal,
-  .hz:not(:has(.hz-pick:not(:checked))) .hz-legs-0,
-  .hz:not(:has(.hz-pick:not(:checked))) .hz-legs-1,
-  .hz:not(:has(.hz-pick:not(:checked))) .hz-legs-2,
+  .hz:has(.hz-call:checked) .hz-wave,
+  .hz:has(.hz-call:checked) .hz-kangal,
+  .hz:has(.hz-call:checked) .hz-legs-0,
+  .hz:has(.hz-call:checked) .hz-legs-1,
+  .hz:has(.hz-call:checked) .hz-legs-2,
   .em-mid .em-face,
   .em-top .em-face,
   ::view-transition-old(root),

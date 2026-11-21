@@ -171,17 +171,13 @@ export interface Copy {
   copy: { code: string; done: string; link: string; linkName(no: string): string };
   /** The status line at the foot of every page, built with the site. */
   status: { command: string; line(issue: number, date: string, stories: number, sources: number): string; none: string };
-  /** The small game in the horizon: find its six landmarks. */
+  /** The horizon: its landmarks tell their names when picked, and the dish calls the Kangal. */
   horizon: {
-    /** The closed game's one line, under the drawing. */
-    ask: string;
-    /** Read before the six boxes. */
+    /** Read before the seven landmarks; never shown. */
     legend: string;
-    /** After the count, "3 / 6 …". */
-    found: string;
-    /** Shown once all six are found. */
-    done: string;
-    names: { bridge: string; maiden: string; mosque: string; galata: string; medrese: string; castle: string };
+    /** The dish's name for assistive tech; never shown. */
+    dish: string;
+    names: { bridge: string; maiden: string; mosque: string; galata: string; medrese: string; divrigi: string; castle: string };
   };
   about: About;
   subscribe: Subscribe;
@@ -384,16 +380,15 @@ export const COPY: Record<Lang, Copy> = {
       none: "henüz baskı yok",
     },
     horizon: {
-      ask: "Ufukta altı yer saklı. Bulabilir misin?",
-      legend: "Ufuktaki yerler: bulduğunu işaretle",
-      found: "bulundu",
-      done: "Hepsini buldun. Radar bir tur attı, Kangal da nöbete geldi.",
+      legend: "Ufuktaki yerler: adını görmek için birini seç",
+      dish: "Radar çanağı: Kangal'ı çağır",
       names: {
         bridge: "Boğaz Köprüsü",
         maiden: "Kız Kulesi",
         mosque: "Süleymaniye Camii",
         galata: "Galata Kulesi",
         medrese: "Çifte Minareli Medrese",
+        divrigi: "Divriği Ulu Camii",
         castle: "Sivas Kalesi",
       },
     },
@@ -667,16 +662,15 @@ export const COPY: Record<Lang, Copy> = {
       none: "no edition yet",
     },
     horizon: {
-      ask: "Six places hide on the horizon. Can you find them?",
-      legend: "Places on the horizon: mark the ones you find",
-      found: "found",
-      done: "You found them all. The radar swept once, and a Kangal came to keep watch.",
+      legend: "Places on the horizon: pick one to see its name",
+      dish: "Radar dish: call the Kangal",
       names: {
         bridge: "Bosphorus Bridge",
         maiden: "Maiden's Tower",
         mosque: "Süleymaniye Mosque",
         galata: "Galata Tower",
         medrese: "Çifte Minareli Medrese",
+        divrigi: "Great Mosque of Divriği",
         castle: "Sivas Castle",
       },
     },

@@ -1011,9 +1011,9 @@ describe("built site", () => {
       const html = readFileSync(file, "utf8");
       const lang = html.includes('<html lang="en"') ? "en" : "tr";
       const foot = html.match(/<footer class="foot label">([\s\S]*?)<\/footer>/)![1];
-      // The horizon's box (the drawing, then its game behind one line), then the signature.
+      // The horizon's box (the drawing, then its landmarks' names), then the signature.
       expect(foot, file).toMatch(
-        /^\s*<div class="hz"><svg class="horizon" [^>]*aria-hidden="true">[\s\S]*?<\/svg>\s*<details class="hz-game">[\s\S]*?<\/details>\s*<\/div>\s*<p class="sig">/,
+        /^\s*<div class="hz"><svg class="horizon" [^>]*aria-hidden="true">[\s\S]*?<\/svg>\s*<fieldset class="hz-marks">[\s\S]*?<\/fieldset>\s*<\/div>\s*<p class="sig">/,
       );
       const horizon = foot.match(/<svg class="horizon"[\s\S]*?<\/svg>/)![0];
       expect(horizon).not.toMatch(/<a\s|<text|tabindex|<input|<label/);
@@ -1022,20 +1022,21 @@ describe("built site", () => {
       for (const part of ["hz-ferry", "hz-train", "hz-cloud hz-cloud-1", "hz-cloud hz-cloud-2", "hz-kangal", "hz-line hz-wave"]) {
         expect(horizon, part).toContain(`class="${part}"`);
       }
-      // The game: six landmarks, each a checkbox named by its landmark (the drawing's text
-      // alternative), a closed <details> to ignore, the tally and the list in the page's language.
-      const game = foot.match(/<details class="hz-game">([\s\S]*?)<\/details>/)![1];
+      // Seven landmarks, each a radio button of one group named by its landmark (the drawing's
+      // text alternative, and the only words: no line of text asks the reader to look for them),
+      // and the dish, a checkbox.
+      const marks = foot.match(/<fieldset class="hz-marks">([\s\S]*?)<\/fieldset>/)![1];
       const copy = COPY[lang].horizon;
-      expect(game.trimStart().startsWith(`<summary class="hz-ask label">${copy.ask}</summary>`), file).toBe(true);
-      expect(game).not.toMatch(/<details[^>]*\sopen/);
-      const ids = ["bridge", "maiden", "mosque", "galata", "medrese", "castle"] as const;
-      const picks = [...game.matchAll(/<input class="hz-pick hz-p-([a-z]+)" type="checkbox" id="hz-p-\1">\s*<label class="hz-spot hz-s-\1" for="hz-p-\1">\s*<span class="visually-hidden">([^<]+)<\/span>\s*<\/label>/g)];
+      expect(foot).not.toMatch(/<details|<summary|hz-ask|hz-tally|hz-list|hz-done/);
+      const ids = ["bridge", "maiden", "mosque", "galata", "medrese", "divrigi", "castle"] as const;
+      for (const id of ids) expect(horizon, id).toContain(`class="hz-mark hz-${id}"`);
+      const picks = [...marks.matchAll(/<input class="hz-pick hz-p-([a-z]+)" type="radio" name="hz" id="hz-p-\1">\s*<label class="hz-spot hz-s-\1" for="hz-p-\1">\s*<span class="hz-name label">([^<]+)<\/span>\s*<\/label>/g)];
       expect(picks.map((m) => m[1])).toEqual([...ids]);
       expect(picks.map((m) => text(m[2]))).toEqual(ids.map((id) => copy.names[id]));
-      expect(game).toContain(`<legend class="visually-hidden">${copy.legend}</legend>`);
-      expect(text(game.match(/<p class="hz-tally label">[\s\S]*?<\/p>/)![0])).toBe(copy.found);
-      expect(game).toMatch(/<ol class="hz-list label" role="list" aria-hidden="true">/);
-      expect(text(game.match(/<p class="hz-done label" role="status"><span>([^<]*)<\/span><\/p>/)![1])).toBe(copy.done);
+      expect(marks).not.toMatch(/\schecked/);
+      expect(marks).toContain(`<legend class="visually-hidden">${copy.legend}</legend>`);
+      const call = marks.match(/<input class="hz-call" type="checkbox" id="hz-call">\s*<label class="hz-spot hz-s-dish" for="hz-call">\s*<span class="visually-hidden">([^<]+)<\/span>\s*<\/label>/);
+      expect(text(call![1])).toBe(copy.dish);
     }
     expect(COPY.tr.horizon.names).toEqual({
       bridge: "Boğaz Köprüsü",
@@ -1043,17 +1044,27 @@ describe("built site", () => {
       mosque: "Süleymaniye Camii",
       galata: "Galata Kulesi",
       medrese: "Çifte Minareli Medrese",
+      divrigi: "Divriği Ulu Camii",
       castle: "Sivas Kalesi",
     });
     const sheet = css();
-    // The tally is a CSS counter of the checked boxes; all six found shows the line that says so
-    // and the Kangal, with no script and nothing stored.
-    expect(cssRule(sheet, ".hz-pick:checked")).toContain("counter-increment: hz-found;");
-    expect(cssRule(sheet, ".hz-count::before")).toContain('content: counter(hz-found) " / 6 ";');
-    expect(cssRule(sheet, ".hz:not(:has(.hz-pick:not(:checked))) .hz-done > span")).toContain("display: inline;");
-    expect(cssRule(sheet, ".hz:not(:has(.hz-pick:not(:checked))) .hz-kangal")).toContain("display: inline;");
+    // A name is clipped to nothing until its landmark is picked, then stands under the ground
+    // line; the picked landmark is drawn in ink. The dish, pressed, shows the Kangal. No script,
+    // nothing stored.
+    const name = cssRule(sheet, ".hz-name");
+    for (const rule of ["width: 1px;", "height: 1px;", "clip-path: inset(50%);", "font-size: 0.6875rem;", "white-space: nowrap;"]) {
+      expect(name).toContain(rule);
+    }
+    const shown = cssRule(sheet, ".hz-pick:checked + .hz-spot .hz-name");
+    expect(shown).toContain("clip-path: none;");
+    expect(shown).toContain("width: auto;");
+    for (const id of ["bridge", "maiden", "mosque", "galata", "medrese", "divrigi", "castle"]) {
+      expect(sheet).toContain(`.hz:has(.hz-p-${id}:checked, .hz-s-${id}:hover) .hz-${id} .hz-line`);
+    }
+    expect(cssRule(sheet, ".hz:has(.hz-call:checked) .hz-kangal")).toContain("display: inline;");
     expect(cssRule(sheet, ".hz-kangal")).toContain("display: none;");
-    // A found blip is a target of 36px.
+    expect(sheet).not.toMatch(/hz-found|hz-game|hz-ask/);
+    // A landmark is a target of 36px.
     const spot = cssRule(sheet, ".hz-spot");
     expect(spot).toContain("width: 2.25rem;");
     expect(spot).toContain("height: 2.25rem;");

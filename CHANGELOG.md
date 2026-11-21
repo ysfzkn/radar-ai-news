@@ -15,8 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Site: a readout panel beside the scope from 48rem, one row per story (number, bearing, sources, topic, title), linked both ways with its blip; and ghost blips for a thin edition: up to eight stories of the previous seven days, small and faint, linking to their editions.
 - Site: the masthead's date and counts settle in like a departure board, once per view; the subscribe label decodes on hover.
 - Site: signal bars on each story (1, 2–3, 4+ sources); the horizon follows Istanbul's time (sun and gulls by day, moon and lit windows at night); `ping` in the command palette pulses the scope.
-- Site: a livelier horizon, redrawn in three depths with recognisable landmarks (the Süleymaniye with four minarets, the Galata Tower's gallery and cap, the medrese's fluted minarets, Sivas castle's towers and flag): a ferry crosses under the Bosphorus Bridge, the Eastern Express passes behind Sivas now and then, clouds drift, stars come out at night.
-- Site: a small game in the horizon, without script: open the line under the drawing and find its six landmarks; their names fill a list, a CSS counter keeps the tally, and with all six the radar sends one ring across the skyline and a Kangal comes to keep watch. Nothing is stored.
+- Site: a livelier horizon, redrawn in three depths with recognisable landmarks (the Süleymaniye with four minarets, the Galata Tower's gallery and cap, the medrese's fluted minarets, the Great Mosque of Divriği with its portal, pyramid caps and stout minaret, Sivas castle's towers and flag): a ferry crosses under the Bosphorus Bridge, the Eastern Express passes behind Sivas now and then, clouds drift, stars come out at night.
+- Site: the horizon's landmarks tell their names, without script: pick one (a tap, a click, the arrow keys) and it is drawn in ink with its name small under the ground line, one at a time; nothing is written under the drawing otherwise. Press the radar dish and it sends one ring across the skyline and a Kangal comes to keep watch. Nothing is stored.
 
 ### Changed
 
