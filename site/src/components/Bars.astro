@@ -1,0 +1,17 @@
+---
+import { COPY } from "../lib/copy";
+import { signalLevel } from "../lib/nav";
+import type { Lang } from "../lib/schema";
+
+interface Props {
+  lang: Lang;
+  count: number;
+}
+
+// Three signal bars, as many lit as the story is carried: 1, 2–3, 4 or more sources. The echo
+// meter beside them gives the exact count; the bars are named weak, fair or strong.
+const { lang, count } = Astro.props;
+const level = signalLevel(count);
+---
+
+<span class={`bars bars-${level}`} role="img" aria-label={COPY[lang].signal[level - 1]}><span></span><span></span><span></span></span>

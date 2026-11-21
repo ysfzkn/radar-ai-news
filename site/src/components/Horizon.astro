@@ -4,6 +4,8 @@
 // mosque between its minarets and the Galata Tower. On the right, Sivas: the twin minarets of the
 // Çifte Minareli Medrese over its portal, poplars, and the castle hill with its flag. Between
 // them a few plain roofs, and on the tallest a small radar dish that turns; gulls drift above.
+// It keeps Istanbul's hours: by day a small sun and the gulls; in the evening and at night
+// (scripts/sky.ts, from the reader's clock) a moon, no gulls and a few windows lit in the accent.
 // Decoration only. The drawing is 640 × 96 (the reading column at 1:1); on a narrow screen it
 // keeps its height and shows its middle: from the Maiden's Tower to the poplars.
 
@@ -101,6 +103,17 @@ const birds = [
   { x: 334, y: 13, s: 0.8 },
   { x: 348, y: 27, s: 0.65 },
 ].map(({ x, y, s }) => `M${r(x - 6 * s)} ${y}Q${r(x - 3 * s)} ${r(y - 4 * s)} ${x} ${y}Q${r(x + 3 * s)} ${r(y - 4 * s)} ${r(x + 6 * s)} ${y}`);
+// Above the mosque's dome, the sky: by day a small sun, its disc and eight short rays; at night
+// a crescent moon. The page draws the day; scripts/sky.ts switches to the night in the evening.
+const SKY = { x: 210, y: 21 };
+const sun =
+  `M${SKY.x + 4} ${SKY.y}A4 4 0 1 0 ${SKY.x - 4} ${SKY.y}A4 4 0 1 0 ${SKY.x + 4} ${SKY.y}` +
+  Array.from({ length: 8 }, (_, i) => {
+    const a = (i * Math.PI) / 4;
+    const p = (d: number) => `${r(SKY.x + d * Math.cos(a))} ${r(SKY.y + d * Math.sin(a))}`;
+    return `M${p(6.5)}L${p(9)}`;
+  }).join("");
+const moon = `M${SKY.x + 1} ${SKY.y - 7}A7 7 0 1 0 ${SKY.x + 1} ${SKY.y + 7}A9 9 0 0 1 ${SKY.x + 1} ${SKY.y - 7}Z`;
 ---
 
 <svg
@@ -115,7 +128,10 @@ const birds = [
   <path class="hz-line" d={maiden + mosque + galata}></path>
   <path class="hz-line" d={line}></path>
   <path class="hz-line" d={medrese + poplars}></path>
-  <path class="hz-line hz-fine" d={windows + galataFine + brick}></path>
+  <path class="hz-line hz-fine" d={galataFine + brick}></path>
+  <path class="hz-line hz-fine hz-win" d={windows}></path>
+  <path class="hz-line hz-sun" d={sun}></path>
+  <path class="hz-line hz-moon" d={moon}></path>
   <g class="hz-dish">
     <path class="hz-line" d={mast}></path>
     <g class="hz-turn">

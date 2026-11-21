@@ -31,7 +31,7 @@ body {
 .page {
   max-width: calc(var(--measure) + 2 * var(--gutter));
   margin-inline: auto;
-  padding-inline: var(--gutter);
+  padding-inline: max(var(--gutter), env(safe-area-inset-left)) max(var(--gutter), env(safe-area-inset-right));
 }
 
 p,
@@ -114,8 +114,8 @@ a:hover {
   stroke: var(--accent);
 }
 
-/* Top strip, two rows at every width: the wordmark and whose site it is, with the subscribe
-   button at the right; then the text links, with the language switch at the right. */
+/* Top strip: the wordmark and whose site it is, with the language switch and the subscribe
+   button at the right; then the dial across the whole row (on a phone, at the window's foot). */
 .top {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -174,68 +174,237 @@ a:hover {
   text-decoration: none;
 }
 
-/* The navigation, then the language switch at the row's end. */
-.top-nav {
-  grid-area: nav;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-1) var(--space-3);
-}
-
-.nav {
-  display: flex;
-  flex-wrap: wrap;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  color: var(--muted);
-}
-
-.nav li + li::before {
-  content: "·";
-  content: "·" / "";
-  margin-inline: 0.45em;
-}
-
-.nav a {
-  text-decoration-color: transparent;
-}
-
 /* Small label links get a taller hit area (at least 24px); inline padding leaves the layout alone. */
-.nav a,
 .foot a,
 .story-sources a {
   padding-block: 0.35em;
 }
 
-.nav a:hover,
-.nav a[aria-current="page"] {
+/* The dial (Masthead.astro): a receiver's tuning scale under the strip. The four sections are its
+   stations, a fine ruler of ticks runs under them and one accent needle stands on the current
+   station. Where the needle rests comes from aria-current alone, so it needs no script; a pointer
+   or the focus on a station draws the needle there, and it goes back when they leave. Between
+   pages the needle carries a view-transition name, so a browser with cross-document view
+   transitions glides it to its new station; without them it is simply in place. Without the
+   stylesheet the dial is a plain list of four links. */
+.dial {
+  grid-area: nav;
+}
+
+.dial-scale {
+  position: relative;
+  padding-bottom: 0.875rem;
+  border-bottom: 1px solid var(--ink);
+}
+
+.dial-stations {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+  text-align: center;
+}
+
+.dial-stations a {
+  display: block;
+  padding-block: 0.35em 0.3em;
+  text-decoration-color: transparent;
+}
+
+.dial-stations a:hover,
+.dial-stations a:focus-visible,
+.dial-stations a[aria-current] {
   color: var(--ink);
+}
+
+.dial-stations a[aria-current="page"] {
+  font-weight: 700;
+}
+
+.dial-stations a:hover {
   text-decoration-color: var(--accent);
 }
 
-/* The language switch: two parts in one outline; the current one is plain text on a chip. */
+.dial-ruler {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 0.75rem;
+  overflow: visible;
+  fill: none;
+}
+
+.dial-ruler path {
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.dial-minor {
+  stroke: var(--control-border);
+}
+
+.dial-medium {
+  stroke: var(--muted);
+}
+
+.dial-major {
+  stroke: var(--ink);
+}
+
+/* The needle: a hairline over the ruler with a round head, at the middle of station --at (1–4). */
+.dial-needle {
+  position: absolute;
+  bottom: -0.3125rem;
+  left: calc((var(--at, 1) - 0.5) * 25%);
+  width: 2px;
+  height: 1.25rem;
+  margin-left: -1px;
+  background: var(--accent);
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.dial-needle::before {
+  content: "";
+  position: absolute;
+  top: -0.25rem;
+  left: -0.1875rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.dial:has(li:nth-child(1) > [aria-current]) .dial-needle {
+  --at: 1;
+  visibility: visible;
+}
+
+.dial:has(li:nth-child(2) > [aria-current]) .dial-needle {
+  --at: 2;
+  visibility: visible;
+}
+
+.dial:has(li:nth-child(3) > [aria-current]) .dial-needle {
+  --at: 3;
+  visibility: visible;
+}
+
+.dial:has(li:nth-child(4) > [aria-current]) .dial-needle {
+  --at: 4;
+  visibility: visible;
+}
+
+.dial:has(li:nth-child(1) > a:is(:hover, :focus-visible)) .dial-needle {
+  --at: 1;
+  visibility: visible;
+}
+
+.dial:has(li:nth-child(2) > a:is(:hover, :focus-visible)) .dial-needle {
+  --at: 2;
+  visibility: visible;
+}
+
+.dial:has(li:nth-child(3) > a:is(:hover, :focus-visible)) .dial-needle {
+  --at: 3;
+  visibility: visible;
+}
+
+.dial:has(li:nth-child(4) > a:is(:hover, :focus-visible)) .dial-needle {
+  --at: 4;
+  visibility: visible;
+}
+
+/* On a phone the dial is fixed to the foot of the window, where a thumb reaches it: full width,
+   each station a 44px target, clear of the home indicator; the page keeps room under its footer
+   so the dial covers nothing. The top strip keeps the wordmark, the language switch and the
+   subscribe button in one row. */
+@media (max-width: 39.99em) {
+  .top {
+    grid-template-areas: "id act";
+    column-gap: var(--space-3);
+  }
+
+  .top .top-act {
+    gap: var(--space-2);
+  }
+
+  .lang .lang-part {
+    padding-inline: 0.5rem;
+  }
+
+  .top .subscribe {
+    padding-inline: 0.5rem;
+    font-size: 0.75rem;
+  }
+
+  .dial {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 40;
+    padding: 0 max(var(--gutter), env(safe-area-inset-right)) env(safe-area-inset-bottom)
+      max(var(--gutter), env(safe-area-inset-left));
+    border-top: 1.5px solid var(--ink);
+    background: var(--bg);
+  }
+
+  .dial-scale {
+    border-bottom: 0;
+  }
+
+  .dial-stations a {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.75rem;
+  }
+
+  body {
+    padding-bottom: calc(4.25rem + env(safe-area-inset-bottom));
+  }
+}
+
+/* The narrowest phones put the switch and the button under the wordmark. */
+@media (max-width: 22.5em) {
+  .top {
+    grid-template-areas:
+      "id"
+      "act";
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* The language switch: a two-position slider. Both languages sit in one rounded track and an ink
+   thumb lies under the current one (the order of the parts says which: TR first). Pointing at the
+   other language nudges the thumb towards it; between the two languages' pages it slides across. */
 .lang {
-  display: inline-flex;
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 2px;
   border: 1px solid var(--control-border);
-  border-radius: 2px;
+  border-radius: 999px;
+  background: var(--surface);
 }
 
 /* 0.6875rem above and below a 1.2 line make a 2.25rem tap target at phone width. */
 .lang-part {
+  position: relative;
+  z-index: 1;
   padding: 0.6875rem 0.625rem;
+  border-radius: 999px;
   line-height: 1.2;
-}
-
-.lang-part + .lang-part {
-  border-left: 1px solid var(--control-border);
+  text-align: center;
 }
 
 .lang-part[aria-current] {
-  background: var(--chip);
-  color: var(--ink);
+  color: var(--bg);
+  font-weight: 700;
 }
 
 a.lang-part {
@@ -249,11 +418,34 @@ a.lang-part:focus-visible {
   text-decoration-color: var(--accent);
 }
 
+.lang-thumb {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 2px;
+  width: calc(50% - 2px);
+  border-radius: 999px;
+  background: var(--ink);
+}
+
+.lang:has(> .lang-part:nth-child(2)[aria-current]) .lang-thumb {
+  translate: 100% 0;
+}
+
+.lang:has(> a.lang-part:first-child:is(:hover, :focus-visible)) .lang-thumb {
+  translate: 88% 0;
+}
+
+.lang:has(> a.lang-part:nth-child(2):is(:hover, :focus-visible)) .lang-thumb {
+  translate: 12% 0;
+}
+
 @media (min-width: 48rem) {
   .lang-part {
     padding-block: 0.25rem;
   }
 }
+
 
 .demo {
   margin-top: var(--space-3);
@@ -372,6 +564,18 @@ a.lang-part:focus-visible {
   color: var(--muted);
 }
 
+/* The departure board's cells (scripts/board.ts): while the masthead's date and counts or the
+   subscribe label settle, each character turns in a cell as wide as the character it lands on. */
+.flap-word {
+  white-space: nowrap;
+}
+
+.flap {
+  display: inline-block;
+  width: var(--w, auto);
+  text-align: center;
+}
+
 /* The plain index of the day: the list a page shows without its stylesheet, and on paper. On
    screen the scope above it carries the same links, so the list stays out of sight and out of
    the accessibility tree (no link is announced twice). */
@@ -461,11 +665,16 @@ a.lang-part:focus-visible {
     grid-area: head;
   }
 
-  /* The scope stays in view beside the stories, so the reader watches its blips turn hollow. */
-  .edition-railed .scope {
+  /* The scope stays in view beside the stories, so the reader watches its blips turn hollow; its
+     readout panel sits under it in the rail. */
+  .edition-railed .scope-rail {
     grid-area: rail;
     position: sticky;
     top: 1.5rem;
+    display: block;
+  }
+
+  .edition-railed .scope {
     max-width: none;
   }
 
@@ -748,6 +957,247 @@ a.lang-part:focus-visible {
 .scope:has(.b-16:is(:hover, :focus-visible)) .t-16 {
   visibility: visible !important;
   z-index: 30 !important;
+}
+
+/* Ghosts: stories of the week's earlier editions on a thin edition's scope, small and faint (an
+   outline in the control grey on white), with no number and no echo; the sweep does not light them. */
+.ghost {
+  outline: none;
+  pointer-events: auto;
+}
+
+.ghost-dot {
+  fill: var(--surface);
+  stroke: var(--control-border);
+  stroke-width: 1.25;
+  stroke-dasharray: 2 1.5;
+}
+
+.ghost:hover .ghost-dot,
+.ghost:focus-visible .ghost-dot {
+  stroke: var(--ink);
+  stroke-dasharray: none;
+}
+
+.ghost:focus-visible .blip-hit {
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+
+.readout-ghost {
+  position: absolute;
+  inset: var(--space-2) 0 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  background: var(--surface);
+  color: var(--muted);
+  visibility: hidden;
+}
+
+.readout-when {
+  color: var(--ink);
+}
+
+.scope:has(.g-1:is(:hover, :focus-visible)) .u-1,
+.scope:has(.g-2:is(:hover, :focus-visible)) .u-2,
+.scope:has(.g-3:is(:hover, :focus-visible)) .u-3,
+.scope:has(.g-4:is(:hover, :focus-visible)) .u-4,
+.scope:has(.g-5:is(:hover, :focus-visible)) .u-5,
+.scope:has(.g-6:is(:hover, :focus-visible)) .u-6,
+.scope:has(.g-7:is(:hover, :focus-visible)) .u-7,
+.scope:has(.g-8:is(:hover, :focus-visible)) .u-8 {
+  visibility: visible;
+  z-index: 31;
+}
+
+/* The readout panel (Scope.astro): beside the scope from 48rem, under it in the rail from 72rem; on
+   a phone the scope's own readout line is the readout. An instrument's display: the label voice in
+   the page colour on ink, one row per story. Hidden from assistive tech, its rows are links for the
+   pointer only; a row and its blip light each other. */
+.scope-panel {
+  display: none;
+  padding: var(--space-2) 0;
+  border: 1.5px solid var(--ink);
+  background: var(--ink);
+  color: var(--line);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 0 var(--space-3) var(--space-2);
+  color: var(--bg);
+  font-weight: 700;
+}
+
+.panel-grid {
+  display: grid;
+  grid-template-columns: 2.5ch 5ch 3.5ch minmax(0, 1fr);
+  column-gap: 1.5ch;
+  padding: 0.1875rem var(--space-3);
+}
+
+.panel-cols {
+  border-bottom: 1px solid var(--muted);
+  color: var(--control-border);
+}
+
+.panel-cols > :last-child {
+  display: none;
+}
+
+.panel-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.panel-row {
+  color: inherit;
+  text-decoration: none;
+}
+
+.pr-no {
+  color: var(--bg);
+  font-weight: 700;
+}
+
+.panel-row > *,
+.panel-cols > * {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.pr-title {
+  grid-column: 1 / -1;
+  color: var(--bg);
+}
+
+.panel-row:hover,
+.scope-rail:has(.b-1:is(:hover, :focus-visible)) .r-1,
+.scope-rail:has(.b-2:is(:hover, :focus-visible)) .r-2,
+.scope-rail:has(.b-3:is(:hover, :focus-visible)) .r-3,
+.scope-rail:has(.b-4:is(:hover, :focus-visible)) .r-4,
+.scope-rail:has(.b-5:is(:hover, :focus-visible)) .r-5,
+.scope-rail:has(.b-6:is(:hover, :focus-visible)) .r-6,
+.scope-rail:has(.b-7:is(:hover, :focus-visible)) .r-7,
+.scope-rail:has(.b-8:is(:hover, :focus-visible)) .r-8,
+.scope-rail:has(.b-9:is(:hover, :focus-visible)) .r-9,
+.scope-rail:has(.b-10:is(:hover, :focus-visible)) .r-10,
+.scope-rail:has(.b-11:is(:hover, :focus-visible)) .r-11,
+.scope-rail:has(.b-12:is(:hover, :focus-visible)) .r-12,
+.scope-rail:has(.b-13:is(:hover, :focus-visible)) .r-13,
+.scope-rail:has(.b-14:is(:hover, :focus-visible)) .r-14,
+.scope-rail:has(.b-15:is(:hover, :focus-visible)) .r-15,
+.scope-rail:has(.b-16:is(:hover, :focus-visible)) .r-16 {
+  background: var(--accent);
+  color: var(--surface);
+}
+
+.panel-row:hover > *,
+.scope-rail:has(.b-1:is(:hover, :focus-visible)) .r-1 > *,
+.scope-rail:has(.b-2:is(:hover, :focus-visible)) .r-2 > *,
+.scope-rail:has(.b-3:is(:hover, :focus-visible)) .r-3 > *,
+.scope-rail:has(.b-4:is(:hover, :focus-visible)) .r-4 > *,
+.scope-rail:has(.b-5:is(:hover, :focus-visible)) .r-5 > *,
+.scope-rail:has(.b-6:is(:hover, :focus-visible)) .r-6 > *,
+.scope-rail:has(.b-7:is(:hover, :focus-visible)) .r-7 > *,
+.scope-rail:has(.b-8:is(:hover, :focus-visible)) .r-8 > *,
+.scope-rail:has(.b-9:is(:hover, :focus-visible)) .r-9 > *,
+.scope-rail:has(.b-10:is(:hover, :focus-visible)) .r-10 > *,
+.scope-rail:has(.b-11:is(:hover, :focus-visible)) .r-11 > *,
+.scope-rail:has(.b-12:is(:hover, :focus-visible)) .r-12 > *,
+.scope-rail:has(.b-13:is(:hover, :focus-visible)) .r-13 > *,
+.scope-rail:has(.b-14:is(:hover, :focus-visible)) .r-14 > *,
+.scope-rail:has(.b-15:is(:hover, :focus-visible)) .r-15 > *,
+.scope-rail:has(.b-16:is(:hover, :focus-visible)) .r-16 > * {
+  color: var(--surface);
+}
+
+.scope-rail:has(.r-1:hover) .b-1 .blip-dot,
+.scope-rail:has(.r-2:hover) .b-2 .blip-dot,
+.scope-rail:has(.r-3:hover) .b-3 .blip-dot,
+.scope-rail:has(.r-4:hover) .b-4 .blip-dot,
+.scope-rail:has(.r-5:hover) .b-5 .blip-dot,
+.scope-rail:has(.r-6:hover) .b-6 .blip-dot,
+.scope-rail:has(.r-7:hover) .b-7 .blip-dot,
+.scope-rail:has(.r-8:hover) .b-8 .blip-dot,
+.scope-rail:has(.r-9:hover) .b-9 .blip-dot,
+.scope-rail:has(.r-10:hover) .b-10 .blip-dot,
+.scope-rail:has(.r-11:hover) .b-11 .blip-dot,
+.scope-rail:has(.r-12:hover) .b-12 .blip-dot,
+.scope-rail:has(.r-13:hover) .b-13 .blip-dot,
+.scope-rail:has(.r-14:hover) .b-14 .blip-dot,
+.scope-rail:has(.r-15:hover) .b-15 .blip-dot,
+.scope-rail:has(.r-16:hover) .b-16 .blip-dot {
+  stroke: var(--ink);
+  stroke-width: 2.5;
+}
+
+.scope-rail:has(.r-1:hover) .t-1,
+.scope-rail:has(.r-2:hover) .t-2,
+.scope-rail:has(.r-3:hover) .t-3,
+.scope-rail:has(.r-4:hover) .t-4,
+.scope-rail:has(.r-5:hover) .t-5,
+.scope-rail:has(.r-6:hover) .t-6,
+.scope-rail:has(.r-7:hover) .t-7,
+.scope-rail:has(.r-8:hover) .t-8,
+.scope-rail:has(.r-9:hover) .t-9,
+.scope-rail:has(.r-10:hover) .t-10,
+.scope-rail:has(.r-11:hover) .t-11,
+.scope-rail:has(.r-12:hover) .t-12,
+.scope-rail:has(.r-13:hover) .t-13,
+.scope-rail:has(.r-14:hover) .t-14,
+.scope-rail:has(.r-15:hover) .t-15,
+.scope-rail:has(.r-16:hover) .t-16 {
+  visibility: visible !important;
+  z-index: 32 !important;
+}
+
+@media (min-width: 48rem) {
+  .scope-rail {
+    display: grid;
+    grid-template-columns: minmax(0, 26.25rem) minmax(0, 1fr);
+    column-gap: var(--space-4);
+    align-items: start;
+  }
+
+  .scope-panel {
+    display: block;
+    margin-top: var(--space-5);
+  }
+}
+
+@media (min-width: 72rem) {
+  .scope-panel {
+    margin-top: var(--space-4);
+  }
+
+  .panel-grid {
+    grid-template-columns: 2.5ch 5ch 3.5ch 10ch minmax(0, 1fr);
+  }
+
+  .panel-cols > :last-child {
+    display: block;
+  }
+
+  .pr-title {
+    grid-column: auto;
+  }
+}
+
+/* On a short window the rail keeps the scope in view and lets the panel go. */
+@media (min-width: 72rem) and (max-height: 51.99rem) {
+  .edition-railed .scope-panel {
+    display: none;
+  }
 }
 
 .scope-caption {
@@ -1069,8 +1519,42 @@ a.story-cat:hover {
   text-decoration-color: currentColor;
 }
 
-.story-meta .echo {
+/* Signal bars: three steps of height, as many in ink as the story is carried (1, 2–3, 4+ sources);
+   the rest in the hairline grey. Their name says weak, fair or strong. */
+.bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 0.75rem;
+  margin-left: var(--space-2);
+}
+
+.bars > span {
+  width: 3px;
+  height: 100%;
+  background: var(--line);
+}
+
+.bars > :first-child {
+  height: 40%;
+}
+
+.bars > :nth-child(2) {
+  height: 70%;
+}
+
+.bars-1 > :first-child,
+.bars-2 > :nth-child(-n + 2),
+.bars-3 > span {
+  background: var(--ink);
+}
+
+/* The echo meter and the signal bars stay together at the row's end. */
+.story-meta .signal {
+  display: inline-flex;
+  align-items: baseline;
   margin-left: auto;
+  white-space: nowrap;
 }
 
 /* From 48rem the number leaves the label row and hangs in a 3rem gutter left of the story. */
@@ -1198,13 +1682,28 @@ a.story-cat:hover {
 }
 
 /* The two buttons are keys: an ink outline on white over a hard 3px shadow. Hover lifts the
-   key by a pixel, a press pushes it down onto its shadow. */
+   key by a pixel and wipes the accent in from the left under a white label (5.5:1; ink on white
+   is 17:1); focus lifts it too, with the focus ring. A press sinks the key into its shadow: it
+   moves by the shadow's offset and the shadow goes, then it comes back. */
 .subscribe,
 .try {
+  position: relative;
+  isolation: isolate;
   border: 1.5px solid var(--ink);
   background: var(--surface);
   color: var(--ink);
   box-shadow: 3px 3px 0 var(--ink);
+}
+
+.subscribe::before,
+.try::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: 0 50%;
 }
 
 .subscribe:hover,
@@ -1215,10 +1714,25 @@ a.story-cat:hover {
   box-shadow: 4px 4px 0 var(--ink);
 }
 
+.subscribe:hover,
+.try:hover,
+.try:hover :is(.story-try-mark, .try-host) {
+  color: var(--surface);
+}
+
+.try:hover .try-host {
+  border-color: currentColor;
+}
+
+.subscribe:hover::before,
+.try:hover::before {
+  transform: none;
+}
+
 .subscribe:active,
 .try:active {
-  transform: translate(2px, 2px);
-  box-shadow: 1px 1px 0 var(--ink);
+  transform: translate(3px, 3px);
+  box-shadow: 0px 0px 0 var(--ink);
 }
 
 /* Inside the lead card the try button is flat: the card already carries the shadow. Hover and
@@ -1234,6 +1748,25 @@ a.story-cat:hover {
 .story-lead .try:hover,
 .story-lead .try:focus-visible {
   background: var(--chip);
+}
+
+/* Neither the flat try button nor the current page's button wipes; their labels stay ink. */
+.story-lead .try::before,
+.subscribe[aria-current="page"]::before {
+  content: none;
+}
+
+.story-lead .try:hover,
+.subscribe[aria-current="page"]:hover {
+  color: var(--ink);
+}
+
+.story-lead .try:hover .story-try-mark {
+  color: var(--accent);
+}
+
+.story-lead .try:hover .try-host {
+  color: var(--muted);
 }
 
 /* On the subscribe page the strip's button is where the reader already is: flat and still. */
@@ -1851,6 +2384,21 @@ a.heat-day:hover {
   stroke: var(--line);
 }
 
+/* The sky keeps Istanbul's hours (html.night from scripts/sky.ts): by day the sun and the gulls,
+   at night the moon and a few windows lit in the accent. */
+.hz-moon,
+html.night :is(.hz-sun, .hz-bird) {
+  display: none;
+}
+
+html.night .hz-moon {
+  display: inline;
+}
+
+html.night .hz-win {
+  stroke: var(--accent);
+}
+
 .hz-tip {
   fill: var(--accent);
 }
@@ -2262,6 +2810,15 @@ kbd {
   text-decoration: underline var(--accent);
 }
 
+.copy-link.is-done::before,
+.copy-code.is-done::before {
+  content: "✓";
+  content: "✓" / "";
+  display: inline-block;
+  margin-right: 0.3em;
+  color: inherit;
+}
+
 .copy-link.is-done {
   color: var(--ok);
 }
@@ -2399,7 +2956,23 @@ kbd {
   .try {
     transition:
       transform 120ms ease-out,
-      box-shadow 120ms ease-out;
+      box-shadow 120ms ease-out,
+      color 120ms ease-out;
+  }
+
+  .subscribe::before,
+  .try::before {
+    transition: transform 120ms ease-out;
+  }
+
+  /* A copy button's mark turns into a check with a small pop; a ping pulses the scope once. */
+  .copy-link.is-done::before,
+  .copy-code.is-done::before {
+    animation: check-in 240ms ease-out both;
+  }
+
+  .ping {
+    animation: ping 600ms ease-out;
   }
 
   /* The lit arcs of each echo meter come in one after another, once, on load. */
@@ -2485,6 +3058,30 @@ kbd {
 
   .top {
     view-transition-name: top;
+  }
+
+  /* The dial's needle and the language switch's thumb move to where they are pointed, and glide
+     from page to page as layers of their own; on a phone the dial at the window's foot is one too. */
+  .dial-needle {
+    transition: left 120ms ease-out;
+    view-transition-name: dial-needle;
+  }
+
+  .lang-thumb {
+    transition: translate 120ms ease-out;
+    view-transition-name: lang-thumb;
+  }
+
+  ::view-transition-group(dial-needle),
+  ::view-transition-group(lang-thumb) {
+    animation-duration: 320ms;
+    animation-timing-function: cubic-bezier(0.3, 0.7, 0.2, 1);
+  }
+
+  @media (max-width: 39.99em) {
+    .dial {
+      view-transition-name: dial;
+    }
   }
 
   /* The 404 page's flat trace draws itself once. */
@@ -2624,6 +3221,20 @@ kbd {
   }
 }
 
+/* The check of a copy button: in from small and tilted. */
+@keyframes check-in {
+  from {
+    transform: scale(0.3) rotate(-25deg);
+  }
+}
+
+/* One pulse, on "ping" in the palette: out a little and back. */
+@keyframes ping {
+  35% {
+    scale: 1.06;
+  }
+}
+
 /* A scan from the top: the new page uncovered line by line. */
 @keyframes vt-scan {
   from {
@@ -2730,7 +3341,8 @@ kbd {
   .copy-link,
   .copy-code,
   .palette,
-  .keys {
+  .keys,
+  .scope-panel {
     display: none;
   }
 
@@ -2759,7 +3371,10 @@ kbd {
   .em-top .em-face,
   ::view-transition-old(root),
   ::view-transition-new(root),
-  .ns-trace {
+  .ns-trace,
+  .copy-link.is-done::before,
+  .copy-code.is-done::before,
+  .ping {
     animation: none;
   }
 

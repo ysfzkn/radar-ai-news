@@ -1,4 +1,5 @@
 ---
+import Bars from "./Bars.astro";
 import Echo from "./Echo.astro";
 import { COPY } from "../lib/copy";
 import { istanbulDate } from "../lib/editions";
@@ -25,7 +26,7 @@ const copy = COPY[lang];
           <p class="story-meta label">
             <time datetime={date}>{shortDate(date, lang)}</time>{" "}
             <span class="story-cat caps">{copy.categories[story.category]}</span>{" "}
-            <Echo lang={lang} count={story.source_count} />
+            <span class="signal"><Echo lang={lang} count={story.source_count} /><Bars lang={lang} count={story.source_count} /></span>
           </p>
           <h2 class="list-title">
             <a href={storyLink(lang, date, story.uid)}>{story.texts[lang]!.title}</a>

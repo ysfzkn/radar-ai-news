@@ -1,7 +1,8 @@
 ---
 import { COPY } from "../lib/copy";
 import { anchorId, type Edition } from "../lib/editions";
-import { categoryClass } from "../lib/format";
+import { categoryClass, shortDate } from "../lib/format";
+import { storyLink } from "../lib/routes";
 import StillToggle from "./StillToggle.astro";
 import {
   BLIP_DOT,
@@ -13,16 +14,19 @@ import {
   sweepStep,
   type Ring,
 } from "../lib/scope";
-import type { Lang } from "../lib/schema";
+import type { Lang, PublicStory } from "../lib/schema";
 
 interface Props {
   lang: Lang;
   edition: Edition;
+  /** Stories of the week's earlier editions, drawn faint when this edition is thin (lib/editions). */
+  ghosts?: { date: string; story: PublicStory }[];
 }
 
-const { lang, edition } = Astro.props;
+const { lang, edition, ghosts = [] } = Astro.props;
 const copy = COPY[lang];
-const placed = placeBlips(edition.stories);
+// The day's stories first, so they keep the places they would have alone; the ghosts fit round them.
+const placed = placeBlips([...edition.stories, ...ghosts.map((g) => g.story)]);
 const blips = edition.stories.map((story, i) => {
   const { ring, angle } = placed[i];
   const { x, y } = blipPoint(ring, angle);
@@ -35,9 +39,24 @@ const blips = edition.stories.map((story, i) => {
     ring,
     href: `#${anchorId(story.uid)}`,
     cat: categoryClass(story.category),
+    category: copy.categories[story.category],
+    bearing: `${String(angle).padStart(3, "0")}°`,
+    count: story.source_count,
     step: `sw-${sweepStep(angle)}`,
     transform: `translate(${x} ${y})`,
     sources: copy.sources(story.source_count),
+  };
+});
+const faint = ghosts.map(({ date, story }, i) => {
+  const { ring, angle } = placed[edition.stories.length + i];
+  const { x, y } = blipPoint(ring, angle);
+  return {
+    n: i + 1,
+    ring,
+    href: storyLink(lang, date, story.uid),
+    title: story.texts[lang]!.title,
+    when: copy.scope.earlier(shortDate(date, lang)),
+    transform: `translate(${x} ${y})`,
   };
 });
 
@@ -60,76 +79,125 @@ const rings: Ring[] = [3, 2, 1];
 ---
 
 {/*
-  The instrument. Every blip is a link to its story. Without a stylesheet the `hidden` attribute
-  keeps the whole drawing out of the way and the plain list under it (EditionIndex) is the index;
-  the stylesheet shows the scope and hides that list on screen.
+  The instrument and its readout panel. Every blip is a link to its story. Without a stylesheet
+  the `hidden` attributes keep both out of the way and the plain list under them (EditionIndex) is
+  the index; the stylesheet shows the scope, and the panel beside it from 48rem.
 */}
-<section class="scope" aria-labelledby="scope-label" hidden>
-  <p class="scope-head label caps">
-    <span id="scope-label">{copy.scope.label}</span>
-    <span class="scope-count">{copy.storyCount(blips.length)}</span>
-  </p>
-  <div class="scope-stage">
-    <div class="scope-dish" data-scope-dish>
-      <svg class="scope-plate" viewBox="-100 -100 200 200" aria-hidden="true">
-        <circle class="plate-face" r={RIM}></circle>
-        <path class="plate-cross" d={`M${-RIM} 0H${RIM}M0 ${-RIM}V${RIM}`}></path>
-        {/* Where each ring would meet the plate: its raised layer shows above this trace. */}
-        {rings.map((ring) => <circle class="ring-trace" r={RING_RADIUS[ring]}></circle>)}
-        <path class="plate-minor" d={minor}></path>
-        <path class="plate-major" d={major}></path>
-      </svg>
-      <div class="scope-sweep" aria-hidden="true"></div>
-      {
-        rings.map((ring) => (
-          <svg class={`scope-layer layer-${ring}`} viewBox="-100 -100 200 200">
-            <g aria-hidden="true">
-              <circle class="ring" r={RING_RADIUS[ring]}></circle>
-              <text class="ring-label" x="2.5" y={-RING_RADIUS[ring] + 6.5}>
-                {RING_SOURCES[ring]}
-              </text>
-            </g>
-          </svg>
-        ))
-      }
-      {/*
-        The blips in story order, each a layer of its own at its ring's depth: the document (and
-        so Tab and a screen reader) follows the edition, 01, 02, 03 …; ring and bearing are only
-        where a blip is drawn.
-      */}
+<div class="scope-rail">
+  <section class="scope" aria-labelledby="scope-label" hidden>
+    <p class="scope-head label caps">
+      <span id="scope-label">{copy.scope.label}</span>
+      <span class="scope-count">{copy.storyCount(blips.length)}</span>
+    </p>
+    <div class="scope-stage">
+      <div class="scope-dish" data-scope-dish>
+        <svg class="scope-plate" viewBox="-100 -100 200 200" aria-hidden="true">
+          <circle class="plate-face" r={RIM}></circle>
+          <path class="plate-cross" d={`M${-RIM} 0H${RIM}M0 ${-RIM}V${RIM}`}></path>
+          {/* Where each ring would meet the plate: its raised layer shows above this trace. */}
+          {rings.map((ring) => <circle class="ring-trace" r={RING_RADIUS[ring]}></circle>)}
+          <path class="plate-minor" d={minor}></path>
+          <path class="plate-major" d={major}></path>
+        </svg>
+        <div class="scope-sweep" aria-hidden="true"></div>
+        {
+          rings.map((ring) => (
+            <svg class={`scope-layer layer-${ring}`} viewBox="-100 -100 200 200">
+              <g aria-hidden="true">
+                <circle class="ring" r={RING_RADIUS[ring]}></circle>
+                <text class="ring-label" x="2.5" y={-RING_RADIUS[ring] + 6.5}>
+                  {RING_SOURCES[ring]}
+                </text>
+              </g>
+            </svg>
+          ))
+        }
+        {/*
+          The blips in story order, each a layer of its own at its ring's depth: the document (and
+          so Tab and a screen reader) follows the edition, 01, 02, 03 …; ring and bearing are only
+          where a blip is drawn.
+        */}
+        {
+          blips.map((blip) => (
+            <svg class={`scope-layer layer-${blip.ring}`} viewBox="-100 -100 200 200"><a class={`blip b-${blip.n} ${blip.cat} ${blip.step}`} href={blip.href} aria-labelledby={`scope-t-${blip.n}`}>
+                <g transform={blip.transform}>
+                  <circle class="blip-hit" r={BLIP_HIT}></circle>
+                  <circle class="blip-echo" r={BLIP_DOT}></circle>
+                  <circle class="blip-dot" r={BLIP_DOT}></circle>
+                  <text class="blip-no">{blip.no}</text>
+                </g>
+              </a></svg>
+          ))
+        }
+        {/*
+          A thin edition keeps company: stories of the week's earlier editions as small, faint
+          ghosts after the day's own blips, each a link to its story on its own edition, named as
+          earlier ("Önceki baskı, 18 Kas: …").
+        */}
+        {
+          faint.map((ghost) => (
+            <svg class={`scope-layer layer-${ghost.ring}`} viewBox="-100 -100 200 200"><a class={`ghost g-${ghost.n}`} href={ghost.href} aria-labelledby={`scope-g-${ghost.n}`}>
+                <g transform={ghost.transform}>
+                  <circle class="blip-hit" r={BLIP_HIT}></circle>
+                  <circle class="ghost-dot" r="4"></circle>
+                </g>
+              </a></svg>
+          ))
+        }
+      </div>
+    </div>
+    {/*
+      The readout: the title of the blip under the pointer or focus, else of the one the sweep passed
+      last. It is hidden from assistive tech as a whole, but each line is its blip's accessible name
+      (aria-labelledby reads hidden text), so no title has to go into an attribute.
+    */}
+    <p class="scope-readout" aria-hidden="true">
+      <span class="readout-idle">{copy.scope.idle}</span>
       {
         blips.map((blip) => (
-          <svg class={`scope-layer layer-${blip.ring}`} viewBox="-100 -100 200 200"><a class={`blip b-${blip.n} ${blip.cat} ${blip.step}`} href={blip.href} aria-labelledby={`scope-t-${blip.n}`}>
-              <g transform={blip.transform}>
-                <circle class="blip-hit" r={BLIP_HIT}></circle>
-                <circle class="blip-echo" r={BLIP_DOT}></circle>
-                <circle class="blip-dot" r={BLIP_DOT}></circle>
-                <text class="blip-no">{blip.no}</text>
-              </g>
-            </a></svg>
+          <span class={`readout-line t-${blip.n} ${blip.cat} ${blip.step}`} id={`scope-t-${blip.n}`}>
+            <span class="readout-no">{blip.no}</span> {blip.title}{" "}
+            <span class="visually-hidden">({blip.sources})</span>
+          </span>
         ))
       }
-    </div>
-  </div>
+      {
+        faint.map((ghost) => (
+          <span class={`readout-ghost u-${ghost.n}`} id={`scope-g-${ghost.n}`}>
+            <span class="readout-when">{ghost.when}</span> {ghost.title}
+          </span>
+        ))
+      }
+    </p>
+    <p class="scope-caption label">{copy.scope.caption}</p>
+    <p class="scope-still"><StillToggle lang={lang} /></p>
+  </section>
   {/*
-    The readout: the title of the blip under the pointer or focus, else of the one the sweep passed
-    last. It is hidden from assistive tech as a whole, but each line is its blip's accessible name
-    (aria-labelledby reads hidden text), so no title has to go into an attribute.
+    The readout panel: one row per story, its number, bearing, sources, topic and title, each a
+    link to the story. It repeats the blips for the eye only, so it is hidden from assistive tech
+    and out of the tab order; the blips are the instrument's links. A row and its blip light
+    each other (CSS).
   */}
-  <p class="scope-readout" aria-hidden="true">
-    <span class="readout-idle">{copy.scope.idle}</span>
-    {
-      blips.map((blip) => (
-        <span class={`readout-line t-${blip.n} ${blip.cat} ${blip.step}`} id={`scope-t-${blip.n}`}>
-          <span class="readout-no">{blip.no}</span> {blip.title}{" "}
-          <span class="visually-hidden">({blip.sources})</span>
-        </span>
-      ))
-    }
-  </p>
-  <p class="scope-caption label">{copy.scope.caption}</p>
-  <p class="scope-still"><StillToggle lang={lang} /></p>
-</section>
+  <div class="scope-panel label" aria-hidden="true" hidden>
+    <p class="panel-head caps"><span>{copy.scope.panel}</span><span>{edition.date}</span></p>
+    <p class="panel-cols panel-grid caps">{copy.scope.columns.map((c) => <span>{c}</span>)}</p>
+    <ol class="panel-rows" role="list">
+      {
+        blips.map((blip) => (
+          <li>
+            <a class={`panel-row panel-grid r-${blip.n}`} href={blip.href} tabindex="-1">
+              <span class="pr-no">{blip.no}</span>
+              <span>{blip.bearing}</span>
+              <span>{blip.count}</span>
+              <span class="caps">{blip.category}</span>
+              <span class="pr-title">{blip.title}</span>
+            </a>
+          </li>
+        ))
+      }
+    </ol>
+  </div>
+</div>
 
 <script>
   import "../scripts/scope";

@@ -1,6 +1,7 @@
 ---
 import Mark from "./Mark.astro";
 import { COPY } from "../lib/copy";
+import { navSection, SECTIONS } from "../lib/nav";
 import { EXTERNAL, OWNER, routes } from "../lib/routes";
 import type { Lang } from "../lib/schema";
 
@@ -10,25 +11,46 @@ interface Props {
   path: string;
   /** The same page in the other language, or null to point at its home. */
   alternate: string | null;
+  /** The newest edition's date, or null: its page tunes the dial to today. */
+  latest: string | null;
 }
 
-const { lang, path, alternate } = Astro.props;
+const { lang, path, alternate, latest } = Astro.props;
 const copy = COPY[lang];
 const other: Lang = lang === "tr" ? "en" : "tr";
 const languages: Lang[] = ["tr", "en"];
-const links = [
-  { href: routes[lang].home, text: copy.nav.today },
-  { href: routes[lang].archive, text: copy.nav.archive },
-  { href: routes[lang].weekIndex, text: copy.nav.week },
-  { href: routes[lang].about, text: copy.nav.about },
-];
-const subscribe = routes[lang].subscribe;
+const r = routes[lang];
+const href = { today: r.home, archive: r.archive, week: r.weekIndex, about: r.about };
+const tuned = navSection(lang, path, latest);
+// The page itself is "page"; a page under a station (an edition, a topic, a week) marks it "true".
+const links = SECTIONS.map((section) => ({
+  href: href[section],
+  text: copy.nav[section],
+  current: (tuned?.section === section ? (tuned.exact ? "page" : "true") : undefined) as "page" | "true" | undefined,
+}));
+const subscribe = r.subscribe;
+
+// The dial's scale: a fine tick every 5 units of 400, a longer one every 25, the longest under
+// each station's centre (12.5 %, 37.5 %, 62.5 %, 87.5 %). Stretched to the strip's width.
+const ticks = (every: number, from: number, skip = 0) =>
+  Array.from({ length: 400 / every - 1 }, (_, i) => (i + 1) * every)
+    .filter((x) => !skip || x % skip !== 0)
+    .map((x) => `M${x} ${from}V12`)
+    .join("");
+const minor = ticks(5, 8, 25);
+const medium = ticks(25, 5).replace(/M(50|150|250|350) 5V12/g, "");
+const major = [50, 150, 250, 350].map((x) => `M${x} 1V12`).join("");
 ---
 
-{/* Two rows: the name and whose it is, with the subscribe button; then the links and the language switch. */}
+{/*
+  Two parts: the name and whose it is, with the palette key, the language switch and the subscribe
+  button; then the dial, a receiver's scale whose stations are the four sections. The needle rests
+  on the current station from aria-current alone (CSS); below 40em the dial is fixed to the foot of
+  the window.
+*/}
 <header class="top">
   <div class="top-id">
-    <a class="wordmark" href={routes[lang].home}>
+    <a class="wordmark" href={r.home}>
       <Mark />
       {copy.siteName}
     </a>
@@ -38,22 +60,6 @@ const subscribe = routes[lang].subscribe;
     <button class="pal-open label" type="button" data-palette-open hidden aria-label={copy.palette.open}>
       <kbd>⌘K</kbd><span class="pal-open-word">{copy.palette.hint}</span>
     </button>
-    <a class="subscribe label" href={subscribe} aria-current={subscribe === path ? "page" : undefined}>
-      {copy.subscribeFree}
-    </a>
-  </div>
-  <nav class="top-nav">
-    <ul class="nav label">
-      {
-        links.map((link) => (
-          <li>
-            <a href={link.href} aria-current={link.href === path ? "page" : undefined}>
-              {link.text}
-            </a>
-          </li>
-        ))
-      }
-    </ul>
     <div class="lang label" role="group" aria-label={copy.language}>
       {
         languages.map((code) =>
@@ -66,6 +72,31 @@ const subscribe = routes[lang].subscribe;
           ),
         )
       }
+      <span class="lang-thumb" aria-hidden="true"></span>
+    </div>
+    <a class="subscribe label" href={subscribe} aria-current={subscribe === path ? "page" : undefined}>
+      {copy.subscribeFree}
+    </a>
+  </div>
+  <nav class="top-nav dial" aria-label={copy.navLabel}>
+    <div class="dial-scale">
+      <ul class="dial-stations label" role="list">
+        {
+          links.map((link) => (
+            <li>
+              <a href={link.href} aria-current={link.current}>
+                {link.text}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+      <svg class="dial-ruler" viewBox="0 0 400 12" preserveAspectRatio="none" width="100%" height="12" aria-hidden="true">
+        <path class="dial-minor" d={minor}></path>
+        <path class="dial-medium" d={medium}></path>
+        <path class="dial-major" d={major}></path>
+      </svg>
+      <span class="dial-needle" aria-hidden="true"></span>
     </div>
   </nav>
 </header>
