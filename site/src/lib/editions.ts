@@ -135,6 +135,25 @@ export function readingMinutes(stories: PublicStory[], lang: Lang): number {
   return Math.max(1, Math.ceil(words / 200));
 }
 
+/**
+ * The stories of the editions of the seven days before `edition`, newest edition first, each with
+ * its edition's date: the ghosts a thin edition's scope shows. None when the edition has `few` or
+ * more stories of its own; never more than `limit`. `editions` is newest first, as built.
+ */
+export function earlierStories(
+  editions: Edition[],
+  edition: Edition,
+  few: number,
+  limit: number,
+): { date: string; story: PublicStory }[] {
+  if (edition.stories.length >= few) return [];
+  const day = dayMs(edition.date);
+  return editions
+    .filter((e) => dayMs(e.date) < day && dayMs(e.date) >= day - 7 * DAY)
+    .flatMap((e) => e.stories.map((story) => ({ date: e.date, story })))
+    .slice(0, limit);
+}
+
 export function anchorId(uid: string): string {
   return `s-${uid.slice(0, 8)}`;
 }
