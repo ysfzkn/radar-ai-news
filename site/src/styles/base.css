@@ -480,7 +480,7 @@ a.lang-part:focus-visible {
    On a wide screen the words stand on the left and the radar on the right, in a band a little
    wider than the reading column, about half a screen tall; the stories follow at once. On a phone
    the words come first and the radar under them, tipped further back, wide and low. The band's
-   ground is the page's own, lit round the radar. */
+   ground is the page's own: the light and shadow belong to the radar alone. */
 .hero {
   --hero-w: min(58rem, 100cqw - 2 * var(--gutter));
   position: relative;
@@ -757,7 +757,7 @@ a.lang-part:focus-visible {
 }
 
 /* A wide screen: the band is wider than the reading column, the words on the left and the radar
-   (22rem across) on the right. */
+   (24rem across) on the right. */
 @media (min-width: 48rem) {
   .hero {
     grid-template-columns: minmax(0, 1fr) minmax(0, 24rem);

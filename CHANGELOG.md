@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Site: the home page opens with a full-screen hero: what Radar is ("Teknoloji ve yapay zekâda bugün gerçekten önemli olan birkaç haber.", "Her sabah · Kısa ve öz"), set large over a three-dimensional radar globe drawn on a canvas (a lit lattice of points with a terminator, halo and ground shadow, a bezel, an orbit with a satellite, a red sweep that lights the points it passes, and the day's stories as labelled pins). A mouse turns it a little, scrolling lets it sink back, and after the loading screen its points gather into place. Without script the build's still frame of the same globe stands; with reduced motion or the pause it is still. A button jumps to the day's edition, a link leads to how it works.
+- Site: the home page opens with a calm hero of about half a screen: the edition's dateline, the slogan "Her sabah. Kısa ve öz." / "Every morning. Short and to the point.", one line saying what Radar is ("Günün teknoloji ve yapay zekâ haberleri.") and a link to how it works, beside the day's radar. On a phone the radar sits under the words, tipped further back so it is wide and low.
+- Site: the home page's toolbar: a search over every story (it opens the archive's search; a link to the archive without script) and topic chips with each topic's count of the day, which show only that topic's stories and grey the radar's other blips without any script. The day's stories follow grouped by topic, each group linking to its topic page, every story keeping its number.
 - Site: the navigation is a frequency dial, a tuning scale with the four sections as stations and an accent needle on the current one (pure CSS from `aria-current`; it follows the pointer and the focus and glides between pages with view transitions). On a phone it is fixed to the foot of the window.
 - Site: a readout panel beside the scope from 48rem, one row per story (number, bearing, sources, topic, title), linked both ways with its blip; and ghost blips for a thin edition: up to eight stories of the previous seven days, small and faint, linking to their editions.
 - Site: the masthead's date and counts settle in like a departure board, once per view; the subscribe label decodes on hover.
@@ -17,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Site: the scope is drawn as a three-dimensional radar instrument: a body with a wall and a ground shadow, a lit bezel with bearings, a glass face with a gleam, and blips standing on stems above their shadows, the louder the taller. On a phone an edition page's scope may be 352 px wide (it is tipped back, so no taller than before).
 - Site: buttons sink into their shadow on press and fill with the accent from the left on hover; the TR / EN switch is a two-position slider; copy buttons turn into a check after copying. The language switch moved to the first row of the top strip.
 
 - Site: the loading screen plays every time the site is entered (a new visit, a link from elsewhere, a reload), not once per browser session, and not when moving between the site's pages. The session key `radar:intro` is gone; `radar:still` is the only key the site stores.
