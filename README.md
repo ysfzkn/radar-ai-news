@@ -6,7 +6,7 @@
 
 Written by an agent. Checked by a human where it counts. Every claim linked to its primary source.
 
-[radar.ozkanyusuf.com](https://radar.ozkanyusuf.com) (launching soon) · [How it works](#how-it-works) · [Quickstart](#quickstart) · [Suggest a source](#suggest-a-source)
+[radar.ozkanyusuf.com](https://radar.ozkanyusuf.com) · [How it works](#how-it-works) · [Quickstart](#quickstart) · [Suggest a source](#suggest-a-source)
 
 [![CI](https://github.com/ysfzkn/radar-ai-news/actions/workflows/ci.yml/badge.svg)](https://github.com/ysfzkn/radar-ai-news/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -87,7 +87,7 @@ Radar is being built in the open, one plan at a time. The code for the first fiv
 - [x] **3. Admin** — review queue, edit, approve, reject, expiry
 - [x] **4. Site** — daily edition, archive, topics, weekly digest, RSS, a free RSS subscription
 - [x] **5. Automation** — a scheduled daily run, notices, saved state
-- [ ] **6. Launch**
+- [x] **6. Launch** — live at [radar.ozkanyusuf.com](https://radar.ozkanyusuf.com)
 
 ## Quickstart
 
