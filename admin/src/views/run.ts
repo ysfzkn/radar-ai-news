@@ -51,7 +51,7 @@ function modeLine(mode: RunInputs["mode"] | null, stories: number | null): strin
 function runRow(r: WorkflowRun): View {
   const meta = [formatDate(r.createdAt), COPY.run.events[r.event]];
   if (r.actor) meta.push(r.actor);
-  if (r.tookMs !== null) meta.push(COPY.run.took(duration(r.tookMs)));
+  if (r.tookMs !== null) meta.push(r.tookMs < 60_000 ? COPY.run.tookUnderMinute : COPY.run.took(duration(r.tookMs)));
   return html`<li class="run-row">
 <span class="${STATE_TONE[r.state]}">${COPY.run.states[r.state]}</span>
 <div class="run-main"><p class="run-title">${r.mode ? modeLine(r.mode, r.stories) : COPY.run.modes.normal.label}</p><p class="meta">${meta.join(" · ")}</p></div>

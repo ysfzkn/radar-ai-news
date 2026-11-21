@@ -125,7 +125,7 @@ describe("GET /admin/run", () => {
     fake.list = () =>
       runsResponse([
         run({ id: 303, status: "completed", conclusion: "failure", event: "workflow_dispatch", display_title: "Daily · review_all · 3" }),
-        run({ id: 202, conclusion: "skipped", display_title: "Daily · collect_only" }),
+        run({ id: 202, conclusion: "skipped", display_title: "Daily · collect_only", updated_at: "2026-11-20T04:16:30Z" }),
         run({ id: 101 }),
       ]);
     const body = decode(await (await get("/admin/run")).text());
@@ -141,6 +141,7 @@ describe("GET /admin/run", () => {
     expect(list).toContain("20 Kas 07:16");
     expect(list).toContain("ysfzkn");
     expect(list).toContain(COPY.run.took("5 dk"));
+    expect(list).toContain(COPY.run.tookUnderMinute);
     for (const id of [101, 202, 303])
       expect(list).toContain(`href="https://github.com/${REPO}/actions/runs/${id}" target="_blank" rel="noopener noreferrer"`);
     expect(body).toContain(COPY.run.skippedHint);
@@ -219,6 +220,15 @@ describe("GET /admin/run", () => {
     expect(body).toMatch(/<a class="top-link run-link" href="\/admin\/run" aria-current="page">/);
     const queue = await (await get("/admin")).text();
     expect(queue).toMatch(/<a class="top-link run-link" href="\/admin\/run">/);
+    // The header also links the live site (new tab) and names who is signed in.
+    expect(queue).toContain(
+      '<a class="top-link site-link" href="https://radar.ozkanyusuf.com" target="_blank" rel="noopener noreferrer"',
+    );
+    expect(queue).toMatch(/<p class="who"><span class="visually-hidden">Oturum: <\/span>dev@localhost<\/p>/);
+    for (const page of [body, queue]) {
+      expect(page).not.toMatch(/\sstyle=/);
+      expect(page).not.toMatch(/<script>|<script [^>]*>[^<]/);
+    }
   });
 
   it("confirms a start once, from the done hint", async () => {

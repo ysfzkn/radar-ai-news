@@ -203,6 +203,7 @@ export const COPY = {
     events: { schedule: "Zamanlanmış", workflow_dispatch: "Elle", other: "Diğer" } satisfies Record<RunEvent, string>,
     skippedHint: "Atlanan çalıştırma çoğunlukla RADAR_ENABLED değişkeninin true olmadığını gösterir.",
     took: (d: string) => `${d} sürdü`,
+    tookUnderMinute: "1 dk'dan kısa sürdü",
     stories: (n: number) => `en çok ${n} haber`,
     historyHeading: "Buradan başlatılanlar",
     historyEmpty: "Buradan henüz bir çalıştırma başlatılmadı.",
