@@ -1,6 +1,7 @@
 ---
 import Base from "../layouts/Base.astro";
 import EditionView from "../components/EditionView.astro";
+import Pitch from "../components/Pitch.astro";
 import { COPY } from "../lib/copy";
 import { loadData } from "../lib/data";
 import { buildEditions, forLang } from "../lib/editions";
@@ -22,7 +23,10 @@ const copy = COPY[lang];
 >
   {
     latest ? (
-      <EditionView lang={lang} edition={latest} previous={editions[1] ?? null} next={null} isLatest />
+      <>
+        <Pitch lang={lang} />
+        <EditionView lang={lang} edition={latest} previous={editions[1] ?? null} next={null} isLatest />
+      </>
     ) : (
       <>
         <h1 class="kunye label">{copy.noEdition}</h1>

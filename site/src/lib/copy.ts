@@ -5,6 +5,8 @@ import type { Category, Lang } from "./schema";
 export interface Copy {
   siteName: string;
   tagline: string;
+  /** What Radar is, in two sentences, at the top of the home page. */
+  pitch: { label: string; text: string; more: string };
   nav: { today: string; archive: string; week: string; about: string };
   /** The name of the dial that holds those four links. */
   navLabel: string;
@@ -191,6 +193,11 @@ export const COPY: Record<Lang, Copy> = {
   tr: {
     siteName: "Radar",
     tagline: "Günün teknoloji ve yapay zekâ haberleri. Beş dakika, gürültü yok.",
+    pitch: {
+      label: "Radar nedir?",
+      text: "Her sabah teknoloji ve yapay zekâ dünyasının en önemli birkaç haberini tek sayfada toplar: kaynağıyla, kısa özetiyle ve “neden önemli” notuyla. Beş dakikada okunur; reklam, izleme ve gürültü yok.",
+      more: "Nasıl çalışır",
+    },
     nav: { today: "Bugün", archive: "Arşiv", week: "Hafta", about: "Künye" },
     navLabel: "Bölümler",
     signal: ["Sinyal: zayıf", "Sinyal: orta", "Sinyal: güçlü"],
@@ -443,6 +450,11 @@ export const COPY: Record<Lang, Copy> = {
   en: {
     siteName: "Radar",
     tagline: "The day's tech and AI news. Five minutes, no noise.",
+    pitch: {
+      label: "What is Radar?",
+      text: "Each morning it gathers the few tech and AI stories that matter on one page: with the source, a short summary and a “why it matters” note. A five-minute read; no ads, no tracking, no noise.",
+      more: "How it works",
+    },
     nav: { today: "Today", archive: "Archive", week: "Week", about: "About" },
     navLabel: "Sections",
     signal: ["Signal: weak", "Signal: fair", "Signal: strong"],

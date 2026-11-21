@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Site: the home page opens with two sentences saying what Radar is, with a link to how it works.
 - Site: the navigation is a frequency dial, a tuning scale with the four sections as stations and an accent needle on the current one (pure CSS from `aria-current`; it follows the pointer and the focus and glides between pages with view transitions). On a phone it is fixed to the foot of the window.
 - Site: a readout panel beside the scope from 48rem, one row per story (number, bearing, sources, topic, title), linked both ways with its blip; and ghost blips for a thin edition: up to eight stories of the previous seven days, small and faint, linking to their editions.
 - Site: the masthead's date and counts settle in like a departure board, once per view; the subscribe label decodes on hover.

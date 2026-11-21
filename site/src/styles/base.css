@@ -467,6 +467,34 @@ a.lang-part:focus-visible {
 }
 
 /* An empty state: a dashed frame and a comment's slashes, in the label face. */
+/* What Radar is, once, at the top of the home page (Pitch.astro): a short paragraph hung on an
+   accent rule, with its question as a mono label. */
+.pitch {
+  margin: 0 0 var(--space-5);
+  padding: var(--space-1) 0 var(--space-1) var(--space-4);
+  border-left: 3px solid var(--accent);
+  max-width: 40rem;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.pitch-label {
+  display: block;
+  margin-bottom: var(--space-1);
+  font-family: var(--font-label);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.pitch-more {
+  margin-left: var(--space-2);
+  font-family: var(--font-label);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+
 .empty {
   margin-bottom: var(--space-6);
   padding: var(--space-4);

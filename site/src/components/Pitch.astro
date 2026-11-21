@@ -1,0 +1,18 @@
+---
+// What Radar is, said once at the top of the home page, for a reader who has just arrived.
+import { COPY } from "../lib/copy";
+import { routes } from "../lib/routes";
+import type { Lang } from "../lib/schema";
+
+interface Props {
+  lang: Lang;
+}
+const { lang } = Astro.props;
+const { pitch } = COPY[lang];
+---
+
+<p class="pitch">
+  <strong class="pitch-label">{pitch.label}</strong>
+  <span class="pitch-text">{pitch.text}</span>
+  <a class="pitch-more" href={routes[lang].about}>{pitch.more} →</a>
+</p>
