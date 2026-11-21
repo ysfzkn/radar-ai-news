@@ -42,6 +42,7 @@ class Summary:
     error: str | None  # one line, already cleaned of secrets
     admin_url: str | None
     waiting: int = 0  # unsent stories, counted when the push was skipped for missing settings
+    mode: str = "normal"  # "normal" | "review_all" | "collect_only" (see radar.daily.MODES)
 
 
 def _possessive(n: int) -> str:
@@ -110,6 +111,8 @@ def origin(url: str | None) -> str | None:
 def render(s: Summary, *, now: datetime | None = None) -> str:
     """Turkish plain text, only the lines that apply; never story text, never a secret."""
     lines = [f"Radar · {_date(now)}"]
+    if s.mode == "collect_only":
+        lines.append("Yalnızca kaynaklar toplandı; haber yazılmadı.")
     if s.review > 0:
         admin = origin(s.admin_url)
         where = f": {admin}/admin" if admin else ""

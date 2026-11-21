@@ -3,7 +3,7 @@ from datetime import timedelta
 import httpx
 
 from fakes import FakeLLM
-from radar.agent import run_agent
+from radar.agent import REVIEW_ALL_REASON, run_agent
 from radar.budget import BudgetExceeded
 from radar.llm import LLMError, LLMUnavailable, Refused
 from radar.models import Candidate, Draft, FactCard, RawItem, Score, StoryText
@@ -103,6 +103,27 @@ def test_run_agent_happy_path(store, now, run_id):
     stories = store.stories_since(now)
     assert sorted(s.status for s in stories) == ["published", "review"]
     assert all(s.source_url.startswith("https://s") and s.source_count == 1 for s in stories)
+
+
+def test_review_all_sends_a_story_that_would_publish_to_review_with_its_own_reason(
+    store, now, run_id
+):
+    candidates = world(store, now)
+    llm = FakeLLM({"score": [three_scores(candidates)], "write": [draft(), draft(" It grew 77%.")]})
+    stats = run_agent(store, candidates, llm, http(), now, run_id, review_all=True)
+    assert stats["written"] == 2 and stats["published"] == 0 and stats["review"] == 2
+    stories = sorted(store.stories_since(now), key=lambda s: len(s.reasons))
+    assert [s.status for s in stories] == ["review", "review"]
+    # The clean story carries the one reason a person can read; the other keeps its own.
+    assert stories[0].reasons == [REVIEW_ALL_REASON]
+    assert REVIEW_ALL_REASON not in stories[1].reasons and stories[1].reasons
+
+
+def test_without_review_all_nothing_carries_its_reason(store, now, run_id):
+    candidates = world(store, now)
+    llm = FakeLLM({"score": [three_scores(candidates)], "write": [draft(), draft(" It grew 77%.")]})
+    run_agent(store, candidates, llm, http(), now, run_id)
+    assert all(REVIEW_ALL_REASON not in s.reasons for s in store.stories_since(now))
 
 
 def test_second_run_makes_no_model_calls(store, now, run_id):

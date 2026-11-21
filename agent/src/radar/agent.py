@@ -15,6 +15,10 @@ from radar.verify import route, verify
 from radar.write import write_story
 
 MAX_ATTEMPTS = 3
+# The reason a story carries when a run asked for every story to wait for a person
+# (`radar daily --review-all`) and nothing else held it back. The admin screen shows it in
+# Turkish.
+REVIEW_ALL_REASON = "manual run: review requested"
 
 
 def plan_scoring(
@@ -48,6 +52,7 @@ def run_agent(
     now: datetime,
     run_id: int,
     max_stories: int = MAX_EDITION,
+    review_all: bool = False,
 ) -> dict:
     stats = {
         "scored": 0,
@@ -118,6 +123,8 @@ def run_agent(
             )
             continue
         status, reasons = route(candidate, score, verify(draft, doc))
+        if review_all and status == "published":
+            status, reasons = "review", [REVIEW_ALL_REASON]
         store.insert_story(
             cluster_id=candidate.cluster_id,
             run_id=run_id,

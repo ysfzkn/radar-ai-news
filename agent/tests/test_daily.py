@@ -102,7 +102,7 @@ class World:
         return [json.loads(r.content)["text"] for r in self.to("api.telegram.org")]
 
 
-def daily(tmp_path, now, world, env=ENV, factory=None, sources=None, max_stories=2):
+def daily(tmp_path, now, world, env=ENV, factory=None, sources=None, max_stories=2, **options):
     out = io.StringIO()
     code = run_daily(
         db_path=tmp_path / "r.db",
@@ -113,6 +113,7 @@ def daily(tmp_path, now, world, env=ENV, factory=None, sources=None, max_stories
         http=world.http,
         llm_factory=factory or (lambda meter: llm()),
         out=out,
+        **options,
     )
     lines = out.getvalue().splitlines()
     assert len(lines) == 1
@@ -128,6 +129,7 @@ def test_the_chain_collects_writes_pushes_and_notifies_about_a_review_story(tmp_
     assert summary["push"]["pushed"] == 2 and summary["push"]["rejected"] == []
     assert summary["review"] == 2 and summary["published"] == 0
     assert summary["failed_step"] is None and summary["cap_reached"] is False
+    assert summary["mode"] == "normal"
     assert world.notices() == [
         "Radar · 19 Kas\n2 haber onayını bekliyor: https://admin.example.com/admin"
     ]
@@ -145,6 +147,65 @@ def test_a_quiet_published_run_sends_no_notice(tmp_path, now):
     code, summary = daily(tmp_path, now, world, factory=lambda meter: llm(risk=False))
     assert code == 0 and summary["published"] == 2 and summary["review"] == 0
     assert world.to("api.telegram.org") == []
+
+
+def test_review_all_publishes_nothing_and_sends_every_story_to_review(tmp_path, now):
+    world = World(now)
+    code, summary = daily(
+        tmp_path, now, world, factory=lambda meter: llm(risk=False), mode="review_all"
+    )
+    assert code == 0 and summary["mode"] == "review_all"
+    assert summary["run"]["published"] == 0 and summary["run"]["review"] == 2
+    assert summary["review"] == 2 and summary["published"] == 0
+    sent = json.loads(world.to("admin.example.com")[0].content)["stories"]
+    assert {s["status"] for s in sent} == {"review"}
+    assert world.notices() == [
+        "Radar · 19 Kas\n2 haber onayını bekliyor: https://admin.example.com/admin"
+    ]
+
+
+def test_collect_only_gathers_sources_and_writes_pushes_and_spends_nothing(tmp_path, now, capsys):
+    uid = earlier_story(tmp_path, now)
+    world = World(now)
+
+    def never(meter):
+        raise AssertionError("collect only must not build a model client")
+
+    code, summary = daily(tmp_path, now, world, factory=never, mode="collect_only")
+    assert code == 0 and summary["mode"] == "collect_only"
+    assert summary["collected"]["sources_ok"] == 2 and summary["collected"]["new_items"] == 4
+    assert summary["run"] is None and summary["push"] is None
+    assert summary["review"] == 0 and summary["published"] == 0 and summary["waiting"] == 0
+    assert summary["failed_step"] is None and summary["cap_reached"] is False
+    # Nothing is sent anywhere but to the sources: no push, and a quiet run sends no notice.
+    assert world.to("admin.example.com") == [] and world.to("api.telegram.org") == []
+    assert world.kinds == ["sources"]
+    assert capsys.readouterr().err == ""
+    store = SqliteStore(str(tmp_path / "r.db"))
+    try:
+        assert store.last_run()["kind"] == "collect"
+        assert store.last_run()["stats"]["llm_calls"] == 0
+        assert [s.uid for s in store.unpushed_stories()] == [uid]  # left for the next run
+        assert store.usage_since(now - timedelta(days=2)) == []
+    finally:
+        store.close()
+
+
+def test_collect_only_with_every_source_down_exits_1_and_says_what_ran(tmp_path, now):
+    world = World(now)
+    world.sources_down = True
+    code, summary = daily(tmp_path, now, world, factory=lambda meter: llm(), mode="collect_only")
+    assert code == 1 and summary["run"] is None and summary["push"] is None
+    (notice,) = world.notices()
+    assert "Yalnızca kaynaklar toplandı; haber yazılmadı." in notice.splitlines()
+    assert "2 kaynaktan 2'si okunamadı." in notice.splitlines()
+
+
+def test_an_unknown_mode_is_refused_before_anything_runs(tmp_path, now):
+    world = World(now)
+    with pytest.raises(ValueError):
+        daily(tmp_path, now, world, mode="everything")
+    assert world.requests == []
 
 
 def test_a_cap_reached_run_still_pushes_what_was_written_says_so_and_exits_0(tmp_path, now):
@@ -380,7 +441,27 @@ def test_cli_daily_passes_its_options(tmp_path, monkeypatch):
     assert str(seen["db_path"]) == db and seen["max_stories"] == 3
     assert seen["out"] is sys.stdout and callable(seen["http"]) and callable(seen["llm_factory"])
     assert cli.main(["daily", "--db", db]) == 0
-    assert seen["max_stories"] == 8
+    assert seen["max_stories"] == 8 and seen["mode"] == "normal"
+    assert cli.main(["daily", "--db", db, "--review-all", "--max-stories", "2"]) == 0
+    assert seen["mode"] == "review_all" and seen["max_stories"] == 2
+    assert cli.main(["daily", "--db", db, "--collect-only"]) == 0
+    assert seen["mode"] == "collect_only"
+
+
+def test_cli_daily_refuses_contradicting_options(tmp_path, monkeypatch, capsys):
+    import radar.daily
+
+    def fake(**kwargs):
+        raise AssertionError("must not run")
+
+    monkeypatch.setattr(radar.daily, "run_daily", fake)
+    db = str(tmp_path / "d.db")
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["daily", "--db", db, "--collect-only", "--review-all"])
+    assert exc.value.code == 2
+    capsys.readouterr()
+    assert cli.main(["daily", "--db", db, "--collect-only", "--max-stories", "2"]) == 2
+    assert "--collect-only writes no story" in capsys.readouterr().err
 
 
 def test_daily_does_not_import_anthropic():

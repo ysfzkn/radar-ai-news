@@ -185,13 +185,16 @@ def _agent_in_run(
     cap: float,
     max_stories: int,
     make_llm,
+    review_all: bool = False,
 ) -> dict:
     """The model steps of a run, metered under `cap`; returns the run's statistics."""
     from radar.agent import run_agent
     from radar.budget import DAILY_TOKEN_TARGET, Meter
 
     meter = Meter(store, run_id, cap, clock=lambda: datetime.now(UTC))
-    agent = run_agent(store, candidates, make_llm(meter), client, now, run_id, max_stories)
+    agent = run_agent(
+        store, candidates, make_llm(meter), client, now, run_id, max_stories, review_all
+    )
     agent["stories_failed"] = agent.pop("failed")
     tokens = meter.tokens_today()
     agent["llm_calls"] = meter.calls
@@ -397,6 +400,10 @@ def _run_daily(args: argparse.Namespace) -> int:
     from radar import daily
     from radar.score import MAX_EDITION
 
+    if args.collect_only and args.max_stories is not None:
+        print("--collect-only writes no story; leave out --max-stories.", file=sys.stderr)
+        return 2
+    mode = "collect_only" if args.collect_only else "review_all" if args.review_all else "normal"
     return daily.run_daily(
         db_path=resolve(args.db),
         sources_path=resolve(args.sources),
@@ -406,6 +413,7 @@ def _run_daily(args: argparse.Namespace) -> int:
         http=_daily_client,
         llm_factory=_daily_llm,
         out=sys.stdout,
+        mode=mode,
     )
 
 
@@ -460,6 +468,17 @@ def main(argv: list[str] | None = None) -> int:
     p_daily.add_argument("--db", default=os.environ.get("RADAR_DB_PATH") or DEFAULT_DB)
     p_daily.add_argument("--sources", default=DEFAULT_SOURCES)
     p_daily.add_argument("--max-stories", type=_positive_int, default=None, metavar="N")
+    modes = p_daily.add_mutually_exclusive_group()
+    modes.add_argument(
+        "--review-all",
+        action="store_true",
+        help="publish nothing; every new story waits for review",
+    )
+    modes.add_argument(
+        "--collect-only",
+        action="store_true",
+        help="collect and store sources only: no model call, no story, no push",
+    )
     p_daily.set_defaults(run=_run_daily)
 
     p_state = commands.add_parser("state", help="keep the database as one encrypted file")

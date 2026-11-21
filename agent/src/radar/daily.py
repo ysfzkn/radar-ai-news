@@ -38,6 +38,9 @@ SECRET_NAMES = (
 )
 URL = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*://\S*")
 ERROR_CHARS = 200
+# What a run may do, as `radar daily` takes it: everything; everything but publishing
+# (`--review-all`); or collecting only (`--collect-only`).
+MODES = ("normal", "review_all", "collect_only")
 BAD_ADMIN_URL = "the admin URL must be https://, or http:// to localhost, 127.0.0.1 or [::1]"
 
 
@@ -74,14 +77,16 @@ def _open_store(db_path: Path | str) -> SqliteStore:
     return SqliteStore(str(path), cli.MIGRATIONS)
 
 
-def _run_step(store, candidates, client, now, run_id, max_stories, llm_factory) -> dict:
+def _run_step(store, candidates, client, now, run_id, max_stories, llm_factory, review_all) -> dict:
     from radar.budget import cap_from_env
 
     try:
         cap = cap_from_env()
     except ValueError as exc:
         raise StepError(str(exc)) from None
-    return cli._agent_in_run(store, candidates, client, now, run_id, cap, max_stories, llm_factory)
+    return cli._agent_in_run(
+        store, candidates, client, now, run_id, cap, max_stories, llm_factory, review_all
+    )
 
 
 def _push_step(store: SqliteStore, url: str, token: str, http) -> dict:
@@ -128,13 +133,19 @@ def run_daily(
     http: Callable[[str], httpx.Client],
     llm_factory: Callable,
     out: TextIO,
+    mode: str = "normal",
 ) -> int:
     """Collect, run and push; print one JSON summary line; notify when something needs it.
 
     `http(kind)` returns a new client for "sources", "admin" or "telegram"; `llm_factory`
-    builds the model client from the meter. Returns 1 when a step failed or no source
-    could be read, else 0.
+    builds the model client from the meter. `mode` is one of MODES: "review_all" publishes
+    nothing (every new story waits for review); "collect_only" stops after the collection:
+    no model client is built, no story is written and nothing is pushed. Returns 1 when a
+    step failed or no source could be read, else 0.
     """
+    if mode not in MODES:
+        raise ValueError(f"unknown mode: {mode}")
+    collect_only = mode == "collect_only"
     failure: tuple[str, str] | None = None
 
     def fail(step: str, exc: BaseException) -> None:
@@ -157,7 +168,7 @@ def run_daily(
         except Exception as exc:
             fail("collect", exc)
         if store is not None:
-            run_id = store.start_run("run", now)
+            run_id = store.start_run("collect" if collect_only else "run", now)
             record: dict = {}
             error_name: str | None = None
             try:
@@ -171,10 +182,18 @@ def run_daily(
                             error_name = type(exc).__name__
                         else:
                             try:
-                                run_stats = _run_step(
-                                    store, candidates, client, now, run_id, max_stories, llm_factory
-                                )
-                                record |= run_stats
+                                if not collect_only:
+                                    run_stats = _run_step(
+                                        store,
+                                        candidates,
+                                        client,
+                                        now,
+                                        run_id,
+                                        max_stories,
+                                        llm_factory,
+                                        mode == "review_all",
+                                    )
+                                    record |= run_stats
                             except Exception as exc:
                                 fail("run", exc)
                                 error_name = type(exc).__name__
@@ -189,7 +208,9 @@ def run_daily(
                 datetime.now(UTC),
                 {**record, "error": error_name} if error_name else record,
             )
-            if not (failure and failure[0] == "collect"):
+            if collect_only:
+                pass  # nothing new was written, and this mode sends nothing anywhere
+            elif not (failure and failure[0] == "collect"):
                 if not url or not token:
                     push_stats = {"skipped": True}
                     waiting = len(store.unpushed_stories())
@@ -221,6 +242,7 @@ def run_daily(
         error=failure[1] if failure else None,
         admin_url=admin_url,
         waiting=waiting,
+        mode=mode,
     )
     print(json.dumps(asdict(summary)), file=out)
     if needs_notice(summary):
