@@ -42,7 +42,8 @@ def llm(writes: list | None = None, risk: bool = True) -> FakeLLM:
     class Scripted(FakeLLM):
         def parse(self, **kwargs):
             if kwargs["step"] == "score":
-                ids = [int(line[1 : line.index("]")]) for line in kwargs["user"].splitlines()]
+                lines = [x for x in kwargs["user"].splitlines() if x.startswith("[")]
+                ids = [int(line[1 : line.index("]")]) for line in lines]
                 flags = ["regulation"] if risk else []
                 scores = [
                     Score(

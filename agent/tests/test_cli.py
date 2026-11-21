@@ -398,7 +398,7 @@ def test_cli_dry_run_estimate_follows_the_reserve_rule(tmp_path, monkeypatch, no
     from radar.write import WRITE_MODEL
 
     monkeypatch.setattr(cli, "make_client", lambda: run_client(now))
-    monkeypatch.setattr(radar.score, "score_user_message", lambda cands: "ğ" * 10)  # 20 bytes
+    monkeypatch.setattr(radar.score, "score_user_message", lambda *a: "ğ" * 10)  # 20 bytes
     seen: list[tuple] = []
     real = radar.budget.worst_case_usd
 
@@ -409,7 +409,7 @@ def test_cli_dry_run_estimate_follows_the_reserve_rule(tmp_path, monkeypatch, no
     monkeypatch.setattr(radar.budget, "worst_case_usd", spy)
     assert main(run_args(tmp_path, "--dry-run", "--max-stories", "3")) == 0
     out = json.loads(capsys.readouterr().out)
-    writer_bytes = len(WRITE_SYSTEM.encode("utf-8")) + MAX_SOURCE_CHARS + MAX_LINKS_CHARS + 300
+    writer_bytes = len(WRITE_SYSTEM.encode("utf-8")) + MAX_SOURCE_CHARS + MAX_LINKS_CHARS + 600
     assert seen == [
         (SCORE_MODEL, len(SCORE_SYSTEM.encode("utf-8")) + 20, 4000),
         (WRITE_MODEL, writer_bytes, 2000),

@@ -13,7 +13,7 @@ from radar.cluster import WINDOW, assign_clusters
 from radar.fetch import fetch_all, make_client
 from radar.models import Candidate, Source
 from radar.paths import resolve
-from radar.prefilter import rank_candidates
+from radar.prefilter import LOOKBACK, rank_backlog, rank_candidates
 from radar.sources import load_sources
 from radar.store import SqliteStore
 
@@ -32,9 +32,11 @@ def _collect_in_run(
     store.upsert_sources(sources)
     report = fetch_all(sources, client, now)
     new_items = store.insert_items(report.items)
-    pending = [i for i in store.items_since(now - WINDOW) if i.cluster_id is None]
+    pending = [i for i in store.items_since(now - LOOKBACK) if i.cluster_id is None]
     new_clusters = assign_clusters(store, pending, now)
-    candidates = rank_candidates(store.clusters_since(now - WINDOW), sources, now)
+    clusters = store.clusters_since(now - LOOKBACK - WINDOW)
+    candidates = rank_candidates(clusters, sources, now)
+    backlog = rank_backlog(clusters, sources, now)
     failed = [s.id for s in sources if s.id in report.errors]
     stats = {
         "sources_ok": len(sources) - len(failed),
@@ -42,10 +44,13 @@ def _collect_in_run(
         "new_items": len(new_items),
         "new_clusters": new_clusters,
         "candidates": len(candidates),
+        "backlog_candidates": len(backlog),
         "llm_calls": 0,
         "failed": failed,
     }
-    return stats, candidates
+    # Fresh first; the backlog is all of it, best first: the agent drops what is written,
+    # blocked or a duplicate before it keeps the best prefilter.BACKLOG_LIMIT.
+    return stats, candidates + backlog
 
 
 def _collect(
@@ -141,7 +146,8 @@ def _open_store(args: argparse.Namespace) -> SqliteStore:
 def _run_dry(args: argparse.Namespace, cap: float) -> int:
     from radar.agent import plan_scoring
     from radar.budget import worst_case_usd
-    from radar.score import SCORE_MODEL, score_user_message
+    from radar.dedup import WRITTEN_WINDOW, WrittenIndex
+    from radar.score import BACKLOG_SYSTEM, SCORE_MODEL, WRITTEN_SHOWN, score_user_message
     from radar.score import SYSTEM as SCORE_SYSTEM
     from radar.source import MAX_LINKS_CHARS, MAX_SOURCE_CHARS
     from radar.write import SYSTEM as WRITE_SYSTEM
@@ -151,16 +157,23 @@ def _run_dry(args: argparse.Namespace, cap: float) -> int:
     store = _open_store(args)
     client = make_client()
     try:
-        stats, candidates = _collect(store, sources, client, datetime.now(UTC))
-        to_score = plan_scoring(store, candidates, datetime.now(UTC))[2]
+        now = datetime.now(UTC)
+        stats, candidates = _collect(store, sources, client, now)
+        to_score = plan_scoring(store, candidates, now)[2]
+        backlog = plan_scoring(store, candidates, now, "backlog")[2]
+        written = WrittenIndex(store.written_refs(now - WRITTEN_WINDOW)).recent(WRITTEN_SHOWN)
     finally:
         client.close()
         store.close()
     worst = 0.0
-    if to_score:
-        size = len(SCORE_SYSTEM.encode("utf-8")) + len(score_user_message(to_score).encode("utf-8"))
-        worst += worst_case_usd(SCORE_MODEL, size, 4000)
-    size = len(WRITE_SYSTEM.encode("utf-8")) + MAX_SOURCE_CHARS + MAX_LINKS_CHARS + 300
+    # Both lanes, as if the backlog were needed: the real run asks it only below the floor.
+    for system, batch in ((SCORE_SYSTEM, to_score), (BACKLOG_SYSTEM, backlog)):
+        if batch:
+            user = score_user_message(batch, now, written)
+            size = len(system.encode("utf-8")) + len(user.encode("utf-8"))
+            worst += worst_case_usd(SCORE_MODEL, size, 4000)
+    # 300 bytes for the category and URL lines, 300 more for the dates line.
+    size = len(WRITE_SYSTEM.encode("utf-8")) + MAX_SOURCE_CHARS + MAX_LINKS_CHARS + 600
     # The writer allows a fallback, so each call reserves two attempts.
     writer = 2 * worst_case_usd(WRITE_MODEL, size, 2000)
     worst += args.max_stories * writer
@@ -168,6 +181,7 @@ def _run_dry(args: argparse.Namespace, cap: float) -> int:
         json.dumps(
             {
                 "would_score": len(to_score),
+                "would_score_backlog": len(backlog),
                 "worst_case_usd": round(worst, 4),
                 "cap_usd": cap,
             }

@@ -84,11 +84,11 @@ def test_caps_at_50_newest(now):
     assert [i.title for i in items] == [f"e{i}" for i in range(50)]
 
 
-def test_drops_entries_older_than_72h(now):
+def test_drops_entries_older_than_14_days(now):
     s = src("a")
     entries = [
-        ("old", now - timedelta(hours=73), ""),
-        ("fresh", now - timedelta(hours=71), ""),
+        ("old", now - timedelta(days=14, hours=1), ""),
+        ("fresh", now - timedelta(days=13, hours=23), ""),
     ]
     items = fetch_feed(s, client_for({s.url: rss(entries)}), now)
     assert [i.title for i in items] == ["fresh"]
@@ -111,7 +111,7 @@ def test_hn_maps_points_and_falls_back_to_item_url(now):
     assert all(i.published_at.utcoffset() == timedelta(0) for i in items)
 
 
-def test_hn_applies_the_72h_window(now):
+def test_hn_applies_the_14_day_window(now):
     s = src("hn", "hn")
     far_future = now + timedelta(days=30)
     assert fetch_hn(s, client_for({s.url: fixture("hn.json")}), far_future) == []

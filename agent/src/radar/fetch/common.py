@@ -13,7 +13,9 @@ from radar.models import RawItem
 from radar.urls import canonicalize
 
 MAX_ITEMS = 50
-MAX_AGE = timedelta(hours=72)
+# Items up to 14 days old are kept, so a story the store never saw while it was fresh can
+# still be chosen from the backlog (prefilter.LOOKBACK).
+MAX_AGE = timedelta(days=14)
 MAX_BYTES = 5 * 1024 * 1024
 MAX_REDIRECTS = 5
 MAX_SECONDS = 20.0  # for a whole fetch, redirects included; the client's timeout is per read
@@ -30,7 +32,7 @@ class FetchRefused(Exception):
 
 
 def limit_items(items: list[RawItem], now: datetime) -> list[RawItem]:
-    """Drop items older than 72h, sort newest first, keep at most 50."""
+    """Drop items older than MAX_AGE (14 days), sort newest first, keep at most 50."""
     cutoff = now - MAX_AGE
     fresh = [i for i in items if i.published_at >= cutoff]
     fresh.sort(key=lambda i: i.published_at, reverse=True)

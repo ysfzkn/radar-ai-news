@@ -89,12 +89,19 @@ def test_run_agent_happy_path(store, now, run_id):
     stats = run_agent(store, candidates, llm, http(), now, run_id)
     assert stats == {
         "scored": 3,
+        "scored_backlog": 0,
         "selected": 2,
+        "selected_fresh": 2,
+        "selected_backlog": 0,
         "written": 2,
+        "written_fresh": 2,
+        "written_backlog": 0,
         "published": 1,
         "review": 1,
         "skipped_thin": 0,
         "skipped_retry": 0,
+        "skipped_duplicate": 0,
+        "skipped_repeat": 0,
         "failed": 0,
         "unavailable": 0,
         "scoring_failed": False,
@@ -126,13 +133,19 @@ def test_without_review_all_nothing_carries_its_reason(store, now, run_id):
     assert all(REVIEW_ALL_REASON not in s.reasons for s in store.stories_since(now))
 
 
-def test_second_run_makes_no_model_calls(store, now, run_id):
+def test_second_run_makes_no_model_calls_when_nothing_was_written_since(store, now, run_id):
     candidates = world(store, now)
     llm = FakeLLM({"score": [three_scores(candidates)], "write": [draft(), draft()]})
     run_agent(store, candidates, llm, http(), now, run_id)
-    llm2 = FakeLLM({})
+    # The leftover was scored before the two stories were written: it is asked once more,
+    # with them in the list of written stories, and then left alone.
+    llm2 = FakeLLM({"score": [ScoreBatch(scores=[score(candidates[2].cluster_id, total=1)])]})
     again = run_agent(store, candidates, llm2, http(), now, store.start_run("run", now))
-    assert llm2.calls == [] and again["scored"] == 0 and again["written"] == 0
+    assert [c["step"] for c in llm2.calls] == ["score"] and again["scored"] == 1
+    assert again["written"] == 0
+    llm3 = FakeLLM({})
+    third = run_agent(store, candidates, llm3, http(), now, store.start_run("run", now))
+    assert llm3.calls == [] and third["scored"] == 0 and third["written"] == 0
 
 
 def test_full_edition_blocks_a_second_edition_the_same_day(store, now, run_id):
@@ -154,10 +167,12 @@ def test_partial_edition_is_topped_up_to_the_limit_only(store, now, run_id):
     llm = FakeLLM({"score": [batch], "write": [draft(), BudgetExceeded("cap")]})
     first = run_agent(store, candidates, llm, http(), now, run_id, max_stories=2)
     assert first["written"] == 1 and first["budget_stopped"] is True
-    llm2 = FakeLLM({"write": [draft(), draft(), draft()]})
+    rescored = ScoreBatch(scores=[score(c.cluster_id) for c in candidates[1:]])
+    llm2 = FakeLLM({"score": [rescored], "write": [draft(), draft(), draft()]})
     again = run_agent(store, candidates, llm2, http(), now, store.start_run("run", now), 2)
     assert again["selected"] == 1 and again["written"] == 1
-    assert [c["step"] for c in llm2.calls] == ["write"]
+    # The leftovers are asked again (a story was written since), then one is written.
+    assert [c["step"] for c in llm2.calls] == ["score", "write"]
     assert len(store.stories_since(now)) == 2
 
 
@@ -167,7 +182,8 @@ def test_new_istanbul_day_starts_a_new_edition(store, now, run_id):
     llm = FakeLLM({"score": [batch], "write": [draft(), draft()]})
     run_agent(store, candidates, llm, http(), now, run_id, max_stories=2)
     tomorrow = now + timedelta(days=1)  # 12:00 UTC is 15:00 in Istanbul, so this is the next day
-    llm2 = FakeLLM({"write": [draft(), draft()]})
+    rescored = ScoreBatch(scores=[score(c.cluster_id) for c in candidates[2:]])
+    llm2 = FakeLLM({"score": [rescored], "write": [draft(), draft()]})
     again = run_agent(store, candidates, llm2, http(), tomorrow, store.start_run("run", now), 2)
     assert again["written"] == 2
 
@@ -307,10 +323,10 @@ def test_unavailable_api_records_no_attempt_and_moves_on(store, now, run_id):
     assert _attempts(store, first) == []
     assert [s.cluster_id for s in store.stories_since(now)] == [second]
     later = now + timedelta(hours=1)
-    llm2 = FakeLLM({"write": [draft()]})
+    llm2 = FakeLLM({"score": [ScoreBatch(scores=[score(first)])], "write": [draft()]})
     again = run_agent(store, candidates, llm2, http(), later, store.start_run("run", later))
     assert again["skipped_retry"] == 0 and again["written"] == 1
-    assert [c["step"] for c in llm2.calls] == ["write"]
+    assert [c["step"] for c in llm2.calls] == ["score", "write"]
     assert sorted(s.cluster_id for s in store.stories_since(now)) == sorted([first, second])
 
 

@@ -1,6 +1,7 @@
 import ipaddress
 import re
 import unicodedata
+from datetime import date
 from urllib.parse import urlsplit
 
 from .models import Candidate, Draft, Score, SourceDoc, Status
@@ -272,11 +273,58 @@ def _check_try_url(url: str | None, doc: SourceDoc) -> list[str]:
     return []
 
 
+EN_MONTHS = (
+    "January February March April May June July August September October November December"
+).split()
+TR_MONTHS = "Ocak Şubat Mart Nisan Mayıs Haziran Temmuz Ağustos Eylül Ekim Kasım Aralık".split()
+# From this many calendar days between the first report and the edition, the text must say
+# when the event happened and must not call it today's.
+STALE_DAYS = 2
+_TODAY = re.compile(r"(?<!\w)(?:today|bugün)", re.IGNORECASE)
+
+
+def _spoken(day: date) -> str:
+    en = f"{day.day} {EN_MONTHS[day.month - 1]} {day.year}"
+    return f"{en} ({day.day} {TR_MONTHS[day.month - 1]} {day.year}, {day.isoformat()})"
+
+
+def date_facts(doc: SourceDoc) -> str:
+    """The dates Radar itself gives the writer (never taken from the page); the verifier
+    counts them as source facts, so a date written from them is not flagged."""
+    if doc.reported_on is None or doc.edition_on is None:
+        return ""
+    return f"First reported: {_spoken(doc.reported_on)}. Edition date: {_spoken(doc.edition_on)}."
+
+
+def _check_dating(draft: Draft, doc: SourceDoc) -> list[str]:
+    if doc.reported_on is None or doc.edition_on is None:
+        return []
+    days = (doc.edition_on - doc.reported_on).days
+    if days < STALE_DAYS:
+        return []
+    month = doc.reported_on.month - 1
+    issues = []
+    for lang, name in (("en", EN_MONTHS[month]), ("tr", TR_MONTHS[month])):
+        story = getattr(draft, lang)
+        if _fold(name) not in _fold(f"{story.title} {story.summary}"):
+            issues.append(
+                f"dating: {lang} text does not say when "
+                f"(first reported {doc.reported_on.isoformat()})"
+            )
+    for where, text in _text_fields(draft):
+        if _TODAY.search(text):
+            issues.append(f"dating: {where} calls a {days}-day-old event today")
+    return issues
+
+
 def verify(draft: Draft, doc: SourceDoc) -> list[str]:
-    issues = _check_lengths(draft) + _check_numbers(draft, doc.text)
-    issues += _check_names(draft, doc.text)
+    facts = date_facts(doc)
+    source = f"{doc.text}\n{facts}" if facts else doc.text
+    issues = _check_lengths(draft) + _check_numbers(draft, source)
+    issues += _check_names(draft, source)
     issues += _check_injection(draft, doc.text)
     issues += _check_try_url(draft.fact_card.try_url, doc)
+    issues += _check_dating(draft, doc)
     return issues
 
 
