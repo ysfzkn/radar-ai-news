@@ -188,7 +188,7 @@ After pulling a change that adds a file under `admin/migrations/` (for example `
 
 ## Deploy
 
-These steps were written from Cloudflare's documentation and have not been run. Nothing in this project has been deployed. Expect to adjust them.
+The project's own Worker was deployed with these steps on 2026-11-20 and 21 (steps 1 to 6 and 8). The run page's GitHub token (below) has not been set on the live Worker yet, so starting a run from the admin has never been done for real.
 
 1. Create the D1 database: `npx wrangler d1 create radar`. Put the id it prints in `database_id` in `admin/wrangler.jsonc` (the file holds the project owner's id; a fork needs its own). The id is not a secret. `preview_database_id` in the same file is the id local development uses, so `npm run dev` keeps its own local database whatever the production id is.
 2. Create the tables: `npx wrangler d1 migrations apply radar --remote`.

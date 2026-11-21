@@ -2,7 +2,7 @@
 
 `site/` is the public face of Radar: a static website, built with [Astro](https://astro.build), that shows the day's tech and AI news as numbered daily editions in Turkish and English. It is Yusuf Özkan's personal project: the top strip shows `ozkanyusuf.com` beside the wordmark, and the footer signs it with links to his site and GitHub account.
 
-Status: the site builds and runs on your machine, with demo data or against a local admin service. It has never been deployed. Nothing rebuilds it on a timer, and none is needed: the admin service's deploy hook rebuilds it when the published set changes, and no page depends on the clock. The [Deploy](#deploy) section was written from documentation and has not been run.
+Status: the site builds and runs on your machine, with demo data or against a local admin service. The project's own site is live at [radar.ozkanyusuf.com](https://radar.ozkanyusuf.com) since 2026-11-21, on Cloudflare Pages. Nothing rebuilds it on a timer, and none is needed: the admin service's deploy hook rebuilds it when the published set changes (seen working on the first approved stories), and no page depends on the clock. The [Deploy](#deploy) section says how it was set up.
 
 ## What it is, and what it is not
 
@@ -155,7 +155,7 @@ Checks: `npm run check` (types), `npm test` and `npm run build` in `site/`. The 
 
 ## Deploy
 
-These steps were written from documentation and have not been run. The Worker and the site have never been deployed. Expect to adjust them.
+The project's own site was deployed this way on Cloudflare Pages (a Pages project, not a Worker: only Pages takes a custom domain by CNAME when the domain's DNS is hosted elsewhere). Other hosts were not tried.
 
 1. Deploy the admin service first ([admin.md](admin.md#deploy)) so that `https://<worker-host>/api/stories` answers.
 2. Pick any static host that can run a Node build. In `site/`, the build command is `npm ci && npm run build:live` and the output folder is `dist`. Set two build variables: `RADAR_API_URL` (the Worker's origin, `https://...`) and `SITE_URL` (the address the site will have, for example `https://radar.example.com`). `SITE_URL` is used for the sitemap and the feed links; without it the build uses the project owner's address, `https://radar.ozkanyusuf.com`. Do not set `RADAR_DEMO` there: with `RADAR_DEMO=1` the fetch stops with an error instead of building the demo data.

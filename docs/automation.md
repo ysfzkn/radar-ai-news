@@ -2,7 +2,7 @@
 
 The agent can run by itself every morning on GitHub Actions. This page describes what the job does, how it keeps its database between runs, when it sends a notice, and how to set it up.
 
-> **Status:** the workflow (`.github/workflows/daily.yml`) has never run on GitHub. Nothing in this project has been pushed or deployed. It is checked by a test that reads the file, and its two state steps were run by hand against a scratch Git repository on a laptop, before the push moved into a job of its own; the artifact handover between the two jobs has never run. The Telegram and e-mail paths were exercised only against fakes: no real message was ever sent. Expect to adjust the setup the first time you try it.
+> **Status:** the workflow (`.github/workflows/daily.yml`) first ran on GitHub on 2026-11-21, started by hand with two stories: both jobs succeeded, the state file was handed from one job to the other and pushed to `radar-state`, and the stories reached the admin service. What has not been seen yet: a scheduled run, a run that fails part-way (whether the state survives it), the `mode` input and the 14-day backlog on real feeds, and a real Telegram or e-mail notice (those paths were exercised only against fakes).
 
 ## What the job does
 

@@ -7,7 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-21
+
+The first public release: the site is live at radar.ozkanyusuf.com, the admin service runs on Cloudflare behind Access, and the daily workflow has run on GitHub.
+
 ### Added
+
+- Agent: a 14-day backlog. When a day has fewer than five qualifying fresh stories, it is topped up to five from stories of the last 14 days that Radar never wrote and that still matter, judged by a stricter bar and their own scoring question. The floor is a target: a weak story is not written to reach it.
+- Agent: duplicates are checked against every story written in the last 30 days, by link, by title (with the same numbers and versions) and by the scorer.
+- Agent: the writer is told when an event was first reported; a story about an older event that does not say when goes to review.
+- Agent: `radar daily --review-all` (nothing is published automatically) and `--collect-only` (sources only, no model call); the daily workflow takes them as the `mode` input.
+- Admin: a run page ("Çalıştır") that starts the daily workflow on GitHub with a chosen mode and story count, shows the recent runs and keeps a history of starts. It needs the `GITHUB_DISPATCH_TOKEN` secret and stays off without it.
+- Admin: a new header, tab bar and status strip.
+- Site: a loading screen on the first page of a browser session (about 2.3 seconds, skippable, never with reduced motion), replacing the 1.2-second opening that a real network nearly always skipped.
+- Site: a command palette (`Ctrl K` or `/`), `j`/`k` between stories, a shortcut sheet, copy buttons, a status line in the footer, a "no signal" 404 page, page transitions, and Open Graph and Twitter card data with an image.
+- Site: the horizon is Istanbul and Sivas on one ground; `/admin` forwards to the review screen.
 
 - Repository scaffold, community files and CI.
 - The `radar` command reads `agent/.env` on start. A variable already set in the environment wins over the file.
