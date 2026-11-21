@@ -8,7 +8,6 @@ import { describe, expect, it } from "vitest";
 const source = readFileSync(join(resolve(import.meta.dirname, ".."), "public", "boot.js"), "utf8");
 
 interface Options {
-  opening?: boolean;
   reduce?: boolean;
   hidden?: boolean;
   navType?: string;
@@ -29,11 +28,10 @@ interface FakeEvent {
 
 function boot(options: Options = {}) {
   const classes = new Set<string>();
-  const attrs = new Map<string, string>(options.opening ? [["data-opening", ""]] : []);
   const store = new Map(Object.entries(options.stored ?? {}));
   const windowListeners: { type: string; fn: Listener; capture: boolean }[] = [];
   const documentListeners: { type: string; fn: Listener }[] = [];
-  const timers: (() => void)[] = [];
+  const timers: { fn: () => void; ms: number }[] = [];
   let now = 1000;
   const guard = <T>(fn: () => T): T => {
     if (options.storageThrows) throw new Error("SecurityError");
@@ -57,7 +55,6 @@ function boot(options: Options = {}) {
       contains: (c: string) => classes.has(c),
       toggle: (c: string) => (classes.has(c) ? (classes.delete(c), false) : (classes.add(c), true)),
     },
-    hasAttribute: (name: string) => attrs.has(name),
   };
   const context = {
     document: {
@@ -75,7 +72,7 @@ function boot(options: Options = {}) {
     },
     addEventListener: (type: string, fn: Listener, opts?: boolean | { capture?: boolean }) =>
       windowListeners.push({ type, fn, capture: opts === true || (typeof opts === "object" && !!opts.capture) }),
-    setTimeout: (fn: () => void) => timers.push(fn),
+    setTimeout: (fn: () => void, ms: number) => timers.push({ fn, ms }),
     Date: { now: () => now },
   };
   runInNewContext(source, context);
@@ -105,42 +102,40 @@ function boot(options: Options = {}) {
     buttons,
     windowListeners,
     fire,
-    runTimers: () => timers.splice(0).forEach((fn) => fn()),
+    timers,
+    runTimers: () => timers.splice(0).forEach((t) => t.fn()),
     advance: (ms: number) => void (now += ms),
   };
 }
 
 describe("boot.js: the opening", () => {
-  it("marks every page as scripted, and opens only an edition page, once per session", () => {
-    const plain = boot();
-    expect([...plain.classes]).toEqual(["js"]);
-    expect(plain.store.has("radar:intro")).toBe(false);
+  it("marks every page as scripted, and opens the first page of a session, whichever it is", () => {
+    const first = boot();
+    expect(first.classes.has("js")).toBe(true);
+    expect(first.classes.has("intro")).toBe(true);
+    expect(first.store.get("radar:intro")).toBe("1");
 
-    const edition = boot({ opening: true });
-    expect(edition.classes.has("js")).toBe(true);
-    expect(edition.classes.has("intro")).toBe(true);
-    expect(edition.store.get("radar:intro")).toBe("1");
-
-    const again = boot({ opening: true, stored: { "radar:intro": "1" } });
-    expect(again.classes.has("intro")).toBe(false);
+    const again = boot({ stored: { "radar:intro": "1" } });
+    expect([...again.classes]).toEqual(["js"]);
   });
 
   it("skips it for reduced motion, a hidden tab, back/forward, and when storage fails", () => {
     for (const options of [{ reduce: true }, { hidden: true }, { navType: "back_forward" }, { storageThrows: true }]) {
-      const page = boot({ opening: true, ...options });
+      const page = boot(options);
       expect(page.classes.has("intro"), JSON.stringify(options)).toBe(false);
       expect(page.classes.has("js"), JSON.stringify(options)).toBe(true);
     }
   });
 
-  it("ends it on its own after 1500 ms", () => {
-    const page = boot({ opening: true });
+  it("ends it on its own at the hard cap of 3500 ms, whatever the loader does", () => {
+    const page = boot();
+    expect(page.timers.map((t) => t.ms)).toEqual([3500]);
     page.runTimers();
     expect(page.classes.has("intro")).toBe(false);
   });
 
   it("consumes the press that skips it, and the click that follows, so no link underneath is followed", () => {
-    const page = boot({ opening: true });
+    const page = boot();
     // The listeners sit in the capture phase, ahead of anything on the page.
     for (const type of ["pointerdown", "touchstart", "keydown", "click"]) {
       expect(page.windowListeners.some((l) => l.type === type && l.capture), type).toBe(true);
@@ -156,7 +151,7 @@ describe("boot.js: the opening", () => {
   });
 
   it("forgets the swallowed click after a moment when none comes (a tap whose click was cancelled)", () => {
-    const page = boot({ opening: true });
+    const page = boot();
     page.fire("touchstart");
     expect(page.classes.has("intro")).toBe(false);
     page.advance(1500);
@@ -165,7 +160,7 @@ describe("boot.js: the opening", () => {
   });
 
   it("consumes the key that skips it, and leaves later keys alone", () => {
-    const page = boot({ opening: true });
+    const page = boot();
     const key = page.fire("keydown");
     expect(key.prevented && key.stopped).toBe(true);
     expect(page.classes.has("intro")).toBe(false);
@@ -175,8 +170,8 @@ describe("boot.js: the opening", () => {
     expect(page.fire("click").prevented).toBe(false);
   });
 
-  it("does not touch presses on a page without the opening", () => {
-    const page = boot();
+  it("does not touch presses once the opening has been seen", () => {
+    const page = boot({ stored: { "radar:intro": "1" } });
     for (const type of ["pointerdown", "keydown", "click"]) {
       const e = page.fire(type);
       expect(e.prevented || e.stopped, type).toBe(false);
@@ -195,7 +190,8 @@ describe("boot.js: the reader's pause", () => {
   });
 
   it("toggles the pause from either button, and remembers it for the session", () => {
-    const page = boot();
+    // After the opening: while it is up, the opening takes every press.
+    const page = boot({ stored: { "radar:intro": "1" } });
     page.fire("click", page.buttons[0]);
     expect(page.classes.has("still")).toBe(true);
     expect(page.store.get("radar:still")).toBe("1");

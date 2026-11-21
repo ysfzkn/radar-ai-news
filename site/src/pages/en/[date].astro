@@ -42,7 +42,6 @@ const { edition, previous, next, isLatest, hasOther } = Astro.props;
   description={COPY[lang].tagline}
   path={routes[lang].edition(edition.date)}
   alternate={hasOther ? routes.tr.edition(edition.date) : null}
-  opening
 >
   <EditionView lang={lang} edition={edition} previous={previous} next={next} isLatest={isLatest} />
 </Base>

@@ -1,12 +1,15 @@
 // Runs first, in <head>, before anything is painted. It marks the page as scripted, applies the
-// reader's pause and decides whether this view opens with the sweep.
+// reader's pause and decides whether this view opens with the loading screen.
 // 1. The pause: the class `still` on <html> stops every looping motion. The buttons marked
 //    `data-still` (on the scope and in the footer) toggle it; it is remembered for the browser
 //    session under `radar:still`.
-// 2. The opening: an edition page, once per browser session, never for a reader who asked for
-//    less motion, on back/forward or in a hidden tab. It is the class `intro` on <html>; anything
-//    that removes it ends the opening at once. The press or key that skips it is consumed, and so
-//    is the click that follows a press, so nothing under the opening is activated.
+// 2. The opening: the first page of a browser session, whichever page it is; never for a reader
+//    who asked for less motion, on back/forward or in a hidden tab. It is the class `intro` on
+//    <html>, which the stylesheet paints as an ink cover before the first paint; the loader
+//    (scripts/intro.ts) draws over it. Anything that removes the class ends the opening at once,
+//    and this file removes it at the hard cap of 3500 ms whatever the loader does. The press or key
+//    that skips it is consumed, and so is the click that follows a press, so nothing under the
+//    opening is activated.
 // Storage is only ever touched inside try/catch: when it fails, motion stays on and the opening
 // is skipped.
 (function () {
@@ -30,7 +33,6 @@
   try {
     var nav = performance.getEntriesByType("navigation")[0];
     if (
-      !d.hasAttribute("data-opening") ||
       matchMedia("(prefers-reduced-motion: reduce)").matches ||
       document.visibilityState === "hidden" ||
       (nav && nav.type === "back_forward") ||
@@ -69,5 +71,5 @@
   addEventListener("keydown", skip, true);
   addEventListener("click", click, true);
   addEventListener("visibilitychange", end);
-  setTimeout(end, 1500);
+  setTimeout(end, 3500);
 })();
