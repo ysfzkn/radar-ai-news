@@ -1917,7 +1917,7 @@ describe("built site", () => {
       expect(shadow.value === "none" || /^\d+px \d+px 0 var\(--ink\)$/.test(shadow.value), shadow.value).toBe(true);
       for (const part of shadow.selector.split(",").map((x) => x.trim())) {
         expect(part.replace(/:(hover|focus-visible|active)$/, "").replace(/\[aria-current="page"\]$/, "")).toMatch(
-          /^(\.story-lead \.try|\.(story-lead|scope|search-box|subscribe|try|palette|keys))$/,
+          /^(\.story-lead \.try|\.(story-lead|scope|search-box|subscribe|try|palette|keys|pitch-mark))$/,
         );
         if (part.startsWith(".story-lead .try")) expect(shadow.value).toBe("none");
       }
@@ -1969,7 +1969,11 @@ describe("built site", () => {
     const gradients = declarations(sheets()).filter((d) => /gradient\(/.test(d.value));
     expect(gradients.map((d) => `${d.selector} ${d.prop}`)).toEqual([".scope-sweep background"]);
     expect(gradients[0].value).toMatch(/^conic-gradient\(transparent 0deg \d+deg, var\(--sweep\) 360deg\)$/);
-    expect(sheets().replace(gradients[0].value, "")).not.toMatch(/gradient\(|backdrop-filter|filter:\s*drop-shadow|text-shadow/);
+    expect(sheets().replace(gradients[0].value, "")).not.toMatch(/gradient\(|backdrop-filter|filter:\s*drop-shadow/);
+    // One text-shadow on the site: the home page headline's hard accent extrusion (and its reset on the plate).
+    const lifted = declarations(sheets()).filter((d) => d.prop === "text-shadow");
+    expect(lifted.map((d) => d.selector).sort()).toEqual([".pitch-lead", ".pitch-mark"]);
+    for (const d of lifted) expect(d.value === "none" || /^(\d+px \d+px 0 var\(--accent\),?\s*)+$/.test(d.value), d.value).toBe(true);
   });
 
   it("every animation and transition sits inside a reduced-motion or @supports guard", () => {

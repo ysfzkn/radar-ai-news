@@ -1,6 +1,6 @@
 ---
-// What Radar is, said once at the top of the home page, for a reader who has just arrived: an ink
-// plate with the statement, and three facts as instrument cells.
+// What Radar is, said once at the top of the home page, for a reader who has just arrived: a
+// headline set like raised type, with its three facts on one mono line under it.
 import { COPY } from "../lib/copy";
 import { routes } from "../lib/routes";
 import type { Lang } from "../lib/schema";
@@ -14,18 +14,18 @@ const [before, marked, after] = pitch.lead;
 ---
 
 <section class="pitch" aria-label={pitch.label}>
-  <p class="pitch-label">{pitch.label}</p>
-  <p class="pitch-lead">{before}<em>{marked}</em>{after}</p>
-  <p class="pitch-sub">{pitch.sub}</p>
-  <ul class="pitch-specs">
+  <p class="pitch-label">))) {pitch.label}</p>
+  <p class="pitch-lead">{before}<em class="pitch-mark">{marked}</em>{after}</p>
+  <p class="pitch-sub">
+    {pitch.sub}
     {
       pitch.specs.map((s) => (
-        <li>
-          <b>{s.k}</b>
-          {s.v}
-        </li>
+        <>
+          {" "}
+          <b>{s.k}:</b> {s.v}.
+        </>
       ))
     }
-  </ul>
-  <a class="pitch-more" href={routes[lang].about}>{pitch.more} →</a>
+    <a class="pitch-more" href={routes[lang].about}>{pitch.more} →</a>
+  </p>
 </section>
