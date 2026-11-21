@@ -1,41 +1,96 @@
 ---
-// The horizon that closes every page: one line drawn at one weight. It is two cities on one
-// ground. On the left, Istanbul: the Bosphorus bridge, the Maiden's Tower on the water, a domed
-// mosque between its minarets and the Galata Tower. On the right, Sivas: the twin minarets of the
-// Çifte Minareli Medrese over its portal, poplars, and the castle hill with its flag. Between
-// them a few plain roofs, and on the tallest a small radar dish that turns; gulls drift above.
-// It keeps Istanbul's hours: by day a small sun and the gulls; in the evening and at night
-// (scripts/sky.ts, from the reader's clock) a moon, no gulls and a few windows lit in the accent.
-// Decoration only. The drawing is 640 × 96 (the reading column at 1:1); on a narrow screen it
-// keeps its height and shows its middle: from the Maiden's Tower to the poplars.
+// The horizon that closes every page: a line drawing of two cities on one ground, in three
+// depths. Far, in the lightest, thinnest line: the Bosphorus Bridge, the hills of the old city and
+// Sivas's castle hill with its flag. In the middle, at the drawing's own weight: Istanbul (the
+// Maiden's Tower on its rock, the Süleymaniye with its four minarets and cascading domes, the
+// Galata Tower), plain roofs with a turning radar dish on the tallest, and Sivas (the Çifte
+// Minareli Medrese's portal between its two fluted minarets, poplars). Near, a little heavier: the
+// water with a ferry crossing under the bridge, and the ground; now and then the Eastern Express
+// passes behind Sivas. Above: a sun or a moon, two clouds, gulls by day and
+// stars by night (scripts/sky.ts keeps Istanbul's hours; without it, the day).
+// Every motion is CSS and stops when the reader's system asks for less motion.
+//
+// The game: six of the landmarks hide a small blip. It is behind one line under the drawing (a
+// <details>), so it costs nothing to ignore. Opened, each landmark is a checkbox: tap, click or
+// Space finds it, its name comes into the list, the count goes up (a CSS counter), and once all six
+// are found the radar sends one ring across the skyline and a Kangal trots in to keep watch by the
+// dish. No script, nothing stored: a reload starts it afresh.
+// The drawing is 640 × 112 (the reading column at 1:1) and is always shown whole.
+import { COPY } from "../lib/copy";
+import type { Lang } from "../lib/schema";
 
-const GROUND = 90;
+interface Props {
+  lang: Lang;
+}
+
+const { horizon } = COPY[Astro.props.lang];
+
+const GROUND = 104;
 const r = (v: number) => +v.toFixed(2);
 
-// Istanbul, far: the bridge. Two towers, the main cable sagging between them, its hangers, the deck.
-const SAG = (t: number) => 58 + 72 * t * (1 - t); // the cable's height between the towers (x 40 → 120)
-const bridge = `M0 78H160M40 ${GROUND}V58M120 ${GROUND}V58M0 71L40 58Q80 94 120 58L160 78`;
-const hangers = [0.2, 0.35, 0.5, 0.65, 0.8].map((t) => `M${40 + 80 * t} ${r(SAG(t))}V78`).join("");
-const water = [14, 62, 96, 132].map((x, i) => `M${x} ${85 - (i % 2)}q3 -2.5 6 0t6 0`).join("");
+/** A pencil minaret standing on `base`: the shaft, its cone and a balcony at each of `rings`. */
+const minaret = (x: number, base: number, top: number, w: number, rings: number[]) =>
+  `M${r(x - w)} ${base}V${top + 7}L${x} ${top}L${r(x + w)} ${top + 7}V${base}` +
+  rings.map((y) => `M${r(x - w - 1.5)} ${y}H${r(x + w + 1.5)}`).join("");
 
-// The Maiden's Tower: a low block on the water, a lantern and its cap.
-const maiden = `M144 ${GROUND}V83H156V${GROUND}M147.5 83V77H152.5V83M146.5 77L150 71L153.5 77Z`;
+// Far: the Bosphorus Bridge. Two towers (each a pair of posts with cross beams), the deck, the
+// main cable sagging between the towers with its hangers, and the back stays.
+const T1 = 26;
+const T2 = 108;
+const TOP = 50;
+const DECK = 84;
+const SAG = (t: number) => TOP + 2 * t * (1 - t) * (110 - TOP);
+const tower = (x: number) =>
+  `M${x - 1.5} ${GROUND}V${TOP - 2}M${x + 1.5} ${GROUND}V${TOP - 2}` +
+  [TOP, 66, DECK + 4].map((y) => `M${x - 1.5} ${y}H${x + 1.5}`).join("");
+const bridge =
+  tower(T1) +
+  tower(T2) +
+  `M0 ${DECK}H134V${GROUND}M0 ${DECK + 2}H134` +
+  `M0 68L${T1} ${TOP}Q${(T1 + T2) / 2} 110 ${T2} ${TOP}L134 70`;
+const hangers = [0.12, 0.24, 0.36, 0.5, 0.64, 0.76, 0.88]
+  .map((t) => `M${r(T1 + (T2 - T1) * t)} ${r(SAG(t))}V${DECK}`)
+  .join("");
+// Far: the old city's hills behind the mosque and the tower.
+const hills = `M156 96C178 86 214 82 250 84S300 88 330 94`;
+// Far: Sivas's castle hill, its walls and battlements along the top, and the flag.
+const castleHill = `M486 ${GROUND}C504 92 522 80 548 76L552 72H598L602 76C616 80 628 90 640 96`;
+const battlements =
+  `M552 72V68` +
+  Array.from({ length: 11 }, () => `h2v-2h2v2`).join("") +
+  `V72M555 68V61h2v-1.6h2v1.6h2v-1.6h2V68M589 68V61h2v-1.6h2v1.6h2v-1.6h2V68`;
+const flagPole = `M574 68V52`;
+const flag = `M574 52.5h9l-2.4 2.8l2.4 2.8h-9Z`;
 
-/** A pencil minaret standing on `base`: the shaft, its cone and one balcony. */
-const minaret = (x: number, base: number, top: number, w: number) =>
-  `M${r(x - w)} ${base}V${top + 8}L${x} ${top}L${r(x + w)} ${top + 8}V${base}` +
-  `M${r(x - w - 1.6)} ${top + 16}H${r(x + w + 1.6)}`;
+// Middle: the Maiden's Tower on its rock: the low block, the tower, its lantern and cupola, the pole.
+const rock = `M136 ${GROUND}Q141 99 148 98.6Q155 99 160 ${GROUND}`;
+const maiden =
+  `M140.5 99V92H155.5V99M143.5 92V78H152.5V92M144.5 78V74H151.5V78` +
+  `M144.5 74A3.5 3.5 0 0 1 151.5 74M148 70.5V66`;
+const maidenFine = `M146 84v3M150 84v3`;
 
-// The mosque: walls, two half-domes stepping up to the main dome, its finial, a minaret each side.
+// Middle: the Süleymaniye. The courtyard's low walls, the prayer hall, its two half-domes stepping
+// up to the drum and the great dome with its finial, small domes along the walls; the two tall
+// minarets (three balconies) beside the hall and the two shorter ones (two) at the courtyard's ends.
+const mosqueBack = `M199 76V70H229V76M199 70A15 15 0 0 1 229 70M214 55V49M212.6 51H215.4`;
 const mosque =
-  `M184 ${GROUND}V76A10 10 0 0 1 196 68A14 14 0 0 1 224 68A10 10 0 0 1 236 76V${GROUND}` +
-  `M210 54V49M184 76H236` +
-  minaret(176, GROUND, 34, 1.6) +
-  minaret(244, GROUND, 34, 1.6);
+  `M164 ${GROUND}V95H184M244 95H264V${GROUND}` +
+  `M184 ${GROUND}V82H244V${GROUND}` +
+  `M190 82A9 9 0 0 1 208 82M220 82A9 9 0 0 1 238 82` +
+  `M184 82a3 3 0 0 1 6 0M238 82a3 3 0 0 1 6 0` +
+  minaret(180, 82, 26, 1.5, [40, 50, 60]) +
+  minaret(248, 82, 26, 1.5, [40, 50, 60]) +
+  minaret(167, 95, 46, 1.3, [58, 68]) +
+  minaret(261, 95, 46, 1.3, [58, 68]);
+const mosqueFine = `M203 73v2M209 73v2M219 73v2M225 73v2M190 90v6M196 90v6M232 90v6M238 90v6`;
 
-// The Galata Tower: the drum, its gallery, the narrower top storey and the cone.
-const galata = `M274 ${GROUND}V54H272V51H275.5V44L282 27L288.5 44V51H292V54H290V${GROUND}M275.5 47.5H288.5`;
-const galataFine = `M279 60v4M285 60v4M279 70v4M285 70v4M282 44v3`;
+// Middle: the Galata Tower. The stone drum, the gallery that juts out under the top storey with its
+// arched windows, the conical cap and its finial.
+const galata =
+  `M280 ${GROUND}V54H296V${GROUND}` +
+  `M278 54H298M278 54V51H298V54M281 51V43H295V51` +
+  `M279.5 43H296.5L288 25ZM288 25V20`;
+const galataFine = `M283.5 49v-2.5a1.2 1.2 0 0 1 2.4 0v2.5M290.1 49v-2.5a1.2 1.2 0 0 1 2.4 0v2.5M285 64v4M291 64v4M285 78v4M291 78v4M288 92v12`;
 
 /** One plain building between the two cities: where it starts, how wide, how tall, its roof. */
 type Roof = "flat" | "gable" | "step";
@@ -58,35 +113,33 @@ for (const [x, w, h, roof] of town) {
 }
 line += `V${GROUND}`;
 
-// A few lit windows on the taller buildings: short strokes, the engraver's hatching.
-const windows = town
-  .filter(([, , h]) => h >= 30)
-  .flatMap(([x, w, h]) =>
-    Array.from({ length: Math.floor((h - 10) / 8) }, (_, i) => `M${r(x + w * 0.3)} ${GROUND - h + 8 + i * 8}h${r(w * 0.4)}`),
-  )
-  .join("");
+// Windows on the taller buildings, short strokes, lit at night; and the Galata's.
+const windows =
+  town
+    .filter(([, , h]) => h >= 30)
+    .flatMap(([x, w, h]) =>
+      Array.from({ length: Math.floor((h - 10) / 8) }, (_, i) => `M${r(x + w * 0.3)} ${GROUND - h + 8 + i * 8}h${r(w * 0.4)}`),
+    )
+    .join("") + `M285.5 70h5M285.5 84h5`;
 
-// Sivas: the Çifte Minareli Medrese. Low wings, the tall portal with its pointed arch, and the two
-// stout brick minarets that rise from the portal's shoulders.
-const PORTAL = 58;
-const stout = (x: number) =>
-  `M${x - 3} ${PORTAL}V32L${x} 25L${x + 3} 32V${PORTAL}M${x - 4.6} 38H${x + 4.6}M${x - 4.6} 40.5H${x + 4.6}`;
+// Middle: the Çifte Minareli Medrese. The low wings, the tall portal with its pointed arch and the
+// stalactite rows over it, and the two fluted brick minarets on the portal's shoulders.
+const PORTAL = 64;
+const fluted = (x: number) =>
+  `M${x - 3} ${PORTAL}V34L${x} 26L${x + 3} 34V${PORTAL}M${x - 4.4} 40H${x + 4.4}M${x - 4.4} 42.5H${x + 4.4}`;
 const medrese =
-  `M432 ${GROUND}V72H442V${PORTAL}H478V72H488V${GROUND}` +
-  `M452 ${GROUND}V74L460 63L468 74V${GROUND}` +
-  stout(447) +
-  stout(473);
-const brick = [447, 473].flatMap((x) => [45, 49, 53].map((y) => `M${x - 3} ${y}h6`)).join("") + `M446 67h28`;
+  `M434 ${GROUND}V84H446V${PORTAL}H482V84H494V${GROUND}` +
+  `M456 ${GROUND}V82Q456 74 464 68Q472 74 472 82V${GROUND}` +
+  fluted(451) +
+  fluted(477);
+const medreseFine =
+  [451, 477].flatMap((x) => [47, 52, 57].map((y) => `M${x - 1} ${y}v3`)).join("") +
+  `M450 68h28M459 76h10M461 72h6M438 92v6M490 92v6`;
 
-// Poplars beside it: a trunk and a tall, narrow leaf.
+// Middle: poplars beside it, a trunk and a tall narrow leaf each.
 const poplar = (x: number, top: number) =>
   `M${x} ${GROUND}V${GROUND - 5}C${x - 4.5} ${GROUND - 14} ${x - 2.5} ${top + 6} ${x} ${top}C${x + 2.5} ${top + 6} ${x + 4.5} ${GROUND - 14} ${x} ${GROUND - 5}`;
-const poplars = poplar(498, 58) + poplar(507, 64);
-
-// The castle hill behind: the slope, the battlements along its top, a flag.
-const castle =
-  `M488 84C514 66 532 58 546 58v-5h4v3h4v-3h4v3h4v-3h4v3h4v-3h4v5C598 59 622 70 640 78` +
-  `M560 50V38l6 2.2l-6 2.2`;
+const poplars = poplar(500, 58) + poplar(509, 66) + poplar(517, 74);
 
 // The dish on the tallest roof: a mast, a tilted bowl and its feed. It turns about the mast.
 const [dx, dw, dh] = town[4];
@@ -97,15 +150,45 @@ const bowl = `M${mastX - 12} ${roof - 21}Q${mastX - 2} ${roof - 4} ${mastX + 11}
 const feed = `M${mastX - 0.5} ${roof - 12.5}L${mastX - 6} ${roof - 23}`;
 const tip = { cx: mastX - 6, cy: roof - 23 };
 
-// Three gulls, two strokes each, drifting on their own slow courses.
+// Near: the water's ripples.
+const ripples = [10, 44, 78, 112].map((x, i) => `M${x} ${107 + (i % 2) * 2}q3 -2 6 0t6 0`).join("");
+
+// Near: a ferry, its hull, deck house with windows and its funnel. Drawn at the bridge's left.
+const ferry = `M0 -4L2 0H25L27 -4ZM5 -4V-8H21V-4M12 -8V-11.5H15V-8M12 -10.3H15`;
+const ferryWin = `M7.5 -6h2M11.5 -6h2M15.5 -6h2`;
+
+// The Eastern Express. Three carriages and the locomotive, facing east (right), on the line that
+// runs behind Sivas: it comes out from behind the town, shows between the medrese and the poplars
+// and along the castle hill's foot, and leaves at the drawing's right edge.
+const cars = [0, 20, 40].map((x) => `M${x} -1V-7H${x + 18}V-1ZM${x} -1H${x + 18}`).join("") + `M18 -4H20M38 -4H40M58 -4H60`;
+const carWin = [0, 20, 40].map((x) => `M${x + 3} -5h3M${x + 8} -5h3M${x + 13} -5h3`).join("");
+const loco = `M60 -1V-6H71V-9H78L81 -5V-1ZM60 -1H81M63 -4h5`;
+const wheels = [3, 15, 23, 35, 43, 55, 64, 77].map((x) => `M${x - 1.2} 0.2h2.4`).join("");
+
+// The Kangal: a big fawn shepherd dog with a black mask and a curled tail, facing west (left),
+// drawn standing; two trotting poses of its legs swap while it comes in.
+const dogBody =
+  `M2 -7Q8 -9.2 15 -7Q16 -5.6 14.6 -4Q9 -3.2 3.4 -4Q1.8 -5.4 2 -7ZM2 -7L-0.6 -10.4Q-3.6 -11.8 -5.4 -9.8L-6.6 -8.2L-4.2 -7.4Q-2 -6.2 3 -4` +
+  `M-1.4 -10.6L-0.4 -8.4M15 -7Q18.4 -10.4 16.2 -12.2Q14 -12.8 14.4 -10.6`;
+const dogMask = `M-5.4 -9.8L-6.6 -8.2L-4.4 -7.6L-4 -9.4Z`;
+const legsStand = `M3 -4.4V0M5.2 -4V0M13 -4V0M14.8 -4.4V0`;
+const legsA = `M3 -4.4L1.4 0M5.2 -4L6.4 0M13 -4L11.4 0M14.8 -4.4L16.2 0`;
+const legsB = `M3 -4.4L4.4 0M5.2 -4L3.6 0M13 -4L14.6 0M14.8 -4.4L13.2 0`;
+
+// Gulls by day: two strokes each, drifting on their own slow courses over the water.
 const birds = [
-  { x: 316, y: 22, s: 1 },
-  { x: 334, y: 13, s: 0.8 },
-  { x: 348, y: 27, s: 0.65 },
+  { x: 120, y: 30, s: 1 },
+  { x: 138, y: 22, s: 0.8 },
+  { x: 152, y: 36, s: 0.65 },
 ].map(({ x, y, s }) => `M${r(x - 6 * s)} ${y}Q${r(x - 3 * s)} ${r(y - 4 * s)} ${x} ${y}Q${r(x + 3 * s)} ${r(y - 4 * s)} ${r(x + 6 * s)} ${y}`);
-// Above the mosque's dome, the sky: by day a small sun, its disc and eight short rays; at night
-// a crescent moon. The page draws the day; scripts/sky.ts switches to the night in the evening.
-const SKY = { x: 210, y: 21 };
+
+// Two clouds, a few round puffs on a flat base.
+const cloud = (x: number, y: number, s: number) =>
+  `M${x} ${y}h${r(34 * s)}a${r(6 * s)} ${r(6 * s)} 0 0 0 ${r(-8 * s)} ${r(-8 * s)}a${r(8 * s)} ${r(8 * s)} 0 0 0 ${r(-14 * s)} ${r(-3 * s)}a${r(6 * s)} ${r(6 * s)} 0 0 0 ${r(-10 * s)} ${r(5 * s)}a${r(5 * s)} ${r(5 * s)} 0 0 0 ${r(-2 * s)} ${r(6 * s)}`;
+
+// The sky over Sivas: by day a small sun, its disc and eight short rays; at night a crescent moon
+// and a scatter of stars. The page draws the day; scripts/sky.ts switches to the night.
+const SKY = { x: 612, y: 22 };
 const sun =
   `M${SKY.x + 4} ${SKY.y}A4 4 0 1 0 ${SKY.x - 4} ${SKY.y}A4 4 0 1 0 ${SKY.x + 4} ${SKY.y}` +
   Array.from({ length: 8 }, (_, i) => {
@@ -114,31 +197,128 @@ const sun =
     return `M${p(6.5)}L${p(9)}`;
   }).join("");
 const moon = `M${SKY.x + 1} ${SKY.y - 7}A7 7 0 1 0 ${SKY.x + 1} ${SKY.y + 7}A9 9 0 0 1 ${SKY.x + 1} ${SKY.y - 7}Z`;
+const stars = [
+  [40, 18],
+  [96, 10],
+  [236, 14],
+  [330, 22],
+  [420, 12],
+  [530, 30],
+  [470, 8],
+]
+  .map(([x, y]) => `M${x} ${y - 1.6}v3.2M${x - 1.6} ${y}h3.2`)
+  .join("");
+
+// The game's six landmarks: where each one's blip sits in the drawing, and its name.
+const spots = [
+  { id: "bridge", x: 67, y: 72 },
+  { id: "maiden", x: 148, y: 84 },
+  { id: "mosque", x: 214, y: 64 },
+  { id: "galata", x: 288, y: 36 },
+  { id: "medrese", x: 464, y: 76 },
+  { id: "castle", x: 576, y: 64 },
+] as const;
 ---
 
-<svg
-  class="horizon"
-  viewBox="0 0 640 96"
-  preserveAspectRatio="xMidYMax slice"
-  aria-hidden="true"
->
-  <path class="hz-line" d={`M0 ${GROUND}H640`}></path>
-  <path class="hz-line hz-far" d={bridge + castle}></path>
-  <path class="hz-line hz-fine" d={hangers + water}></path>
-  <path class="hz-line" d={maiden + mosque + galata}></path>
-  <path class="hz-line" d={line}></path>
-  <path class="hz-line" d={medrese + poplars}></path>
-  <path class="hz-line hz-fine" d={galataFine + brick}></path>
-  <path class="hz-line hz-fine hz-win" d={windows}></path>
-  <path class="hz-line hz-sun" d={sun}></path>
-  <path class="hz-line hz-moon" d={moon}></path>
-  <g class="hz-dish">
-    <path class="hz-line" d={mast}></path>
-    <g class="hz-turn">
-      <path class="hz-line" d={bowl}></path>
-      <path class="hz-line" d={feed}></path>
-      <circle class="hz-tip" cx={tip.cx} cy={tip.cy} r="1.6"></circle>
+<div class="hz">
+  <svg class="horizon" viewBox="0 0 640 112" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
+    <path class="hz-line hz-sun" d={sun}></path>
+    <path class="hz-line hz-moon" d={moon}></path>
+    <path class="hz-line hz-fine hz-star" d={stars}></path>
+    <g class="hz-cloud hz-cloud-1"><path class="hz-line hz-far" d={cloud(40, 30, 1)}></path></g>
+    <g class="hz-cloud hz-cloud-2"><path class="hz-line hz-far" d={cloud(300, 16, 0.7)}></path></g>
+    <g class="hz-mark hz-bridge">
+      <path class="hz-line hz-far" d={bridge}></path>
+      <path class="hz-line hz-far hz-fine" d={hangers}></path>
     </g>
-  </g>
-  {birds.map((d, i) => <path class={`hz-line hz-bird hz-bird-${i + 1}`} d={d}></path>)}
-</svg>
+    <path class="hz-line hz-far" d={hills}></path>
+    <path class="hz-line hz-far hz-solid" d={castleHill}></path>
+    <g class="hz-mark hz-castle">
+      <path class="hz-line hz-far" d={battlements + flagPole}></path>
+      <path class="hz-flag" d={flag}></path>
+    </g>
+    <g class="hz-train" transform="translate(338 104)">
+      <path class="hz-line hz-solid" d={cars + loco}></path>
+      <path class="hz-line hz-fine hz-win" d={carWin}></path>
+      <path class="hz-line" d={wheels}></path>
+      <circle class="hz-lamp" cx="80" cy="-4" r="0.9"></circle>
+    </g>
+    <g class="hz-mark hz-maiden">
+      <path class="hz-line hz-solid" d={rock}></path>
+      <path class="hz-line hz-solid" d={maiden}></path>
+      <path class="hz-line hz-fine" d={maidenFine}></path>
+    </g>
+    <g class="hz-mark hz-mosque">
+      <path class="hz-line hz-solid" d={mosqueBack}></path>
+      <path class="hz-line hz-solid" d={mosque}></path>
+      <path class="hz-line hz-fine" d={mosqueFine}></path>
+    </g>
+    <g class="hz-mark hz-galata">
+      <path class="hz-line hz-solid" d={galata}></path>
+      <path class="hz-line hz-fine" d={galataFine}></path>
+    </g>
+    <path class="hz-line hz-solid" d={line}></path>
+    <path class="hz-line hz-fine hz-win" d={windows}></path>
+    <g class="hz-mark hz-medrese">
+      <path class="hz-line hz-solid" d={medrese}></path>
+      <path class="hz-line hz-fine" d={medreseFine}></path>
+    </g>
+    <path class="hz-line hz-solid" d={poplars}></path>
+    <g class="hz-dish">
+      <path class="hz-line" d={mast}></path>
+      <g class="hz-turn">
+        <path class="hz-line" d={bowl}></path>
+        <path class="hz-line" d={feed}></path>
+        <circle class="hz-tip" cx={tip.cx} cy={tip.cy} r="1.6"></circle>
+      </g>
+      <circle class="hz-line hz-wave" cx={tip.cx} cy={tip.cy} r="6"></circle>
+    </g>
+    <path class="hz-line hz-near" d={`M0 ${GROUND}H640`}></path>
+    <path class="hz-line hz-fine" d={ripples}></path>
+    <g transform="translate(14 104)">
+      <g class="hz-ferry">
+        <path class="hz-line hz-near hz-solid" d={ferry}></path>
+        <path class="hz-line hz-fine hz-win" d={ferryWin}></path>
+      </g>
+    </g>
+    <g class="hz-kangal" transform="translate(394 110) scale(1.3)">
+      <path class="hz-line hz-near hz-solid" d={dogBody}></path>
+      <path class="hz-mask" d={dogMask}></path>
+      <path class="hz-line hz-near hz-legs hz-legs-0" d={legsStand}></path>
+      <path class="hz-line hz-near hz-legs hz-legs-1" d={legsA}></path>
+      <path class="hz-line hz-near hz-legs hz-legs-2" d={legsB}></path>
+    </g>
+    {birds.map((d, i) => <path class={`hz-line hz-bird hz-bird-${i + 1}`} d={d}></path>)}
+  </svg>
+  <details class="hz-game">
+    <summary class="hz-ask label">{horizon.ask}</summary>
+    <fieldset class="hz-finds">
+      <legend class="visually-hidden">{horizon.legend}</legend>
+      {
+        spots.map(({ id }) => (
+          <>
+            <input class={`hz-pick hz-p-${id}`} type="checkbox" id={`hz-p-${id}`} />
+            <label class={`hz-spot hz-s-${id}`} for={`hz-p-${id}`}>
+              <span class="visually-hidden">{horizon.names[id]}</span>
+            </label>
+          </>
+        ))
+      }
+      <p class="hz-tally label">
+        <span class="hz-count"></span>
+        {horizon.found}
+      </p>
+      <ol class="hz-list label" role="list" aria-hidden="true">
+        {
+          spots.map(({ id }) => (
+            <li class={`hz-n hz-n-${id}`}>
+              <span class="hz-q">?</span>
+              <span class="hz-t">{horizon.names[id]}</span>
+            </li>
+          ))
+        }
+      </ol>
+      <p class="hz-done label" role="status"><span>{horizon.done}</span></p>
+    </fieldset>
+  </details>
+</div>

@@ -81,7 +81,7 @@ const status = siteStatus(stories, lang);
         <slot />
       </main>
       <footer class="foot label">
-        <Horizon />
+        <Horizon lang={lang} />
         <p class="sig">
           {copy.owner}{" · "}<a href={OWNER.site} {...EXTERNAL}>{copy.by}</a>{" · "}<a
             href={OWNER.github}

@@ -903,7 +903,7 @@ describe("built site", () => {
           blipLayers++;
         } else if (/^<svg class="emblem cat-[a-z]+" viewBox="0 0 48 48" width="(56|96)" height="\1" aria-hidden="true">/.test(svg)) {
           emblems++;
-        } else if (svg.startsWith('<svg class="horizon" viewBox="0 0 640 96" preserveAspectRatio="xMidYMax slice" aria-hidden="true">')) {
+        } else if (svg.startsWith('<svg class="horizon" viewBox="0 0 640 112" preserveAspectRatio="xMidYMax meet" aria-hidden="true">')) {
           horizons++;
         } else if (/^<svg class="scope-layer layer-[123]" viewBox="-100 -100 200 200"><a class="ghost g-\d+" /.test(svg)) {
           ghostLayers++;
@@ -1008,20 +1008,65 @@ describe("built site", () => {
 
   it("every page ends with the horizon above the signature, hidden from assistive tech and from print", () => {
     for (const file of [DEMO, EMPTY].flatMap(htmlFiles)) {
-      const foot = readFileSync(file, "utf8").match(/<footer class="foot label">([\s\S]*?)<\/footer>/)![1];
-      // The horizon, then the signature: no pause button between them.
-      expect(foot, file).toMatch(/^\s*<svg class="horizon" [^>]*aria-hidden="true">[\s\S]*?<\/svg>\s*<p class="sig">/);
+      const html = readFileSync(file, "utf8");
+      const lang = html.includes('<html lang="en"') ? "en" : "tr";
+      const foot = html.match(/<footer class="foot label">([\s\S]*?)<\/footer>/)![1];
+      // The horizon's box (the drawing, then its game behind one line), then the signature.
+      expect(foot, file).toMatch(
+        /^\s*<div class="hz"><svg class="horizon" [^>]*aria-hidden="true">[\s\S]*?<\/svg>\s*<details class="hz-game">[\s\S]*?<\/details>\s*<\/div>\s*<p class="sig">/,
+      );
       const horizon = foot.match(/<svg class="horizon"[\s\S]*?<\/svg>/)![0];
-      expect(horizon).not.toMatch(/<a\s|<text|tabindex/);
+      expect(horizon).not.toMatch(/<a\s|<text|tabindex|<input|<label/);
       expect(horizon).toContain('class="hz-turn"');
       expect(horizon.match(/class="hz-line hz-bird hz-bird-\d"/g)).toHaveLength(3);
+      for (const part of ["hz-ferry", "hz-train", "hz-cloud hz-cloud-1", "hz-cloud hz-cloud-2", "hz-kangal", "hz-line hz-wave"]) {
+        expect(horizon, part).toContain(`class="${part}"`);
+      }
+      // The game: six landmarks, each a checkbox named by its landmark (the drawing's text
+      // alternative), a closed <details> to ignore, the tally and the list in the page's language.
+      const game = foot.match(/<details class="hz-game">([\s\S]*?)<\/details>/)![1];
+      const copy = COPY[lang].horizon;
+      expect(game.trimStart().startsWith(`<summary class="hz-ask label">${copy.ask}</summary>`), file).toBe(true);
+      expect(game).not.toMatch(/<details[^>]*\sopen/);
+      const ids = ["bridge", "maiden", "mosque", "galata", "medrese", "castle"] as const;
+      const picks = [...game.matchAll(/<input class="hz-pick hz-p-([a-z]+)" type="checkbox" id="hz-p-\1">\s*<label class="hz-spot hz-s-\1" for="hz-p-\1">\s*<span class="visually-hidden">([^<]+)<\/span>\s*<\/label>/g)];
+      expect(picks.map((m) => m[1])).toEqual([...ids]);
+      expect(picks.map((m) => text(m[2]))).toEqual(ids.map((id) => copy.names[id]));
+      expect(game).toContain(`<legend class="visually-hidden">${copy.legend}</legend>`);
+      expect(text(game.match(/<p class="hz-tally label">[\s\S]*?<\/p>/)![0])).toBe(copy.found);
+      expect(game).toMatch(/<ol class="hz-list label" role="list" aria-hidden="true">/);
+      expect(text(game.match(/<p class="hz-done label" role="status"><span>([^<]*)<\/span><\/p>/)![1])).toBe(copy.done);
     }
-    const print = printRules(css());
+    expect(COPY.tr.horizon.names).toEqual({
+      bridge: "Boğaz Köprüsü",
+      maiden: "Kız Kulesi",
+      mosque: "Süleymaniye Camii",
+      galata: "Galata Kulesi",
+      medrese: "Çifte Minareli Medrese",
+      castle: "Sivas Kalesi",
+    });
+    const sheet = css();
+    // The tally is a CSS counter of the checked boxes; all six found shows the line that says so
+    // and the Kangal, with no script and nothing stored.
+    expect(cssRule(sheet, ".hz-pick:checked")).toContain("counter-increment: hz-found;");
+    expect(cssRule(sheet, ".hz-count::before")).toContain('content: counter(hz-found) " / 6 ";');
+    expect(cssRule(sheet, ".hz:not(:has(.hz-pick:not(:checked))) .hz-done > span")).toContain("display: inline;");
+    expect(cssRule(sheet, ".hz:not(:has(.hz-pick:not(:checked))) .hz-kangal")).toContain("display: inline;");
+    expect(cssRule(sheet, ".hz-kangal")).toContain("display: none;");
+    // A found blip is a target of 36px.
+    const spot = cssRule(sheet, ".hz-spot");
+    expect(spot).toContain("width: 2.25rem;");
+    expect(spot).toContain("height: 2.25rem;");
+    const print = printRules(sheet);
     expect(cssRule(print, ".screen-off,\n  .horizon")).toContain("display: none;");
-    // One weight: every line of the drawing is the same stroke, kept at its width at any scale.
-    const line = cssRule(css(), ".hz-line");
+    expect(cssRule(print, ".hz")).toContain("display: none;");
+    // The drawing's base line: one stroke, kept at its width at any scale; far and near lines
+    // are lighter and heavier than it.
+    const line = cssRule(sheet, ".hz-line");
     expect(line).toContain("stroke-width: 1.25;");
     expect(line).toContain("vector-effect: non-scaling-stroke;");
+    expect(cssRule(sheet, ".hz-far")).toContain("stroke-width: 1;");
+    expect(cssRule(sheet, ".hz-near")).toContain("stroke-width: 1.5;");
   });
 
   it("there is no pause button: motion runs whenever the reader's system allows it", () => {
@@ -1311,7 +1356,9 @@ describe("built site", () => {
     const horizon = page(DEMO, "").match(/<svg class="horizon"[\s\S]*?<\/svg>/)![0];
     for (const part of ["hz-sun", "hz-moon", "hz-win"]) expect(horizon).toContain(`hz-line ${part === "hz-win" ? "hz-fine hz-win" : part}"`);
     const sheet = css();
-    expect(cssRule(sheet, ".hz-moon,\nhtml.night :is(.hz-sun, .hz-bird)")).toContain("display: none;");
+    expect(cssRule(sheet, ".hz-moon,\n.hz-star,\nhtml.night :is(.hz-sun, .hz-bird)")).toContain("display: none;");
+    expect(cssRule(sheet, "html.night :is(.hz-moon, .hz-star)")).toContain("display: inline;");
+    expect(cssRule(sheet, "html.night .hz-lamp")).toContain("fill: var(--accent);");
     expect(cssRule(sheet, "html.night .hz-win")).toContain("stroke: var(--accent);");
     const sky = readFileSync(join(root, "src", "scripts", "sky.ts"), "utf8");
     expect(sky).toContain("(new Date().getUTCHours() + 3) % 24");
@@ -2065,10 +2112,11 @@ describe("built site", () => {
       if (d.prop.startsWith("transition")) expect(d.value).toMatch(/120ms/);
     }
     // Only a fixed set of things loop: the scope's one 6 s clock (the sweep, each blip's echo and
-    // the readout) and the horizon's slow life, at 20 s or slower. There is no pause button: each
+    // the readout) and the horizon's slow life (the dish, the gulls, the ferry, the train, the
+    // clouds), at 20 s or slower. There is no pause button: each
     // loops whenever the reader's system allows motion (with or without script) and the
     // reduced-motion setting stops them all, each resting on its plain frame.
-    const LOOPED = [".blip-echo", ".hz-bird", ".hz-turn", ".readout-line", ".scope-sweep"];
+    const LOOPED = [".blip-echo", ".hz-bird", ".hz-cloud", ".hz-ferry", ".hz-train", ".hz-turn", ".readout-line", ".scope-sweep"];
     expect(sheets()).not.toMatch(/alternate/);
     const loops = decls.filter((d) => /infinite/.test(d.value));
     expect(loops.map((d) => d.selector).sort()).toEqual(LOOPED);
@@ -2080,7 +2128,7 @@ describe("built site", () => {
     const hz = decls.filter(
       (x) => x.stack[0] === "@media (prefers-reduced-motion: no-preference)" && x.selector.startsWith(".hz-") && /^animation(-duration)?$/.test(x.prop),
     );
-    expect(hz.length).toBe(4);
+    expect(hz.length).toBe(8);
     for (const d of hz) expect(Number(d.value.match(/(\d+)s\b/)![1]), `${d.selector} ${d.value}`).toBeGreaterThanOrEqual(20);
     // No other rule sets these animations going: anything else on them only pauses or cancels.
     const looped = new RegExp(`(${LOOPED.map((s) => s.replace(".", "\\.")).join("|")})\\b`);
@@ -2140,6 +2188,13 @@ describe("built site", () => {
         "@keyframes ns-draw",
         "@keyframes check-in",
         "@keyframes ping",
+        "@keyframes ferry-cross",
+        "@keyframes train-run",
+        "@keyframes cloud-drift",
+        "@keyframes dish-wave",
+        "@keyframes kangal-trot",
+        "@keyframes kangal-halt",
+        "@keyframes kangal-step",
       ]),
     );
     const fades = keyframes.filter((d) => d.prop === "opacity");

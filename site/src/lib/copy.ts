@@ -171,6 +171,18 @@ export interface Copy {
   copy: { code: string; done: string; link: string; linkName(no: string): string };
   /** The status line at the foot of every page, built with the site. */
   status: { command: string; line(issue: number, date: string, stories: number, sources: number): string; none: string };
+  /** The small game in the horizon: find its six landmarks. */
+  horizon: {
+    /** The closed game's one line, under the drawing. */
+    ask: string;
+    /** Read before the six boxes. */
+    legend: string;
+    /** After the count, "3 / 6 …". */
+    found: string;
+    /** Shown once all six are found. */
+    done: string;
+    names: { bridge: string; maiden: string; mosque: string; galata: string; medrese: string; castle: string };
+  };
   about: About;
   subscribe: Subscribe;
 }
@@ -370,6 +382,20 @@ export const COPY: Record<Lang, Copy> = {
       command: "radar status",
       line: (issue, date, stories, sources) => `sayı ${issue} · ${date} · ${stories} haber · ${sources} kaynak`,
       none: "henüz baskı yok",
+    },
+    horizon: {
+      ask: "Ufukta altı yer saklı. Bulabilir misin?",
+      legend: "Ufuktaki yerler: bulduğunu işaretle",
+      found: "bulundu",
+      done: "Hepsini buldun. Radar bir tur attı, Kangal da nöbete geldi.",
+      names: {
+        bridge: "Boğaz Köprüsü",
+        maiden: "Kız Kulesi",
+        mosque: "Süleymaniye Camii",
+        galata: "Galata Kulesi",
+        medrese: "Çifte Minareli Medrese",
+        castle: "Sivas Kalesi",
+      },
     },
     about: {
       title: "Künye",
@@ -639,6 +665,20 @@ export const COPY: Record<Lang, Copy> = {
       line: (issue, date, stories, sources) =>
         `issue ${issue} · ${date} · ${stories} ${stories === 1 ? "story" : "stories"} · ${sources} ${sources === 1 ? "source" : "sources"}`,
       none: "no edition yet",
+    },
+    horizon: {
+      ask: "Six places hide on the horizon. Can you find them?",
+      legend: "Places on the horizon: mark the ones you find",
+      found: "found",
+      done: "You found them all. The radar swept once, and a Kangal came to keep watch.",
+      names: {
+        bridge: "Bosphorus Bridge",
+        maiden: "Maiden's Tower",
+        mosque: "Süleymaniye Mosque",
+        galata: "Galata Tower",
+        medrese: "Çifte Minareli Medrese",
+        castle: "Sivas Castle",
+      },
     },
     about: {
       title: "About",

@@ -3225,13 +3225,30 @@ a.heat-day:hover {
   user-select: all;
 }
 
-/* The horizon over the footer (Horizon.astro): one line at one weight, low on contrast; its
-   ground line is the footer's rule. Only the dish's feed carries the accent. */
+/* The horizon over the footer (Horizon.astro): a line drawing in three depths, low on contrast;
+   its ground line is the footer's rule. Far lines are the lightest and thinnest, near ones a
+   little heavier; the buildings are filled with the page's own colour, so what stands in front
+   hides what stands behind. The accent is kept for the dish's feed, the flag, and the game. It is
+   always drawn whole: at the reading column's width 1:1, on a phone across the whole window. */
+.hz {
+  position: relative;
+  width: 100%;
+  margin-bottom: var(--space-3);
+  container-type: inline-size;
+}
+
+@media (max-width: 39.99em) {
+  .hz {
+    width: calc(100% + 2 * var(--gutter));
+    margin-inline: calc(-1 * var(--gutter));
+  }
+}
+
 .horizon {
   display: block;
   width: 100%;
-  height: 6rem;
-  margin-bottom: var(--space-3);
+  height: auto;
+  aspect-ratio: 640 / 112;
   overflow: hidden;
 }
 
@@ -3245,29 +3262,58 @@ a.heat-day:hover {
 }
 
 .hz-far {
-  stroke: var(--line);
+  stroke: color-mix(in srgb, var(--control-border) 50%, var(--bg));
+  stroke-width: 1;
 }
 
 .hz-fine {
-  stroke: var(--line);
+  stroke: color-mix(in srgb, var(--control-border) 55%, var(--bg));
+  stroke-width: 1;
+}
+
+.hz-near {
+  stroke: color-mix(in srgb, var(--control-border) 70%, var(--ink));
+  stroke-width: 1.5;
+}
+
+.hz-solid {
+  fill: var(--bg);
+}
+
+.hz-flag,
+.hz-tip {
+  fill: var(--accent);
+}
+
+.hz-mask {
+  fill: var(--ink);
+}
+
+.hz-lamp {
+  fill: var(--control-border);
 }
 
 /* The sky keeps Istanbul's hours (html.night from scripts/sky.ts): by day the sun and the gulls,
-   at night the moon and a few windows lit in the accent. */
+   at night the moon, the stars, and the windows, the ferry's and the train's lit in the accent. */
 .hz-moon,
+.hz-star,
 html.night :is(.hz-sun, .hz-bird) {
   display: none;
 }
 
-html.night .hz-moon {
+html.night :is(.hz-moon, .hz-star) {
   display: inline;
+}
+
+html.night .hz-star {
+  stroke: var(--control-border);
 }
 
 html.night .hz-win {
   stroke: var(--accent);
 }
 
-.hz-tip {
+html.night .hz-lamp {
   fill: var(--accent);
 }
 
@@ -3275,6 +3321,256 @@ html.night .hz-win {
 .hz-turn {
   transform-box: view-box;
   transform-origin: 392px 0;
+}
+
+/* The ferry turns about its own middle at each end of its crossing; the clouds drift right. */
+.hz-ferry {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.hz-cloud-1 {
+  --from: -90px;
+  --to: 620px;
+}
+
+.hz-cloud-2 {
+  --from: -340px;
+  --to: 360px;
+}
+
+/* The game's reward: a ring the dish sends across the skyline, and the Kangal; both wait. */
+.hz-wave {
+  stroke: var(--accent);
+  visibility: hidden;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.hz-kangal {
+  display: none;
+}
+
+.hz-legs-1,
+.hz-legs-2 {
+  visibility: hidden;
+}
+
+/* The game (Horizon.astro): one quiet line under the drawing, a <details>. Opened, each of the six
+   landmarks shows a blip, the label of a hidden checkbox placed on the drawing (in drawing units,
+   through the box's container width); a found blip lights, its landmark is drawn in ink and its
+   name comes into the list; a CSS counter keeps the tally. Nothing is stored. */
+.hz-game {
+  margin-top: var(--space-1);
+}
+
+.hz-ask {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding-inline: 0.25rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  list-style: none;
+  cursor: pointer;
+}
+
+.hz-ask::-webkit-details-marker {
+  display: none;
+}
+
+.hz-ask::before {
+  content: "";
+  flex: none;
+  width: 0.625rem;
+  height: 0.625rem;
+  border: 1.5px solid var(--accent);
+  border-radius: 50%;
+}
+
+.hz-ask:hover {
+  color: var(--ink);
+}
+
+.hz-game[open] .hz-ask::before {
+  background: var(--accent);
+}
+
+.hz-finds {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0 var(--gutter);
+  border: 0;
+  counter-reset: hz-found;
+}
+
+.hz-pick {
+  position: absolute;
+  left: calc(var(--x) * 100cqw / 640);
+  top: calc(var(--y) * 100cqw / 640);
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  appearance: none;
+}
+
+.hz-pick:checked {
+  counter-increment: hz-found;
+}
+
+.hz-spot {
+  position: absolute;
+  left: calc(var(--x) * 100cqw / 640);
+  top: calc(var(--y) * 100cqw / 640);
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  translate: -50% -50%;
+  cursor: pointer;
+}
+
+.hz-spot::before {
+  content: "";
+  width: 0.625rem;
+  height: 0.625rem;
+  border: 1.5px solid var(--accent);
+  border-radius: 50%;
+}
+
+.hz-spot:hover::before {
+  border-color: var(--ink);
+}
+
+.hz-pick:checked + .hz-spot::before {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.hz-pick:focus-visible + .hz-spot {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.hz-p-bridge,
+.hz-s-bridge {
+  --x: 67;
+  --y: 72;
+}
+
+.hz-p-maiden,
+.hz-s-maiden {
+  --x: 148;
+  --y: 84;
+}
+
+.hz-p-mosque,
+.hz-s-mosque {
+  --x: 214;
+  --y: 64;
+}
+
+.hz-p-galata,
+.hz-s-galata {
+  --x: 288;
+  --y: 36;
+}
+
+.hz-p-medrese,
+.hz-s-medrese {
+  --x: 464;
+  --y: 76;
+}
+
+.hz-p-castle,
+.hz-s-castle {
+  --x: 576;
+  --y: 64;
+}
+
+.hz-count::before {
+  content: counter(hz-found) " / 6 ";
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.hz-tally {
+  font-size: 0.75rem;
+}
+
+.hz-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-1) var(--space-4);
+  padding: 0;
+  font-size: 0.75rem;
+  list-style: none;
+}
+
+.hz-q {
+  display: inline-block;
+  min-width: 3rem;
+  border-bottom: 1px dashed var(--control-border);
+  color: var(--control-border);
+  text-align: center;
+}
+
+.hz-t,
+.hz-done > span {
+  display: none;
+}
+
+.hz-done {
+  max-width: 28rem;
+  color: var(--ink);
+  font-size: 0.75rem;
+}
+
+/* A found landmark: its name in the list, its lines in ink. */
+.hz-p-bridge:checked ~ .hz-list .hz-n-bridge .hz-t,
+.hz-p-maiden:checked ~ .hz-list .hz-n-maiden .hz-t,
+.hz-p-mosque:checked ~ .hz-list .hz-n-mosque .hz-t,
+.hz-p-galata:checked ~ .hz-list .hz-n-galata .hz-t,
+.hz-p-medrese:checked ~ .hz-list .hz-n-medrese .hz-t,
+.hz-p-castle:checked ~ .hz-list .hz-n-castle .hz-t {
+  display: inline;
+  color: var(--ink);
+}
+
+.hz-p-bridge:checked ~ .hz-list .hz-n-bridge .hz-q,
+.hz-p-maiden:checked ~ .hz-list .hz-n-maiden .hz-q,
+.hz-p-mosque:checked ~ .hz-list .hz-n-mosque .hz-q,
+.hz-p-galata:checked ~ .hz-list .hz-n-galata .hz-q,
+.hz-p-medrese:checked ~ .hz-list .hz-n-medrese .hz-q,
+.hz-p-castle:checked ~ .hz-list .hz-n-castle .hz-q {
+  display: none;
+}
+
+.hz:has(.hz-p-bridge:checked) .hz-bridge .hz-line,
+.hz:has(.hz-p-maiden:checked) .hz-maiden .hz-line,
+.hz:has(.hz-p-mosque:checked) .hz-mosque .hz-line,
+.hz:has(.hz-p-galata:checked) .hz-galata .hz-line,
+.hz:has(.hz-p-medrese:checked) .hz-medrese .hz-line,
+.hz:has(.hz-p-castle:checked) .hz-castle .hz-line {
+  stroke: var(--ink);
+}
+
+/* All six found: the line that says so, and the Kangal by the dish (it trots in where motion is
+   allowed; see the motion rules). */
+.hz:not(:has(.hz-pick:not(:checked))) .hz-done > span {
+  display: inline;
+}
+
+.hz:not(:has(.hz-pick:not(:checked))) .hz-kangal {
+  display: inline;
 }
 
 /* Footer: the owner's signature, then the site's own links. */
@@ -3947,8 +4243,11 @@ kbd {
     animation: screen-off 650ms cubic-bezier(0.7, 0, 0.3, 1) forwards;
   }
 
-  /* The horizon's dish turns once a minute's third, its birds glide on their own slow courses.
-     With less motion asked for, the dish faces the reader and the birds hold their places. */
+  /* The horizon's slow life: the dish turns once a minute's third, the gulls glide on their own
+     courses, the ferry crosses under the bridge and back, the Eastern Express passes behind
+     Sivas about once a minute and a quarter, the clouds drift. With less motion asked for, all of
+     it holds its place: the dish faces the reader, the ferry waits by the shore, the train behind
+     the town. */
   .hz-turn {
     animation: dish-turn 20s ease-in-out infinite;
   }
@@ -3965,6 +4264,45 @@ kbd {
   .hz-bird-3 {
     animation-duration: 52s;
     animation-delay: -30s;
+  }
+
+  .hz-ferry {
+    animation: ferry-cross 64s ease-in-out -20s infinite;
+  }
+
+  .hz-train {
+    animation: train-run 75s linear -8s infinite;
+  }
+
+  .hz-cloud {
+    animation: cloud-drift 170s linear -60s infinite;
+  }
+
+  .hz-cloud-2 {
+    animation-duration: 230s;
+    animation-delay: -150s;
+  }
+
+  /* All six landmarks found: the dish sends one ring across the skyline, and the Kangal trots in
+     from the east to stand by it, its legs swapping between two trotting poses on the way. */
+  .hz:not(:has(.hz-pick:not(:checked))) .hz-wave {
+    animation: dish-wave 2400ms ease-out 200ms both;
+  }
+
+  .hz:not(:has(.hz-pick:not(:checked))) .hz-kangal {
+    animation: kangal-trot 8800ms linear both;
+  }
+
+  .hz:not(:has(.hz-pick:not(:checked))) .hz-legs-0 {
+    animation: kangal-halt 8800ms steps(1, end) both;
+  }
+
+  .hz:not(:has(.hz-pick:not(:checked))) .hz-legs-1 {
+    animation: kangal-step 400ms steps(1, end) 22;
+  }
+
+  .hz:not(:has(.hz-pick:not(:checked))) .hz-legs-2 {
+    animation: kangal-step 400ms steps(1, end) -200ms 22;
   }
 
   @supports (animation-timeline: scroll()) {
@@ -4142,6 +4480,95 @@ kbd {
   }
 }
 
+/* The ferry: across under the bridge, a turn about its middle, and back. */
+@keyframes ferry-cross {
+  0%,
+  100% {
+    translate: 0 0;
+    scale: 1 1;
+  }
+
+  44% {
+    translate: 84px 0;
+    scale: 1 1;
+  }
+
+  50% {
+    translate: 84px 0;
+    scale: -1 1;
+  }
+
+  94% {
+    translate: 0 0;
+    scale: -1 1;
+  }
+}
+
+/* The Eastern Express: from behind the town to off the drawing's edge in a quarter of the cycle,
+   then out of sight until it comes again. */
+@keyframes train-run {
+  0% {
+    translate: 0 0;
+  }
+
+  26%,
+  100% {
+    translate: 310px 0;
+  }
+}
+
+@keyframes cloud-drift {
+  from {
+    translate: var(--from) 0;
+  }
+
+  to {
+    translate: var(--to) 0;
+  }
+}
+
+/* The reward's ring: from the dish's feed across the whole skyline, cooling from the accent. */
+@keyframes dish-wave {
+  from {
+    visibility: visible;
+    scale: 1;
+    stroke: var(--accent);
+  }
+
+  to {
+    visibility: hidden;
+    scale: 64;
+    stroke: var(--line);
+  }
+}
+
+/* The Kangal comes in from beyond the drawing's right edge; its standing legs show once it stops. */
+@keyframes kangal-trot {
+  from {
+    translate: 260px 0;
+  }
+}
+
+@keyframes kangal-halt {
+  from {
+    visibility: hidden;
+  }
+
+  to {
+    visibility: visible;
+  }
+}
+
+@keyframes kangal-step {
+  0% {
+    visibility: visible;
+  }
+
+  50% {
+    visibility: hidden;
+  }
+}
+
 /* A bird's glide: a little across and up, and back. */
 @keyframes bird-drift {
   0%,
@@ -4216,6 +4643,14 @@ kbd {
   .hero.is-entering .hero-radar,
   .hz-turn,
   .hz-bird,
+  .hz-ferry,
+  .hz-train,
+  .hz-cloud,
+  .hz:not(:has(.hz-pick:not(:checked))) .hz-wave,
+  .hz:not(:has(.hz-pick:not(:checked))) .hz-kangal,
+  .hz:not(:has(.hz-pick:not(:checked))) .hz-legs-0,
+  .hz:not(:has(.hz-pick:not(:checked))) .hz-legs-1,
+  .hz:not(:has(.hz-pick:not(:checked))) .hz-legs-2,
   .em-mid .em-face,
   .em-top .em-face,
   ::view-transition-old(root),
@@ -4234,6 +4669,10 @@ kbd {
 
   .screen-off,
   .horizon {
+    display: none;
+  }
+
+  .hz {
     display: none;
   }
 
