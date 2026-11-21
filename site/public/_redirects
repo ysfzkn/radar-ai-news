@@ -1,0 +1,4 @@
+# The review screen lives on the Worker, behind Cloudflare Access. These only forward the short
+# address; signing in still happens there.
+/admin https://radar-admin.ozkan-development.workers.dev/admin 302
+/admin/* https://radar-admin.ozkan-development.workers.dev/admin/:splat 302
