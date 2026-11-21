@@ -341,6 +341,13 @@ a:hover {
     font-size: 0.75rem;
   }
 
+  /* The header is a layer of its own (it has a view-transition-name), so the dial fixed inside it
+     is only as high as the header: lift the header above the page's own layers (the scope). */
+  .top {
+    position: relative;
+    z-index: 40;
+  }
+
   .dial {
     position: fixed;
     right: 0;
