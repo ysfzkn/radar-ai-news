@@ -109,8 +109,37 @@ export interface Copy {
   notFoundTitle: string;
   notFoundText: string;
   notFoundHome: string;
+  /** The share picture's description, for those who cannot see it. */
+  ogImageAlt: string;
+  /** The 404 page's headline, over the empty scope. */
+  noSignal: string;
+  notFoundHint: string;
   feedTitle: string;
   feedDescription: string;
+  /** The command palette, the shortcut sheet and the copy buttons: all of them come with script. */
+  palette: {
+    /** The accessible name of the strip's button, and the word beside its key. */
+    open: string;
+    hint: string;
+    title: string;
+    placeholder: string;
+    pages: string;
+    stories: string;
+    none: string;
+    loading: string;
+    /** The other language's edition, as a palette item. */
+    other: string;
+    rss: string;
+    /** The line of keys under the list. */
+    foot: string;
+    keysTitle: string;
+    keys: readonly (readonly [string, string])[];
+    close: string;
+  };
+  /** The copy buttons: on a command, and on each story's link. */
+  copy: { code: string; done: string; link: string; linkName(no: string): string };
+  /** The status line at the foot of every page, built with the site. */
+  status: { command: string; line(issue: number, date: string, stories: number, sources: number): string; none: string };
   about: About;
   subscribe: Subscribe;
 }
@@ -141,6 +170,10 @@ export interface Subscribe {
   otherFeed: string;
   otherFeedLink: string;
   noNewsletter: string;
+  /** The feed from a command line: a heading, a line, and the label of the command block. */
+  terminalHeading: string;
+  terminalText: string;
+  terminalTitles: string;
 }
 
 const { site: SITE, github: GITHUB, repository: REPOSITORY, issues: ISSUES } = OWNER;
@@ -248,8 +281,45 @@ export const COPY: Record<Lang, Copy> = {
     notFoundTitle: "Sayfa bulunamadı",
     notFoundText: "Sayfa bulunamadı.",
     notFoundHome: "Bugünün baskısına dön",
+    ogImageAlt: "Radar: üç yaylı işaret ve bir radar ekranı; günün teknoloji ve yapay zekâ haberleri",
+    noSignal: "Sinyal yok",
+    notFoundHint: "Bu adres radarda görünmüyor. Belki taşındı, belki hiç yoktu.",
     feedTitle: "Radar: günün teknoloji ve yapay zekâ haberleri",
     feedDescription: "Günün teknoloji ve yapay zekâ haberleri. Beş dakika, gürültü yok.",
+    palette: {
+      open: "Komut paletini aç",
+      hint: "Ara",
+      title: "Komut paleti",
+      placeholder: "Sayfa ya da haber ara…",
+      pages: "Sayfalar",
+      stories: "Haberler",
+      none: "Eşleşen bir şey yok.",
+      loading: "Haberler yükleniyor…",
+      other: "English edition",
+      rss: "RSS akışı",
+      foot: "↑↓ seç · ↵ aç · esc kapat · ? kısayollar",
+      keysTitle: "Klavye kısayolları",
+      keys: [
+        ["Ctrl K · ⌘K", "Komut paletini aç"],
+        ["/", "Ara"],
+        ["j · k", "Sonraki · önceki haber"],
+        ["[ · ]", "Önceki · sonraki sayı"],
+        ["?", "Bu liste"],
+        ["Esc", "Kapat"],
+      ],
+      close: "Kapat",
+    },
+    copy: {
+      code: "Kopyala",
+      done: "Kopyalandı",
+      link: "bağlantı",
+      linkName: (no) => `${no} numaralı haberin bağlantısını kopyala`,
+    },
+    status: {
+      command: "radar status",
+      line: (issue, date, stories, sources) => `sayı ${issue} · ${date} · ${stories} haber · ${sources} kaynak`,
+      none: "henüz baskı yok",
+    },
     about: {
       title: "Künye",
       description: "Radar'ı kim çıkarıyor; haberler nasıl seçiliyor, yazılıyor ve denetleniyor.",
@@ -328,7 +398,7 @@ export const COPY: Record<Lang, Copy> = {
           heading: "Gizlilik",
           paragraphs: [
             "Bu site çerez kullanmaz, seni izlemez ve üçüncü taraflardan hiçbir şey yüklemez: analitik, reklam ya da dış yazı tipi yok. Her sayfa statik bir HTML dosyasıdır ve betik olmadan da eksiksiz çalışır.",
-            "Sitenin kendi küçük betiği yalnızca bir kolaylık ekler: arşivde arama (arama verisi bu siteden gelir), radar ekranının eğimi ve okunan haberlerin işareti, “Neden önemli” satırının belirişi, günün ilk sayfasındaki kısa açılış ve dönen hareketi durduran düğme. Hareketi azaltmayı seçtiysen hareketlerin hiçbiri oynamaz.",
+            "Sitenin kendi küçük betiği yalnızca bir kolaylık ekler: arşivde arama ve komut paleti (arama verisi bu siteden gelir), klavye kısayolları, kopyalama düğmeleri (panoya yalnızca sen bastığında yazar), radar ekranının eğimi ve okunan haberlerin işareti, “Neden önemli” satırının belirişi, bir ziyaretin ilk sayfasındaki kısa açılış ve dönen hareketi durduran düğme. Hareketi azaltmayı seçtiysen hareketlerin hiçbiri oynamaz.",
             "Arşivde aradığın sözcükler tarayıcında ve sayfanın adresinde kalır; adres de tarayıcı geçmişine yazılır. Sayfayı yenilediğinde ya da bir sonuca tıkladığında adres yalnızca bu siteye gider; başka kimseye gönderilmez.",
             "Tarayıcının oturum belleğine en çok iki anahtar yazılır: açılışın bir kez gösterildiğini hatırlayan radar:intro ve hareketi durdurduysan bunu hatırlayan radar:still. İkisi de sekme kapanınca silinir. Başka hiçbir şey saklanmaz.",
           ],
@@ -351,6 +421,9 @@ export const COPY: Record<Lang, Copy> = {
       otherFeed: "İngilizce sayıların ayrı bir akışı var:",
       otherFeedLink: "İngilizce akış",
       noNewsletter: "E-posta bülteni yok; Radar'ı şimdilik yalnızca RSS ile takip edebilirsin.",
+      terminalHeading: "Terminalden",
+      terminalText: "Akış düz XML'dir; komut satırından da okunur. Bu komut son başlıkları listeler:",
+      terminalTitles: "Son başlıklar",
     },
   },
   en: {
@@ -456,8 +529,46 @@ export const COPY: Record<Lang, Copy> = {
     notFoundTitle: "Page not found",
     notFoundText: "Page not found.",
     notFoundHome: "Go to today's edition",
+    ogImageAlt: "Radar: the three-arc mark and a radar screen; the day's tech and AI news",
+    noSignal: "No signal",
+    notFoundHint: "This address does not show on the radar. It may have moved, or never existed.",
     feedTitle: "Radar: the day's tech and AI news",
     feedDescription: "The day's tech and AI news. Five minutes, no noise.",
+    palette: {
+      open: "Open the command palette",
+      hint: "Search",
+      title: "Command palette",
+      placeholder: "Search pages or stories…",
+      pages: "Pages",
+      stories: "Stories",
+      none: "Nothing matches.",
+      loading: "Loading stories…",
+      other: "Türkçe baskı",
+      rss: "RSS feed",
+      foot: "↑↓ select · ↵ open · esc close · ? shortcuts",
+      keysTitle: "Keyboard shortcuts",
+      keys: [
+        ["Ctrl K · ⌘K", "Open the command palette"],
+        ["/", "Search"],
+        ["j · k", "Next · previous story"],
+        ["[ · ]", "Previous · next issue"],
+        ["?", "This list"],
+        ["Esc", "Close"],
+      ],
+      close: "Close",
+    },
+    copy: {
+      code: "Copy",
+      done: "Copied",
+      link: "link",
+      linkName: (no) => `Copy the link to story ${no}`,
+    },
+    status: {
+      command: "radar status",
+      line: (issue, date, stories, sources) =>
+        `issue ${issue} · ${date} · ${stories} ${stories === 1 ? "story" : "stories"} · ${sources} ${sources === 1 ? "source" : "sources"}`,
+      none: "no edition yet",
+    },
     about: {
       title: "About",
       description: "Who makes Radar, and how its stories are chosen, written and checked.",
@@ -536,7 +647,7 @@ export const COPY: Record<Lang, Copy> = {
           heading: "Privacy",
           paragraphs: [
             "This site sets no cookies, does not track you and loads nothing from third parties: no analytics, no ads, no outside fonts. Every page is a static HTML file and is complete without scripts.",
-            "The site's own small script only adds conveniences: the archive search (its data comes from this site), the radar's tilt and the marks on stories you have read, the way the “Why it matters” line appears, a short opening on the day's first page, and the button that pauses the looping motion. If you have asked for less motion, none of it moves.",
+            "The site's own small script only adds conveniences: the archive search and the command palette (their data comes from this site), keyboard shortcuts, copy buttons (they write to your clipboard only when you press them), the radar's tilt and the marks on stories you have read, the way the “Why it matters” line appears, a short opening on the first page of a visit, and the button that pauses the looping motion. If you have asked for less motion, none of it moves.",
             "What you type in the archive search stays in your browser and in the page's address, so it is also in your browser history. When you reload the page or click a result, that address goes to this site only; it is sent to no one else.",
             "At most two keys are written to the browser's session storage: radar:intro, which remembers that the opening has been shown, and radar:still, which remembers that you paused the motion. Both are gone when the tab closes. Nothing else is stored.",
           ],
@@ -559,6 +670,9 @@ export const COPY: Record<Lang, Copy> = {
       otherFeed: "The Turkish issues have a feed of their own:",
       otherFeedLink: "Turkish feed",
       noNewsletter: "There is no e-mail newsletter; for now Radar is RSS only.",
+      terminalHeading: "From the terminal",
+      terminalText: "The feed is plain XML, so a command line reads it too. This lists the latest headlines:",
+      terminalTitles: "Latest headlines",
     },
   },
 };

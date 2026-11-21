@@ -708,20 +708,20 @@ describe("built site", () => {
   });
 
   it("the opening is decided by boot.js and never written into the markup", () => {
-    // What boot.js decides (once per session, only where the page asks for it, skipped for reduced
-    // motion, back/forward, a hidden tab and failing storage; ended by a press, a key or 1500 ms,
-    // the skipping press consumed) is run and checked in boot.test.ts. Here: the markup.
+    // What boot.js decides (the first page of a session, whichever it is; skipped for reduced
+    // motion, back/forward, a hidden tab and failing storage; ended by a press, a key or the 3500 ms
+    // cap, the skipping press consumed) is run and checked in boot.test.ts. Here: the markup.
     for (const dir of [DEMO, HOSTILE, EMPTY, REAL]) {
       for (const file of htmlFiles(dir)) {
         const html = readFileSync(file, "utf8");
         const tag = html.match(/<html[^>]*>/)![0];
         expect(tag, file).not.toMatch(/\bclass=/);
         expect(html, file).not.toMatch(/class="[^"]*\bintro\b/);
-        // Only an edition page may open with the sweep.
-        expect(tag.includes("data-opening"), file).toBe(html.includes('<section class="scope"'));
+        // No page asks for it any more: any page may be the first of a session.
+        expect(tag, file).not.toContain("data-opening");
       }
     }
-    // The ink cover lives in the reduced-motion guard and clears itself at 1500 ms if no script comes.
+    // The ink cover lives in the reduced-motion guard and clears itself at the 3500 ms cap if no script comes.
     const cover = declarations(css()).filter((d) => d.selector === "html.intro body::before");
     const screen = cover.filter((d) => d.stack[0] === "@media (prefers-reduced-motion: no-preference)");
     expect(screen.map((d) => `${d.prop}: ${d.value}`)).toEqual([
@@ -730,7 +730,7 @@ describe("built site", () => {
       "inset: 0",
       "z-index: 100",
       "background: var(--ink)",
-      "animation: intro-hold 0s 1500ms forwards",
+      "animation: intro-hold 0s 3500ms forwards",
     ]);
     expect(cover.every((d) => d.stack[0] === "@media (prefers-reduced-motion: no-preference)" || d.stack[0] === "@media print")).toBe(true);
     expect(cssRule(css(), "html:not(.intro) .intro-canvas")).toContain("display: none;");
@@ -745,9 +745,11 @@ describe("built site", () => {
       // CSSOM custom properties only, never a style attribute.
       expect(source, name).not.toMatch(/setAttribute\(\s*["']style|\.style\.(?!setProperty)/);
     }
+    // The loader runs only where boot.js put the class, and boot.js never does for reduced motion.
     const intro = readFileSync(join(dir, "intro.ts"), "utf8");
-    expect(intro).toContain('matchMedia("(prefers-reduced-motion: reduce)")');
-    expect(intro).toContain("const BUDGET = 1200;");
+    expect(intro).toContain('if (!root.classList.contains("intro")) return;');
+    const palette = readFileSync(join(dir, "palette.ts"), "utf8");
+    expect(palette).toContain('matchMedia("(prefers-reduced-motion: reduce)")');
     const scope = readFileSync(join(dir, "scope.ts"), "utf8");
     expect(scope).toContain('matchMedia("(prefers-reduced-motion: reduce)")');
     expect(scope).toContain('matchMedia("(pointer: fine)")');
@@ -827,6 +829,8 @@ describe("built site", () => {
           emblems++;
         } else if (svg.startsWith('<svg class="horizon" viewBox="0 0 640 96" preserveAspectRatio="xMidYMax slice" aria-hidden="true">')) {
           horizons++;
+        } else if (svg.startsWith('<svg class="nosignal" viewBox="-100 -100 200 200" aria-hidden="true">')) {
+          expect(file.endsWith("404.html"), file).toBe(true);
         } else {
           expect(svg, file).toMatch(/^<svg class="echo-arcs" viewBox="0 0 44 14"/);
           for (const arc of meterArcs) expect(svg, file).toContain(arc);
@@ -986,22 +990,28 @@ describe("built site", () => {
     const reading = readFileSync(join(root, "src", "scripts", "reading.ts"), "utf8");
     expect(reading).toContain('matchMedia("(prefers-reduced-motion: reduce)")');
     expect(reading).toContain("textContent = token.text");
-    // The script comes with the scope's bundle, so an edition page still loads two scripts. The
-    // opening comes first in it, and the scope's and the reading details' set-up each catch their
-    // own failure, so neither can keep the opening from finishing.
+    // The script comes with the scope's bundle. The opening and the palette come with every page's
+    // own bundle, and the scope's and the reading details' set-up each catch their own failure.
     const bundle = readFileSync(join(root, "src", "components", "Scope.astro"), "utf8").match(/<script>([\s\S]*?)<\/script>/)![1];
-    expect(bundle.trim().split(/\s*\n\s*/)).toEqual(['import "../scripts/intro";', 'import "../scripts/scope";', 'import "../scripts/reading";']);
+    expect(bundle.trim().split(/\s*\n\s*/)).toEqual(['import "../scripts/scope";', 'import "../scripts/reading";']);
+    const base = readFileSync(join(root, "src", "layouts", "Base.astro"), "utf8").match(/<script>([\s\S]*?)<\/script>/)![1];
+    expect(base.trim().split(/\s*\n\s*/)).toEqual(['import "../scripts/intro";', 'import "../scripts/palette";']);
     for (const name of ["scope.ts", "reading.ts"]) {
       const source = readFileSync(join(root, "src", "scripts", name), "utf8");
       expect(source, name).toMatch(/\ntry \{\n[\s\S]*\n\} catch \{\n[\s\S]*\n\}\n$/);
     }
   });
 
-  it("the opening ends on the mark and the issue, and all its beats fit in 1200 ms", () => {
+  it("the opening ends on the mark and the issue, and its beats last 1.8 to 2.4 s, well inside the 3.5 s cap", () => {
     const intro = readFileSync(join(root, "src", "scripts", "intro.ts"), "utf8");
     const beat = (name: string) => Number(intro.match(new RegExp(`const ${name} = (\\d+);`))![1]);
-    expect(beat("SWEEP") + beat("MEET") + beat("HOLD") + beat("FADE")).toBeLessThanOrEqual(beat("BUDGET"));
-    expect(beat("BUDGET")).toBe(1200);
+    const total = beat("SCAN") + beat("CLOSE") + beat("HOLD") + beat("OPEN");
+    expect(total).toBeGreaterThanOrEqual(1800);
+    expect(total).toBeLessThanOrEqual(2400);
+    expect(readFileSync(join(root, "public", "boot.js"), "utf8")).toContain("setTimeout(end, 3500);");
+    // Counted from when the loader starts, not from the navigation.
+    expect(intro).toContain("const start = performance.now();");
+    expect(intro).not.toContain("BUDGET");
     // The issue comes from the masthead as text and reaches only the canvas.
     expect(intro).toContain('document.querySelector(".masthead .mh-no")');
     expect(intro).toContain("ctx.fillText(issue");
@@ -1097,7 +1107,7 @@ describe("built site", () => {
     }
   });
 
-  it("every page loads /boot.js first in the head; only the edition and archive pages load another script", () => {
+  it("every page loads /boot.js first in the head and its own bundle; the edition and archive pages load one more script", () => {
     expect(readFileSync(join(root, "public", "boot.js"), "utf8")).toContain("classList.add");
     for (const dir of [DEMO, HOSTILE, EMPTY, REAL]) {
       for (const file of htmlFiles(dir)) {
@@ -1108,7 +1118,8 @@ describe("built site", () => {
         expect(head, file).toContain('<script src="/boot.js"></script>');
         const archive = /[\\/](arsiv|archive)[\\/]index\.html$/.test(file);
         const edition = html.includes('<section class="scope"');
-        expect(srcs.length, file).toBe(archive || edition ? 2 : 1);
+        expect(srcs.length, file).toBe(archive || edition ? 3 : 2);
+        expect(srcs.at(-1), file).toMatch(/^\/_astro\/Base[^"]+\.js$/);
         if (archive) expect(srcs[1], file).toMatch(/^\/_astro\/ArchiveView[^"]+\.js$/);
         if (edition) expect(srcs[1], file).toMatch(/^\/_astro\/Scope[^"]+\.js$/);
       }
@@ -1757,14 +1768,14 @@ describe("built site", () => {
     expect(value(".emblem", "--cat-mid")).toBe("color-mix(in srgb, var(--cat) 55%, var(--cat-soft))");
   });
 
-  it("only the lead card, the scope, the search box, the subscribe button and the try button have a box-shadow, and none is blurred", () => {
+  it("only the lead card, the scope, the search box, the two buttons and the two dialogs have a box-shadow, and none is blurred", () => {
     const shadows = declarations(sheets()).filter((d) => d.prop === "box-shadow");
     expect(shadows.length).toBeGreaterThan(3);
     for (const shadow of shadows) {
       expect(shadow.value === "none" || /^\d+px \d+px 0 var\(--ink\)$/.test(shadow.value), shadow.value).toBe(true);
       for (const part of shadow.selector.split(",").map((x) => x.trim())) {
         expect(part.replace(/:(hover|focus-visible|active)$/, "").replace(/\[aria-current="page"\]$/, "")).toMatch(
-          /^(\.story-lead \.try|\.(story-lead|scope|search-box|subscribe|try))$/,
+          /^(\.story-lead \.try|\.(story-lead|scope|search-box|subscribe|try|palette|keys))$/,
         );
         if (part.startsWith(".story-lead .try")) expect(shadow.value).toBe("none");
       }
@@ -1897,6 +1908,8 @@ describe("built site", () => {
         "@keyframes emblem-lift",
         "@keyframes dish-turn",
         "@keyframes bird-drift",
+        "@keyframes vt-scan",
+        "@keyframes ns-draw",
       ]),
     );
     const fades = keyframes.filter((d) => d.prop === "opacity");
@@ -1928,6 +1941,51 @@ describe("built site", () => {
     expect(pill).toContain("background: var(--accent);");
     expect(pill).toContain("color: var(--surface);");
     expect(pill).toContain("border-radius: 999px;");
+  });
+
+  it("every page carries Open Graph and Twitter card meta with the 1200 × 630 share picture", () => {
+    for (const file of [DEMO, REAL].flatMap(htmlFiles)) {
+      const head = readFileSync(file, "utf8").match(/<head>([\s\S]*?)<\/head>/)![1];
+      const meta = (key: string) => head.match(new RegExp(`<meta (?:name|property)="${key}" content="([^"]*)"`))?.[1];
+      for (const key of ["og:type", "og:title", "og:description", "og:url", "og:image", "og:image:alt", "twitter:card", "twitter:title", "twitter:description", "twitter:image"]) {
+        expect(meta(key), `${file} ${key}`).toBeTruthy();
+      }
+      expect(meta("og:image")).toBe(`${SITE}/og.png`);
+      expect(meta("twitter:card")).toBe("summary_large_image");
+      expect(meta("og:title")).toBe(meta("twitter:title"));
+    }
+    // A real PNG of 1200 × 630, served from the site itself.
+    const png = readFileSync(join(DEMO, "og.png"));
+    expect(png.subarray(1, 4).toString("ascii")).toBe("PNG");
+    expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([1200, 630]);
+  });
+
+  it("every page has the palette, the shortcut sheet and the status line; without script none of it is open", () => {
+    for (const file of [DEMO, EMPTY].flatMap(htmlFiles)) {
+      const html = readFileSync(file, "utf8");
+      const lang = html.match(/<html lang="(tr|en)"/)![1] as "tr" | "en";
+      // The dialogs are closed in the markup and the strip's button that opens one is hidden.
+      expect(html, file).toMatch(/<dialog class="palette" data-palette aria-label="[^"]+" data-src="\/search-(tr|en)\.json"/);
+      expect(html, file).toContain('<dialog class="keys" data-keys aria-labelledby="keys-title">');
+      expect(html, file).not.toMatch(/<dialog[^>]*\sopen/);
+      expect(html, file).toMatch(/<button class="pal-open label" type="button" data-palette-open hidden aria-label="[^"]+">/);
+      // Every page item is a plain link.
+      const palette = html.match(/<dialog class="palette"[\s\S]*?<\/dialog>/)![0];
+      expect(palette.match(/<li class="pal-item" role="option"/g)).toHaveLength(7 + CATEGORIES.length);
+      expect(palette).toContain(`href="${routes[lang].archive}"`);
+      expect(palette).toContain(`href="${routes[lang].rss}"`);
+      const status = text(html.match(/<p class="status">([\s\S]*?)<\/p>/)![1]);
+      expect(status, file).toMatch(new RegExp(`^\\$ ${COPY[lang].status.command} `));
+    }
+    expect(text(page(DEMO, "").match(/<p class="status">([\s\S]*?)<\/p>/)![1])).toMatch(
+      /^\$ radar status sayı 4 · 2026-11-20 · \d+ haber · \d+ kaynak$/,
+    );
+    expect(text(page(EMPTY, "").match(/<p class="status">([\s\S]*?)<\/p>/)![1])).toBe("$ radar status henüz baskı yok");
+    // The subscribe page's command is text to copy; the copy button comes with script.
+    for (const path of ["abone", "en/subscribe"]) {
+      const html = page(DEMO, path);
+      expect(html).toMatch(/<code data-copy>curl -s https:\/\/[^<]+\/rss\.xml \| grep -o &#39;&lt;title&gt;\[\^&lt;\]\*&#39; \| cut -d&#39;&gt;&#39; -f2<\/code>/);
+    }
   });
 
   it("every internal link in the built pages points at a file that exists", () => {

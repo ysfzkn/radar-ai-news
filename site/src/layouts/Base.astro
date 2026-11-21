@@ -3,11 +3,13 @@ import "../styles/tokens.css";
 import "../styles/base.css";
 import Horizon from "../components/Horizon.astro";
 import Masthead from "../components/Masthead.astro";
+import Palette from "../components/Palette.astro";
 import StillToggle from "../components/StillToggle.astro";
 import { COPY } from "../lib/copy";
 import { loadData } from "../lib/data";
 import { EXTERNAL, OWNER, routes } from "../lib/routes";
 import type { Lang } from "../lib/schema";
+import { siteStatus } from "../lib/status";
 
 interface Props {
   lang: Lang;
@@ -17,19 +19,22 @@ interface Props {
   path: string;
   /** The same page in the other language, or null when it has none. */
   alternate: string | null;
-  /** An edition page: boot.js may open it with the sweep (once per browser session). */
-  opening?: boolean;
 }
 
-const { lang, title, description, path, alternate, opening = false } = Astro.props;
+const { lang, title, description, path, alternate } = Astro.props;
 const copy = COPY[lang];
 const other: Lang = lang === "tr" ? "en" : "tr";
 const absolute = (address: string) => new URL(address, Astro.site).href;
-const { demo } = loadData();
+const { demo, stories } = loadData();
+// The share card: a 1200 × 630 picture of the mark and the scope, made once by
+// scripts/og-image.mjs and kept in public/.
+const image = absolute("/og.png");
+// The footer's status line, counted at build from the published stories.
+const status = siteStatus(stories, lang);
 ---
 
 <!doctype html>
-<html lang={lang} data-opening={opening ? "" : undefined}>
+<html lang={lang}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -49,12 +54,24 @@ const { demo } = loadData();
     }
     <link rel="alternate" type="application/rss+xml" title={copy.feedTitle} href={absolute(routes[lang].rss)} />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="theme-color" content="#f7f7f4" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content={copy.siteName} />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={absolute(path)} />
     <meta property="og:locale" content={lang === "tr" ? "tr_TR" : "en_GB"} />
+    <meta property="og:locale:alternate" content={lang === "tr" ? "en_GB" : "tr_TR"} />
+    <meta property="og:image" content={image} />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={copy.ogImageAlt} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={image} />
+    <meta name="twitter:image:alt" content={copy.ogImageAlt} />
   </head>
   <body>
     <a class="skip" href="#main">{copy.skip}</a>
@@ -80,7 +97,20 @@ const { demo } = loadData();
           <a href={routes[lang].about}>{copy.nav.about}</a>{" "}
           <a href={OWNER.repository} {...EXTERNAL}>{copy.sourceCode}</a>
         </p>
+        {/* A terminal line: the newest edition and what the site holds, as of its build. */}
+        <p class="status">
+          <span class="status-cmd" aria-hidden="true">$ {copy.status.command}</span>{" "}
+          <span class="status-out">
+            <span class="status-dot" aria-hidden="true"></span>
+            {status ? copy.status.line(status.issue, status.date, status.stories, status.sources) : copy.status.none}
+          </span>
+        </p>
       </footer>
     </div>
+    <Palette lang={lang} alternate={alternate} />
+    <script>
+      import "../scripts/intro";
+      import "../scripts/palette";
+    </script>
   </body>
 </html>

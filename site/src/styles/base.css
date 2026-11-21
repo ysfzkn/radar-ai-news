@@ -274,9 +274,20 @@ a.lang-part:focus-visible {
   font-weight: 600;
 }
 
+/* An empty state: a dashed frame and a comment's slashes, in the label face. */
 .empty {
-  padding-bottom: var(--space-6);
+  margin-bottom: var(--space-6);
+  padding: var(--space-4);
+  border: 1px dashed var(--control-border);
   color: var(--muted);
+  font-family: var(--font-label);
+  font-size: 0.875rem;
+}
+
+.empty::before {
+  content: "// ";
+  content: "// " / "";
+  color: var(--accent);
 }
 
 /* The masthead of an edition: one h1 set as three rows between a heavy rule and a hairline.
@@ -847,7 +858,7 @@ a.lang-part:focus-visible {
 .intro-canvas {
   position: fixed;
   inset: 0;
-  z-index: 101;
+  z-index: 200;
   width: 100%;
   height: 100%;
 }
@@ -1932,6 +1943,438 @@ html.still .still-play {
   pointer-events: none;
 }
 
+/* The strip's palette button (Masthead.astro): hidden without script and at phone width, where
+   there is no keyboard to press; it reads the key that opens the palette. */
+.top-act {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.pal-open {
+  display: none;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2.25rem;
+  padding: 0.25rem 0.5rem 0.25rem 0.375rem;
+  border: 1px solid var(--control-border);
+  border-radius: 2px;
+  background: var(--bg);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.pal-open:hover,
+.pal-open:focus-visible {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+@media (min-width: 40em) {
+  .pal-open:not([hidden]) {
+    display: inline-flex;
+  }
+}
+
+kbd {
+  padding: 0.0625rem 0.375rem;
+  border: 1px solid var(--control-border);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-label);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+/* The command palette and the shortcut sheet (Palette.astro, scripts/palette.ts): modal dialogs in
+   the cards' language, an ink outline over a hard shadow, with the page dimmed in ink behind. */
+.palette,
+.keys {
+  width: min(40rem, calc(100% - 2rem));
+  max-height: min(34rem, calc(100% - 6rem));
+  margin: 12vh auto auto;
+  padding: 0;
+  border: 1.5px solid var(--ink);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 6px 6px 0 var(--ink);
+}
+
+.palette[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.palette::backdrop,
+.keys::backdrop {
+  background: color-mix(in srgb, var(--ink) 45%, transparent);
+}
+
+.pal-box {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1.5px solid var(--ink);
+}
+
+.pal-input {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-1) 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  outline: none;
+}
+
+.pal-input::placeholder {
+  color: var(--muted);
+}
+
+.pal-list {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: var(--space-2);
+  overflow-y: auto;
+  list-style: none;
+}
+
+.pal-group {
+  padding: var(--space-2) var(--space-2) var(--space-1);
+  color: var(--muted);
+  font-size: 0.6875rem;
+}
+
+.pal-item a {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  text-decoration: none;
+}
+
+.pal-item[aria-selected="true"] a {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.pal-kind {
+  color: var(--accent);
+  text-align: center;
+}
+
+.pal-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pal-path {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.pal-item[aria-selected="true"] :is(.pal-kind, .pal-path) {
+  color: var(--line);
+}
+
+.pal-note {
+  padding: var(--space-2) var(--space-4) var(--space-4);
+  color: var(--muted);
+}
+
+.pal-foot {
+  padding: var(--space-2) var(--space-4);
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+@media (max-width: 39.99em) {
+  .pal-path,
+  .pal-foot {
+    display: none;
+  }
+
+  .pal-item a {
+    grid-template-columns: 2rem minmax(0, 1fr);
+  }
+}
+
+.keys {
+  width: min(26rem, calc(100% - 2rem));
+  padding: var(--space-5);
+}
+
+.keys-title {
+  margin-bottom: var(--space-3);
+  color: var(--muted);
+}
+
+.keys-list {
+  margin: 0;
+}
+
+.keys-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-4);
+  padding-block: var(--space-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.keys-row dt {
+  flex: none;
+}
+
+.keys-row dd {
+  margin: 0;
+  color: var(--muted);
+  text-align: right;
+}
+
+.keys-close,
+.copy-code {
+  margin-top: var(--space-4);
+  padding: 0.25rem 0.625rem;
+  border: 1px solid var(--control-border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.keys-close:hover {
+  border-color: var(--ink);
+}
+
+/* The footer's status line: a command and its answer, counted at build. */
+.status {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-1) var(--space-3);
+  margin-top: var(--space-3);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 0.75rem;
+}
+
+.status-cmd {
+  color: var(--ink);
+}
+
+.status-dot {
+  display: inline-block;
+  margin-right: var(--space-2);
+  vertical-align: 0.05em;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--ok);
+}
+
+/* A command to copy, on the subscribe page: ink, like the why-it-matters pill, in the label face. */
+.term {
+  margin-top: var(--space-3);
+  border: 1.5px solid var(--ink);
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.term-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-1) var(--space-3);
+  border-bottom: 1px solid var(--muted);
+  color: var(--line);
+  font-size: 0.6875rem;
+}
+
+.term-dots::before {
+  content: "● ● ●";
+  content: "● ● ●" / "";
+  color: var(--accent);
+  letter-spacing: 0.1em;
+}
+
+.term-body {
+  position: relative;
+  margin: 0;
+  padding: var(--space-4) var(--space-3);
+  font-family: var(--font-label);
+  font-size: 0.8125rem;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.term-prompt {
+  color: var(--accent-soft);
+}
+
+.term-body .copy-code {
+  display: block;
+  margin-top: var(--space-3);
+  border-color: var(--muted);
+  background: none;
+  color: var(--bg);
+}
+
+.term-body .copy-code:hover,
+.term-body .copy-code.is-done {
+  border-color: var(--bg);
+}
+
+/* Each story's copy-link button, at the end of its label row (scripts/palette.ts adds it). */
+.copy-link {
+  margin-left: auto;
+  padding: 0.25rem 0.375rem;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.copy-link::before {
+  content: "#";
+  content: "#" / "";
+  margin-right: 0.2em;
+  color: var(--accent);
+}
+
+.copy-link:hover,
+.copy-link:focus-visible {
+  color: var(--ink);
+  text-decoration: underline var(--accent);
+}
+
+.copy-link.is-done {
+  color: var(--ok);
+}
+
+/* The lead card's emblem stands at its top right; from 40em the button stays clear of it. */
+@media (min-width: 40em) {
+  .story-lead .copy-link {
+    margin-right: 3.5rem;
+  }
+}
+
+/* The 404 page: an empty scope with a flat trace, then the words in both languages. */
+.nosignal-page {
+  display: grid;
+  gap: var(--space-5);
+  align-items: center;
+  padding-block: var(--space-6) var(--space-5);
+}
+
+@media (min-width: 40em) {
+  .nosignal-page {
+    grid-template-columns: 13rem minmax(0, 1fr);
+    gap: var(--space-6);
+  }
+}
+
+.nosignal {
+  display: block;
+  width: 100%;
+  max-width: 13rem;
+  margin-inline: auto;
+}
+
+.ns-face {
+  fill: var(--surface);
+  stroke: var(--ink);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.ns-ring,
+.ns-cross,
+.ns-tick {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.ns-tick {
+  stroke: var(--control-border);
+}
+
+/* At the drawing's scale (no non-scaling stroke): the trace is 187 units long, its dash 190. */
+.ns-trace {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ns-code {
+  fill: var(--ink);
+  font-family: var(--font-label);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-anchor: middle;
+}
+
+.nosignal-text .kunye {
+  padding-block: 0 var(--space-3);
+}
+
+.nosignal-head {
+  font-family: var(--font-display);
+  font-size: clamp(2.25rem, 8vw, 3.25rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+}
+
+.nosignal-sep {
+  color: var(--accent);
+}
+
+.nosignal-hint {
+  margin-top: var(--space-3);
+  color: var(--muted);
+}
+
+.nosignal-page .empty {
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  border: 0;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: inherit;
+}
+
+.nosignal-page .empty::before {
+  content: none;
+}
+
+.nosignal-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin-top: var(--space-3);
+  color: var(--muted);
+}
+
 /* Motion: only for readers who have not asked for less. Five things loop (the scope's sweep, its
    blip echoes and readout, the horizon's dish and birds); they run only with script, which brings
    the pause button, and stop on their plain frame once the reader pauses (html.still). Without
@@ -2011,18 +2454,43 @@ html.still .still-play {
   }
 
   /* The opening's first frame is ink, painted before the page; scripts/intro.ts takes over with
-     its canvas. Should the script never come, the cover clears itself at 1500 ms. */
+     its canvas. Should the script never come, the cover clears itself at 3500 ms, the same hard
+     cap boot.js keeps. */
   html.intro body::before {
     content: "";
     position: fixed;
     inset: 0;
     z-index: 100;
     background: var(--ink);
-    animation: intro-hold 0s 1500ms forwards;
+    animation: intro-hold 0s 3500ms forwards;
   }
 
   html.intro.intro-live body::before {
     content: none;
+  }
+
+  /* From page to page, the new page is scanned in from the top over the old one; the top strip
+     stays where it is. Only same-site navigations, only where the browser has it. */
+  @view-transition {
+    navigation: auto;
+  }
+
+  ::view-transition-old(root) {
+    animation: none;
+  }
+
+  ::view-transition-new(root) {
+    animation: vt-scan 340ms cubic-bezier(0.25, 0.7, 0.25, 1) both;
+  }
+
+  .top {
+    view-transition-name: top;
+  }
+
+  /* The 404 page's flat trace draws itself once. */
+  .ns-trace {
+    stroke-dasharray: 190;
+    animation: ns-draw 1100ms ease-out both;
   }
 
   /* The "why it matters" line inks in word by word when first seen (reading.ts wraps the words
@@ -2156,6 +2624,19 @@ html.still .still-play {
   }
 }
 
+/* A scan from the top: the new page uncovered line by line. */
+@keyframes vt-scan {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+}
+
+@keyframes ns-draw {
+  from {
+    stroke-dashoffset: 190;
+  }
+}
+
 @keyframes intro-hold {
   to {
     visibility: hidden;
@@ -2246,6 +2727,13 @@ html.still .still-play {
     display: none;
   }
 
+  .copy-link,
+  .copy-code,
+  .palette,
+  .keys {
+    display: none;
+  }
+
   .story-lead,
   .subscribe,
   .try {
@@ -2268,7 +2756,10 @@ html.still .still-play {
   html.js:not(.still) .hz-turn,
   html.js:not(.still) .hz-bird,
   .em-mid .em-face,
-  .em-top .em-face {
+  .em-top .em-face,
+  ::view-transition-old(root),
+  ::view-transition-new(root),
+  .ns-trace {
     animation: none;
   }
 

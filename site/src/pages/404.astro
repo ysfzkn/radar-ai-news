@@ -3,8 +3,16 @@ import Base from "../layouts/Base.astro";
 import { COPY } from "../lib/copy";
 import { routes } from "../lib/routes";
 
-// One page for every missing address, so it speaks both languages.
+// One page for every missing address, so it speaks both languages: an empty scope, no signal.
 const { tr, en } = COPY;
+const rings = [32, 60, 88];
+// The ticks round the rim: one every 10°, a longer one every 30°.
+const ticks = Array.from({ length: 36 }, (_, i) => {
+  const a = (i * 10 * Math.PI) / 180;
+  const long = i % 3 === 0 ? 7 : 3.5;
+  const p = (r: number) => `${+(r * Math.sin(a)).toFixed(2)} ${+(-r * Math.cos(a)).toFixed(2)}`;
+  return `M${p(96)}L${p(96 - long)}`;
+}).join("");
 ---
 
 <Base
@@ -14,11 +22,32 @@ const { tr, en } = COPY;
   path="/404.html"
   alternate={null}
 >
-  <h1 class="kunye label">
-    <span class="kunye-no">404</span>{" · "}{tr.notFoundTitle}{" · "}<span lang="en">{en.notFoundTitle}</span>
-  </h1>
-  <p class="empty">
-    {tr.notFoundText} <a href={routes.tr.home}>{tr.notFoundHome}</a><br />
-    <span lang="en">{en.notFoundText} <a href={routes.en.home} hreflang="en">{en.notFoundHome}</a></span>
-  </p>
+  <div class="nosignal-page">
+    <svg class="nosignal" viewBox="-100 -100 200 200" aria-hidden="true">
+      <circle class="ns-face" r="96"></circle>
+      <path class="ns-tick" d={ticks}></path>
+      <path class="ns-cross" d="M-96 0H96M0 -96V96"></path>
+      {rings.map((r) => <circle class="ns-ring" r={r}></circle>)}
+      <path class="ns-trace" d="M-88 0H-30L-24 -6L-18 5L-12 0H88"></path>
+      <text class="ns-code" x="0" y="44">404</text>
+    </svg>
+    <div class="nosignal-text">
+      <h1 class="kunye label">
+        <span class="kunye-no">404</span>{" · "}{tr.notFoundTitle}{" · "}<span lang="en">{en.notFoundTitle}</span>
+      </h1>
+      <p class="nosignal-head">{tr.noSignal}<span class="nosignal-sep" aria-hidden="true"> / </span><span lang="en">{en.noSignal}</span></p>
+      <p class="nosignal-hint">{tr.notFoundHint}</p>
+      <p class="nosignal-hint" lang="en">{en.notFoundHint}</p>
+      <p class="empty">
+        {tr.notFoundText} <a href={routes.tr.home}>{tr.notFoundHome}</a><br />
+        <span lang="en">{en.notFoundText} <a href={routes.en.home} hreflang="en">{en.notFoundHome}</a></span>
+      </p>
+      <p class="nosignal-links label">
+        <a href={routes.tr.archive}>{tr.nav.archive}</a>
+        <a href={routes.tr.weekIndex}>{tr.nav.week}</a>
+        <a href={routes.en.archive} hreflang="en" lang="en">{en.nav.archive}</a>
+        <a href={routes.en.weekIndex} hreflang="en" lang="en">{en.nav.week}</a>
+      </p>
+    </div>
+  </div>
 </Base>
