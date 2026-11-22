@@ -140,7 +140,7 @@ jobs:
       # Hands the encrypted file to the push job (it is public on the branch anyway).
       - name: Hand over the state file
         if: always() && steps.save.outputs.packed == 'true'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: radar-state
           path: ${{ runner.temp }}/state.bin
