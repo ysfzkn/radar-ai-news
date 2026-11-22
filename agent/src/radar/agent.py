@@ -20,6 +20,7 @@ from radar.prefilter import BACKLOG_LIMIT, LOOKBACK, first_reported
 from radar.score import (
     MAX_EDITION,
     MIN_EDITION,
+    PER_SOURCE,
     WRITTEN_SHOWN,
     score_candidates,
     select,
@@ -115,6 +116,7 @@ class _Pass:
             "skipped_retry": 0,
             "skipped_duplicate": 0,
             "skipped_repeat": 0,
+            "skipped_source_limit": 0,
             "failed": 0,
             "unavailable": 0,
             "scoring_failed": False,
@@ -122,11 +124,30 @@ class _Pass:
         }
         self.clusters: dict[int, Cluster] = {}
         self.index = WrittenIndex([])
+        # The source that leads each cluster, and how many of today's stories each leads.
+        self.lead: dict[int, str] = {}
+        self.taken: dict[str, int] = {}
 
     def load(self) -> None:
         since = self.now - LOOKBACK - WINDOW
         self.clusters = {c.id: c for c in self.store.clusters_since(since)}
         self.index = WrittenIndex(self.store.written_refs(self.now - WRITTEN_WINDOW))
+
+    def load_sources(self, candidates: list[Candidate]) -> None:
+        today = [s.cluster_id for s in self.store.stories_since(day_start(self.now))]
+        self.lead = self.store.lead_sources([*today, *(c.cluster_id for c in candidates)])
+        self.taken = {}
+        for cluster_id in today:
+            self._count(cluster_id)
+
+    def _count(self, cluster_id: int) -> None:
+        source = self.lead.get(cluster_id)
+        if source is not None:
+            self.taken[source] = self.taken.get(source, 0) + 1
+
+    def source_full(self, c: Candidate) -> bool:
+        source = self.lead.get(c.cluster_id)
+        return source is not None and self.taken.get(source, 0) >= PER_SOURCE
 
     def is_duplicate(self, c: Candidate) -> bool:
         cluster = self.clusters.get(c.cluster_id)
@@ -175,6 +196,9 @@ class _Pass:
             return "skipped"
         if self.index.matches(cluster):  # a story written earlier in this run
             stats["skipped_duplicate"] += 1
+            return "skipped"
+        if self.source_full(candidate):  # its source leads PER_SOURCE stories today
+            stats["skipped_source_limit"] += 1
             return "skipped"
         stats["selected"] += 1
         stats[f"selected_{lane}"] += 1
@@ -229,6 +253,7 @@ class _Pass:
             lane=lane,
         )
         self.index.add(cluster, [draft.en.title, draft.tr.title], doc.url, now)
+        self._count(candidate.cluster_id)
         stats["written"] += 1
         stats[f"written_{lane}"] += 1
         stats[status] += 1
@@ -254,12 +279,17 @@ def run_agent(
         return stats
     floor = max(0, min(MIN_EDITION, max_stories) - written_today)
     run.load()
+    run.load_sources(candidates)
 
     planned = run.scores(candidates, "fresh")
     if planned is None:
         return stats
     fresh, scores = planned
-    for candidate in select(fresh, scores, limit):
+    # Counted over every eligible story, before the cut to `limit`.
+    stats["skipped_source_limit"] += len(select(fresh, scores, len(fresh))) - len(
+        select(fresh, scores, len(fresh), sources=run.lead, taken=run.taken)
+    )
+    for candidate in select(fresh, scores, limit, sources=run.lead, taken=run.taken):
         if run.write(candidate, scores[candidate.cluster_id], "fresh") == "stop":
             return stats
 

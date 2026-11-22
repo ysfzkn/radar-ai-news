@@ -3,6 +3,7 @@
 from datetime import timedelta
 
 import httpx
+import pytest
 
 from fakes import FakeLLM
 from radar.agent import run_agent
@@ -14,6 +15,8 @@ ARTICLE = (
     + "Alpha engine 2.0 adds streaming support for agents and ships a new quickstart. " * 4
     + "</p></article></body></html>"
 )
+
+pytestmark = pytest.mark.usefixtures("no_source_limit")
 
 
 def http() -> httpx.Client:

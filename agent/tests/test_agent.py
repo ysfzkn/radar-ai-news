@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 import httpx
+import pytest
 
 from fakes import FakeLLM
 from radar.agent import REVIEW_ALL_REASON, run_agent
@@ -8,6 +9,8 @@ from radar.budget import BudgetExceeded
 from radar.llm import LLMError, LLMUnavailable, Refused
 from radar.models import Candidate, Draft, FactCard, RawItem, Score, StoryText
 from radar.score import ScoreBatch
+
+pytestmark = pytest.mark.usefixtures("no_source_limit")
 
 ARTICLE = (
     "<html><body><article><p>"
@@ -102,6 +105,7 @@ def test_run_agent_happy_path(store, now, run_id):
         "skipped_retry": 0,
         "skipped_duplicate": 0,
         "skipped_repeat": 0,
+        "skipped_source_limit": 0,
         "failed": 0,
         "unavailable": 0,
         "scoring_failed": False,

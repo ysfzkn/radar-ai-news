@@ -416,6 +416,24 @@ class SqliteStore:
                 [(uid,) for uid in uids],
             )
 
+    def lead_sources(self, cluster_ids: list[int]) -> dict[int, str]:
+        """The id of the source that leads each cluster: the one whose item comes first by
+        tier, then time, as in `story_sources`. A cluster with no item is left out."""
+        lead: dict[int, str] = {}
+        ids = list(dict.fromkeys(cluster_ids))
+        for start in range(0, len(ids), 500):
+            chunk = ids[start : start + 500]
+            rows = self._conn.execute(
+                "SELECT i.cluster_id AS cluster_id, i.source_id AS source_id FROM items i "
+                "JOIN sources s ON s.id = i.source_id "
+                f"WHERE i.cluster_id IN ({','.join('?' * len(chunk))}) "
+                "ORDER BY s.tier, i.published_at, i.id",
+                chunk,
+            )
+            for r in rows:
+                lead.setdefault(r["cluster_id"], r["source_id"])
+        return lead
+
     def story_sources(self, cluster_id: int) -> list[dict]:
         """The story's public source links, one per distinct URL, by tier then time.
 

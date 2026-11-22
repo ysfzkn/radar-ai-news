@@ -10,6 +10,8 @@ from radar.models import Candidate, Lane, Score
 
 SCORE_MODEL = "claude-haiku-5-5"
 MAX_EDITION = 8
+# Stories one source may lead in one edition (one Istanbul day), both lanes together.
+PER_SOURCE = 2
 # The edition's floor: when fewer fresh stories qualify, the backlog tops the day up to
 # this many, never past `--max-stories`, and only with stories that pass its own bar.
 MIN_EDITION = 5
@@ -141,9 +143,35 @@ def _key(scores: dict[int, Score]):
     return key
 
 
-def select(
-    candidates: list[Candidate], scores: dict[int, Score], limit: int = MAX_EDITION
+def within_source_limit(
+    ordered: list[Candidate], sources: dict[int, str], taken: dict[str, int]
 ) -> list[Candidate]:
+    """`ordered` without the candidates that would take a source past PER_SOURCE: the best
+    of each source stay. `sources` maps a cluster to the source that leads it, `taken` says
+    how many stories of the edition each source leads already. A cluster with no known
+    source is never dropped."""
+    counts = dict(taken)
+    kept = []
+    for c in ordered:
+        source = sources.get(c.cluster_id)
+        if source is not None:
+            if counts.get(source, 0) >= PER_SOURCE:
+                continue
+            counts[source] = counts.get(source, 0) + 1
+        kept.append(c)
+    return kept
+
+
+def select(
+    candidates: list[Candidate],
+    scores: dict[int, Score],
+    limit: int = MAX_EDITION,
+    sources: dict[int, str] | None = None,
+    taken: dict[str, int] | None = None,
+) -> list[Candidate]:
+    """The fresh picks, best first. With `sources`, no source leads more than PER_SOURCE
+    stories of the edition (see `within_source_limit`): the limit is applied before the
+    cut, so the places a prolific source loses go to the next best stories."""
     key = _key(scores)
     eligible = sorted(
         (
@@ -156,6 +184,8 @@ def select(
         ),
         key=key,
     )
+    if sources is not None:
+        eligible = within_source_limit(eligible, sources, taken or {})
     chosen = eligible[:limit]
     cut = [
         c for c in eligible[limit:] if c.is_turkey and scores[c.cluster_id].total >= TURKEY_TOTAL

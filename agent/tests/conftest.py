@@ -70,6 +70,14 @@ def cluster_id(store, now) -> int:
 
 
 @pytest.fixture
+def no_source_limit(monkeypatch):
+    """For tests whose invented stories all come from one source and are about something
+    else: the per-source limit is out of the way."""
+    monkeypatch.setattr("radar.score.PER_SOURCE", 1000)
+    monkeypatch.setattr("radar.agent.PER_SOURCE", 1000)
+
+
+@pytest.fixture
 def run_id(store, now) -> int:
     return store.start_run("agent", now)
 
