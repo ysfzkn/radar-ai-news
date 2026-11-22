@@ -80,6 +80,13 @@ sources:
     tier: community
     kind: hn
     url: "https://hn.algolia.com/api/v1/search_by_date?tags=story&query=AI%20agent%20LLM&numericFilters=points%3E50"
+  - id: hn-front
+    name: Hacker News
+    tier: community
+    kind: hn
+    # The front page as it stands, stories with at least 100 points: any subject, chosen
+    # by the community. The scorer keeps only what is about tech and AI.
+    url: "https://hn.algolia.com/api/v1/search?tags=front_page&hitsPerPage=30&numericFilters=points%3E%3D100"
   - id: localllama
     name: r/LocalLLaMA
     tier: community

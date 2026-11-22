@@ -52,9 +52,18 @@ def test_a_cluster_is_led_by_its_first_source_by_tier_then_time(store, now):
     assert store.lead_sources([both.cluster_id, 99999]) == {both.cluster_id: "github-blog"}
 
 
+def test_a_hacker_news_story_is_counted_by_the_site_it_points_to(store, now):
+    one = make(store, now, age=timedelta(hours=2), lane="fresh", n=0, source="hn", host="blog")
+    two = make(store, now, age=timedelta(hours=2), lane="fresh", n=1, source="hn", host="other")
+    assert store.lead_sources([one.cluster_id, two.cluster_id]) == {
+        one.cluster_id: "site:blog0.test",
+        two.cluster_id: "site:other1.test",
+    }
+
+
 def test_a_prolific_source_gets_two_places_and_the_others_keep_theirs(store, now, run_id):
     loud = fresh(store, now, 4)
-    quiet = fresh(store, now, 2, start=4, source="hn")
+    quiet = fresh(store, now, 2, start=4, source="webrazzi-ai")
     candidates = [*loud, *quiet]
     llm = FakeLLM(
         {"score": [ScoreBatch(scores=[good(c) for c in candidates])], "write": [draft()] * 4}
@@ -62,7 +71,7 @@ def test_a_prolific_source_gets_two_places_and_the_others_keep_theirs(store, now
     stats = run_agent(store, candidates, llm, http(), now, run_id)
     assert stats["written"] == 4 and stats["skipped_source_limit"] == 2
     stories = store.stories_since(now)
-    assert led_by(store, stories) == ["github-blog", "github-blog", "hn", "hn"]
+    assert led_by(store, stories) == ["github-blog", "github-blog", "webrazzi-ai", "webrazzi-ai"]
     assert {s.cluster_id for s in stories} >= {loud[0].cluster_id, loud[1].cluster_id}
 
 
@@ -72,16 +81,16 @@ def test_a_later_run_of_the_day_counts_what_the_day_already_has(store, now, run_
     assert run_agent(store, first, llm, http(), now, run_id)["written"] == 2
 
     later = now + timedelta(hours=1)
-    more = [*fresh(store, now, 2, start=2), *fresh(store, now, 1, start=4, source="hn")]
+    more = [*fresh(store, now, 2, start=2), *fresh(store, now, 1, start=4, source="webrazzi-ai")]
     llm = FakeLLM({"score": [ScoreBatch(scores=[good(c) for c in more])], "write": [draft()]})
     stats = run_agent(store, [*first, *more], llm, http(), later, store.start_run("agent", later))
     assert stats["written"] == 1 and stats["skipped_source_limit"] == 2
-    assert led_by(store, store.stories_since(now)) == ["github-blog", "github-blog", "hn"]
+    assert led_by(store, store.stories_since(now)) == ["github-blog", "github-blog", "webrazzi-ai"]
 
 
 def test_the_backlog_cannot_take_a_source_past_the_limit(store, now, run_id):
     new = fresh(store, now, 1)
-    old = [*backlog(store, now, 3), *backlog(store, now, 1, start=9, source="hn")]
+    old = [*backlog(store, now, 3), *backlog(store, now, 1, start=9, source="webrazzi-ai")]
     llm = FakeLLM(
         {
             "score": [
@@ -94,4 +103,4 @@ def test_the_backlog_cannot_take_a_source_past_the_limit(store, now, run_id):
     stats = run_agent(store, [*new, *old], llm, http(), now, run_id)
     assert stats["written_fresh"] == 1 and stats["written_backlog"] == 2
     assert stats["skipped_source_limit"] == 2
-    assert led_by(store, store.stories_since(now)) == ["github-blog", "github-blog", "hn"]
+    assert led_by(store, store.stories_since(now)) == ["github-blog", "github-blog", "webrazzi-ai"]

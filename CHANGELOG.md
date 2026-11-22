@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Sources: the Hacker News front page (`hn-front`, stories with at least 100 points, any subject; the scorer keeps what is about tech and AI). For the per-source limit a story led by Hacker News counts for the site it points to.
 - Site: the home page opens with a calm hero of about half a screen: the edition's dateline, the slogan "Her sabah. Kısa ve öz." / "Every morning. Short and to the point.", one line saying what Radar is ("Günün teknoloji ve yapay zekâ haberleri.") and a link to how it works, beside the day's radar. On a phone the radar sits under the words, tipped further back so it is wide and low.
 - Site: the home page's toolbar: a search over every story (it opens the archive's search; a link to the archive without script) and topic chips with each topic's count of the day, which show only that topic's stories and grey the radar's other blips without any script. The day's stories follow grouped by topic, each group linking to its topic page, every story keeping its number.
 - Site: the navigation is a frequency dial, a tuning scale with the four sections as stations and an accent needle on the current one (pure CSS from `aria-current`; it follows the pointer and the focus and glides between pages with view transitions). On a phone it is fixed to the foot of the window.
