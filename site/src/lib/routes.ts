@@ -48,10 +48,8 @@ export function storyLink(lang: Lang, date: string, uid: string): string {
 /** The attributes of every link that leaves the site: a new tab, no opener, no referrer. */
 export const EXTERNAL = { target: "_blank", rel: "noopener noreferrer" } as const;
 
-/** The owner's addresses, linked from the top strip, the footer and the Künye page. */
+/** The owner's address, linked from the top strip, the footer and the Künye page. The site
+ *  links neither the owner's GitHub account nor Radar's repository. */
 export const OWNER = {
   site: "https://ozkanyusuf.com",
-  github: "https://github.com/ysfzkn",
-  repository: "https://github.com/ysfzkn/radar-ai-news",
-  issues: "https://github.com/ysfzkn/radar-ai-news/issues",
 } as const;

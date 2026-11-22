@@ -83,15 +83,11 @@ const status = siteStatus(stories, lang);
       <footer class="foot label">
         <Horizon lang={lang} />
         <p class="sig">
-          {copy.owner}{" · "}<a href={OWNER.site} {...EXTERNAL}>{copy.by}</a>{" · "}<a
-            href={OWNER.github}
-            {...EXTERNAL}>{copy.github}</a
-          >
+          {copy.owner}{" · "}<a href={OWNER.site} {...EXTERNAL}>{copy.by}</a>
         </p>
         <p class="foot-links">
           <a href={routes[lang].rss}>{copy.rss}</a>{" "}
-          <a href={routes[lang].about}>{copy.nav.about}</a>{" "}
-          <a href={OWNER.repository} {...EXTERNAL}>{copy.sourceCode}</a>
+          <a href={routes[lang].about}>{copy.nav.about}</a>
         </p>
         {/* A terminal line: the newest edition and what the site holds, as of its build. */}
         <p class="status">

@@ -75,12 +75,10 @@ export interface Copy {
   langShort: string;
   skip: string;
   rss: string;
-  sourceCode: string;
   /** The owner's name, in the footer signature. */
   owner: string;
   /** The owner's site as shown beside the wordmark and in the footer. */
   by: string;
-  github: string;
   /** The subscribe button, in the top strip and under the end of an edition. */
   subscribeFree: string;
   /** The line before the button under the end of an edition. */
@@ -215,7 +213,7 @@ export interface Subscribe {
   terminalTitles: string;
 }
 
-const { site: SITE, github: GITHUB, repository: REPOSITORY, issues: ISSUES } = OWNER;
+const { site: SITE } = OWNER;
 
 export const COPY: Record<Lang, Copy> = {
   tr: {
@@ -270,10 +268,8 @@ export const COPY: Record<Lang, Copy> = {
     langShort: "TR",
     skip: "İçeriğe geç",
     rss: "RSS",
-    sourceCode: "Kaynak kodu",
     owner: "Yusuf Özkan",
     by: "ozkanyusuf.com",
-    github: "GitHub",
     subscribeFree: "Ücretsiz abone ol",
     dontMiss: "Sonraki sayıyı kaçırma.",
     categories: {
@@ -399,13 +395,9 @@ export const COPY: Record<Lang, Copy> = {
         {
           heading: "Radar'ı kim çıkarıyor?",
           paragraphs: [
-            "Radar, Yusuf Özkan'ın kişisel projesi; onu o yürütüyor ve sitenin kaynak kodu herkese açık.",
+            "Radar, Yusuf Özkan'ın kişisel projesi; onu o yürütüyor.",
           ],
-          links: [
-            { text: "ozkanyusuf.com", href: SITE },
-            { text: "GitHub", href: GITHUB },
-            { text: "Radar'ın kaynak kodu", href: REPOSITORY },
-          ],
+          links: [{ text: "ozkanyusuf.com", href: SITE }],
         },
         {
           heading: "Radar nedir?",
@@ -462,9 +454,9 @@ export const COPY: Record<Lang, Copy> = {
         {
           heading: "Yanlış bir haber mi gördün?",
           paragraphs: [
-            "Yanlış ya da yanıltıcı bir haber gördüysen haberin bağlantısıyla birlikte bir issue aç. En değerli bildirim budur.",
+            "Yanlış ya da yanıltıcı bir haber gördüysen haberin bağlantısıyla birlikte bana yaz. En değerli bildirim budur.",
           ],
-          links: [{ text: "GitHub'da issue aç", href: ISSUES }],
+          links: [{ text: "ozkanyusuf.com üzerinden yaz", href: SITE }],
         },
         {
           heading: "Gizlilik",
@@ -551,10 +543,8 @@ export const COPY: Record<Lang, Copy> = {
     langShort: "EN",
     skip: "Skip to content",
     rss: "RSS",
-    sourceCode: "Source code",
     owner: "Yusuf Özkan",
     by: "ozkanyusuf.com",
-    github: "GitHub",
     subscribeFree: "Subscribe free",
     dontMiss: "Don't miss the next issue.",
     categories: {
@@ -681,13 +671,9 @@ export const COPY: Record<Lang, Copy> = {
         {
           heading: "Who makes Radar?",
           paragraphs: [
-            "Radar is a personal project by Yusuf Özkan, who runs it; the site's source code is open.",
+            "Radar is a personal project by Yusuf Özkan, who runs it.",
           ],
-          links: [
-            { text: "ozkanyusuf.com", href: SITE },
-            { text: "GitHub", href: GITHUB },
-            { text: "Radar's source code", href: REPOSITORY },
-          ],
+          links: [{ text: "ozkanyusuf.com", href: SITE }],
         },
         {
           heading: "What Radar is",
@@ -744,9 +730,9 @@ export const COPY: Record<Lang, Copy> = {
         {
           heading: "Found a wrong story?",
           paragraphs: [
-            "If a story is wrong or misleading, please open an issue with the story's link. It is the most valuable report there is.",
+            "If a story is wrong or misleading, please write to me with the story's link. It is the most valuable report there is.",
           ],
-          links: [{ text: "Open an issue on GitHub", href: ISSUES }],
+          links: [{ text: "Write via ozkanyusuf.com", href: SITE }],
         },
         {
           heading: "Privacy",

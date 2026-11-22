@@ -332,7 +332,7 @@ describe("built site", () => {
       const section = sections.find((x) => /dil modeli,|written by a language model/.test(x));
       expect(section).toBeDefined();
       expect(section).not.toContain("<a ");
-      expect(html.match(/href="https:\/\/github.com\/ysfzkn\/radar-ai-news\/issues"/g)).toHaveLength(1);
+      expect(html).not.toContain("github.com/ysfzkn");
     }
   });
 
@@ -1706,7 +1706,7 @@ describe("built site", () => {
     expect(text(tr)).not.toContain("en fazla sekiz");
     expect(text(en)).not.toContain("at most eight");
     for (const html of [tr, en]) {
-      expect(html).toContain('href="https://github.com/ysfzkn/radar-ai-news/issues"');
+      expect(html).not.toContain("github.com/ysfzkn");
     }
   });
 
@@ -1767,21 +1767,22 @@ describe("built site", () => {
     expect(COPY.en.nav.about).toBe("About");
   });
 
-  it("the Künye page opens with who makes Radar and links ozkanyusuf.com and the GitHub account", () => {
+  it("the Künye page opens with who makes Radar and links ozkanyusuf.com, and no GitHub address", () => {
     for (const [path, heading] of [["kunye", "Radar'ı kim çıkarıyor?"], ["en/about", "Who makes Radar?"]] as const) {
       const html = page(DEMO, path);
       const first = html.match(/<section>([\s\S]*?)<\/section>/)![1];
       expect(text(first.match(/<h2[^>]*>([\s\S]*?)<\/h2>/)![1])).toBe(heading);
       expect(text(first)).toContain("Yusuf Özkan");
-      for (const href of ["https://ozkanyusuf.com", "https://github.com/ysfzkn", "https://github.com/ysfzkn/radar-ai-news"]) {
-        expect(first, `${path} ${href}`).toContain(`href="${href}" ${EXTERNAL}`);
-      }
+      expect(first, path).toContain(`href="https://ozkanyusuf.com" ${EXTERNAL}`);
+      // The owner's GitHub account and Radar's repository are linked nowhere on the page.
+      expect(html, path).not.toContain("github.com/ysfzkn");
+      expect(text(html), path).not.toMatch(/kaynak kodu|source code/i);
     }
     expect(text(page(DEMO, "kunye"))).toContain(
-      "Radar, Yusuf Özkan'ın kişisel projesi; onu o yürütüyor ve sitenin kaynak kodu herkese açık.",
+      "Radar, Yusuf Özkan'ın kişisel projesi; onu o yürütüyor.",
     );
     expect(text(page(DEMO, "en/about"))).toContain(
-      "Radar is a personal project by Yusuf Özkan, who runs it; the site's source code is open.",
+      "Radar is a personal project by Yusuf Özkan, who runs it.",
     );
     // Most stories publish themselves, so the page does not say he publishes every issue.
     expect(text(page(DEMO, "kunye"))).not.toContain("Her sayıyı o yayımlıyor");
@@ -1803,11 +1804,11 @@ describe("built site", () => {
       const foot = html.match(/<footer class="foot label">([\s\S]*?)<\/footer>/)![1];
       const sig = foot.match(/<p class="sig">([\s\S]*?)<\/p>/);
       expect(sig, file).not.toBeNull();
-      expect(text(sig![1])).toBe("Yusuf Özkan · ozkanyusuf.com · GitHub");
+      expect(text(sig![1])).toBe("Yusuf Özkan · ozkanyusuf.com");
       expect(sig![1]).toContain(`<a href="https://ozkanyusuf.com" ${EXTERNAL}>ozkanyusuf.com</a>`);
-      expect(sig![1]).toContain(`<a href="https://github.com/ysfzkn" ${EXTERNAL}>GitHub</a>`);
-      // Then the RSS, Künye and source code links, after the signature.
-      expect(text(foot).indexOf("RSS")).toBeGreaterThan(text(foot).indexOf("GitHub"));
+      // Then the RSS and Künye links, after the signature; no GitHub or source code link.
+      expect(text(foot).indexOf("RSS")).toBeGreaterThan(text(foot).indexOf("ozkanyusuf.com"));
+      expect(foot, file).not.toContain("github.com/ysfzkn");
     }
   });
 
