@@ -6,7 +6,7 @@ name: Daily
 
 on:
   schedule:
-    - cron: "15 4 * * *" # 07:15 in Istanbul
+    - cron: "15 21 * * *" # 00:15 in Istanbul; GitHub may start it hours late
   workflow_dispatch:
     inputs:
       max_stories:

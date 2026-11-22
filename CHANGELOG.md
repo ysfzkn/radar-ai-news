@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Automation: the daily workflow is scheduled for 21:15 UTC (00:15 in Istanbul) instead of 04:15 UTC, so a run that GitHub starts hours late still finishes before morning.
 - Site: the scope is drawn as a three-dimensional radar instrument: a body with a wall and a ground shadow, a lit bezel with bearings, a glass face with a gleam, and blips standing on stems above their shadows, the louder the taller. On a phone an edition page's scope may be 352 px wide (it is tipped back, so no taller than before).
 - Site: buttons sink into their shadow on press and fill with the accent from the left on hover; the TR / EN switch is a two-position slider; copy buttons turn into a check after copying. The language switch moved to the first row of the top strip.
 

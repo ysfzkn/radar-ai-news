@@ -154,7 +154,7 @@ export const COPY = {
     tab: "Çalıştır",
     title: "Ajanı çalıştır",
     intro:
-      "Günlük işi GitHub Actions'ta şimdi başlatır: her sabah 07:15'te kendiliğinden çalışan işin aynısı. Nasıl çalışacağını aşağıdan seç.",
+      "Günlük işi GitHub Actions'ta şimdi başlatır: her gece 00:15'ten sonra kendiliğinden çalışan işin aynısı. Nasıl çalışacağını aşağıdan seç.",
     notSetUpTitle: "Buradan çalıştırma kurulu değil.",
     notSetUp:
       "Worker'da GITHUB_DISPATCH_TOKEN (gizli) ve GITHUB_REPO ayarlanınca bu sayfa işi başlatabilir. O zamana kadar iş sabah kendiliğinden ya da GitHub'daki Actions sekmesinden başlar.",

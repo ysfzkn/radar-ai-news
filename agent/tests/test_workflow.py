@@ -56,7 +56,7 @@ def push_step() -> dict:
 
 def test_schedule_and_manual_trigger():
     on = triggers(load("daily.yml"))
-    assert on["schedule"] == [{"cron": "15 4 * * *"}]
+    assert on["schedule"] == [{"cron": "15 21 * * *"}]
     inputs = on["workflow_dispatch"]["inputs"]
     assert list(inputs) == ["max_stories", "mode"]
     assert inputs["max_stories"]["type"] == "string"
