@@ -3225,6 +3225,113 @@ a.heat-day:hover {
   user-select: all;
 }
 
+/* The newsletter's form on the subscribe page. Like the archive's search box, the field sits in a
+   key's frame (ink outline, white, hard shadow); the button is the frame's ink end and fills with
+   the accent on hover. The form is plain HTML and posts to the admin Worker, which
+   answers by sending the reader back here with a notice's id at the end of the address: that
+   notice is then the page's target and the only one shown. */
+.mail-state {
+  display: none;
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-left: 3px solid var(--danger);
+  background: var(--danger-soft);
+  scroll-margin-top: var(--space-6);
+}
+
+.mail-state.mail-ok {
+  border-left-color: var(--ok);
+  background: var(--ok-soft);
+}
+
+.mail-state:target {
+  display: block;
+}
+
+.mail-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+}
+
+.mail-label {
+  color: var(--muted);
+}
+
+.mail-box {
+  display: flex;
+  align-items: stretch;
+  max-width: 32rem;
+  border: 1.5px solid var(--ink);
+  background: var(--surface);
+  box-shadow: 3px 3px 0 var(--ink);
+}
+
+.mail-box:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* The frame carries the border and the focus ring; the field itself is bare, in the display face. */
+.mail-input {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  min-height: 3rem;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.mail-input:focus-visible {
+  outline: none;
+}
+
+.mail-input::placeholder {
+  color: var(--control-border);
+  font-weight: 400;
+}
+
+.mail-button {
+  padding: var(--space-2) var(--space-5);
+  border: 0;
+  border-radius: 0;
+  background: var(--ink);
+  color: var(--surface);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.mail-button:hover,
+.mail-button:focus-visible {
+  background: var(--accent);
+}
+
+.mail-button:focus-visible {
+  outline: none;
+}
+
+.mail-trap {
+  position: absolute;
+  left: -200vw;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.prose .mail-notice {
+  margin-top: var(--space-4);
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
 /* The horizon over the footer (Horizon.astro): a line drawing in three depths, low on contrast;
    its ground line is the footer's rule. Far lines are the lightest and thinnest, near ones a
    little heavier; the buildings are filled with the page's own colour, so what stands in front

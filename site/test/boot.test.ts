@@ -13,6 +13,8 @@ interface Options {
   navType?: string;
   /** `document.referrer`; the site itself is https://radar.example. */
   referrer?: string;
+  /** `location.hash`, for example "#mail-sent". */
+  hash?: string;
   stored?: Record<string, string>;
   storageThrows?: boolean;
 }
@@ -66,7 +68,7 @@ function boot(options: Options = {}) {
       querySelectorAll: (sel: string) => (sel === "[data-still]" ? buttons : []),
       addEventListener: (type: string, fn: Listener) => documentListeners.push({ type, fn }),
     },
-    location: { origin: "https://radar.example" },
+    location: { origin: "https://radar.example", hash: options.hash ?? "" },
     performance: { getEntriesByType: () => [{ type: options.navType ?? "navigate" }] },
     matchMedia: (q: string) => ({ matches: q === "(prefers-reduced-motion: reduce)" && !!options.reduce }),
     sessionStorage: {
@@ -138,6 +140,17 @@ describe("boot.js: the opening", () => {
       const page = boot(options);
       expect(page.classes.has("intro"), JSON.stringify(options)).toBe(false);
       expect(page.classes.has("js"), JSON.stringify(options)).toBe(true);
+    }
+  });
+
+  it("skips it for a reader the newsletter's form sent back with its answer, and only for them", () => {
+    for (const hash of ["#mail-sent", "#mail-invalid", "#mail-error"]) {
+      // The Worker's redirect carries no referrer, so without the hash this would be an entry.
+      expect(boot({ hash }).classes.has("intro"), hash).toBe(false);
+      expect(boot({ hash }).classes.has("js"), hash).toBe(true);
+    }
+    for (const hash of ["", "#s-0123abcd", "#email", "#x-mail-sent"]) {
+      expect(boot({ hash }).classes.has("intro"), hash).toBe(true);
     }
   });
 

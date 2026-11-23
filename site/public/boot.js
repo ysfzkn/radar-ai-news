@@ -2,7 +2,9 @@
 // whether this view opens with the loading screen. It stores nothing.
 // The opening: every time the site is entered (a new visit, a typed address, a link from
 // elsewhere, a reload), on whichever page; not when the reader moves between pages of the site,
-// never for a reader who asked for less motion, on back/forward or in a hidden tab. It is the
+// never for a reader who asked for less motion, on back/forward or in a hidden tab, and not for a
+// reader the newsletter's form has just sent back with its answer (the address then ends with
+// "#mail-" and a name: they are waiting for that answer, not arriving). It is the
 // class `intro` on <html>, which the stylesheet paints as an ink cover before the first paint; the
 // loader (scripts/intro.ts) draws over it. Anything that removes the class ends the opening at
 // once, and this file removes it at the hard cap of 3500 ms whatever the loader does. The press or
@@ -17,11 +19,13 @@
     var type = nav ? nav.type : "navigate";
     // Reached from another page of this site: no opening. A reload keeps its first referrer.
     var inside = type !== "reload" && (document.referrer || "").indexOf(location.origin + "/") === 0;
+    var answered = (location.hash || "").indexOf("#mail-") === 0;
     if (
       matchMedia("(prefers-reduced-motion: reduce)").matches ||
       document.visibilityState === "hidden" ||
       type === "back_forward" ||
-      inside
+      inside ||
+      answered
     )
       return;
   } catch (e) {

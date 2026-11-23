@@ -9,4 +9,10 @@ export interface Env {
   // Starting the daily workflow from /admin/run. Both are needed; without them the page says so.
   GITHUB_DISPATCH_TOKEN?: string; // secret; fine-grained token, Actions read and write on one repository
   GITHUB_REPO?: string; // "owner/name", not a secret
+  // The e-mail newsletter (see src/mail.ts). Without the first three nothing is ever sent.
+  RESEND_API_KEY?: string; // secret; a Resend key with sending access only
+  MAIL_FROM?: string; // the sender's bare address on the domain verified at Resend, not a secret
+  PUBLIC_URL?: string; // this Worker's own https origin, for the links inside a mail
+  MAIL_REPLY_TO?: string; // optional address that replies go to
+  SITE_URL?: string; // the static site's https origin; defaults to the live site
 }

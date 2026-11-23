@@ -6,7 +6,9 @@ import { z } from "zod";
 import { COPY, failureMessage } from "./copy";
 import type { Env } from "./env";
 import { RUN_MODES, dispatchRun, githubConfig, isActive, listRuns, type RunInputs, type RunsResult } from "./github";
+import { sendDaily } from "./daily";
 import { ingest } from "./ingest";
+import { newsletter } from "./newsletter";
 import { notifySite, waiter } from "./notify";
 import { publicApi } from "./public";
 import type { Lang, Status } from "./schema";
@@ -35,6 +37,7 @@ import {
   type StoryFull,
   type Tab,
 } from "./stories";
+import { purgePending } from "./subscribers";
 import { CSS, JS } from "./views/assets";
 import { editionView } from "./views/edition";
 import { STATUSES, formatDay, layout, listHref, storyPath, type Page, type View } from "./views/layout";
@@ -50,6 +53,7 @@ export const app = new Hono<AppEnv>();
 app.get("/healthz", (c) => c.text("ok"));
 app.route("/", ingest);
 app.route("/", publicApi);
+app.route("/", newsletter);
 
 // ---------------------------------------------------------------------------
 // Admin screen: everything at /admin and under it is authenticated.
@@ -494,9 +498,23 @@ app.onError(async (err, c) => {
 // Any other path under /admin: the not-found page, reached only after the middleware signed the user in.
 app.all("/admin/*", (c) => page(c, { title: COPY.notFoundTitle, active: null, body: notFoundView() }, 404));
 
-// Hourly cron (see wrangler.jsonc): expires review stories aged 72 hours or more.
+// Hourly cron (see wrangler.jsonc): expires review stories aged 72 hours or more, deletes
+// newsletter addresses left unconfirmed for 7 days, and mails today's edition to the readers who
+// have not had it (see src/daily.ts). The newsletter's steps never stop the expiry or each other:
+// a failure is logged by its name only.
 async function scheduled(controller: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
-  await expireStale(env.DB, new Date(controller.scheduledTime));
+  const now = new Date(controller.scheduledTime);
+  await expireStale(env.DB, now);
+  for (const [name, step] of [
+    ["purge", () => purgePending(env.DB, now)],
+    ["daily mail", () => sendDaily(env, now)],
+  ] as const) {
+    try {
+      await step();
+    } catch (e) {
+      console.error(`newsletter: ${name} failed`, e instanceof Error ? e.name : "error");
+    }
+  }
 }
 
 export default { fetch: app.fetch, scheduled };

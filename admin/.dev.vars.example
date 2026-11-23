@@ -4,3 +4,8 @@ INGEST_TOKEN=change-me
 DEV_NO_AUTH=1
 # Optional: an https deploy-hook URL the Worker POSTs to when the published set changes.
 # SITE_DEPLOY_HOOK=
+# Optional: the e-mail newsletter. With all three set, this local Worker sends real mail through
+# Resend to whoever subscribes on it; leave them out and nothing is sent.
+# RESEND_API_KEY=
+# MAIL_FROM=bulten@example.com
+# PUBLIC_URL=https://example.workers.dev

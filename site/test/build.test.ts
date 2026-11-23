@@ -3,6 +3,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { COPY } from "../src/lib/copy";
+import { MAIL_STATES, NEWSLETTER } from "../src/lib/newsletter";
 import { routes } from "../src/lib/routes";
 import { CATEGORIES } from "../src/lib/schema";
 import { BLIP_HIT, RING_RADIUS, SCOPE_HALF } from "../src/lib/scope";
@@ -19,16 +20,20 @@ const DEMO = join(root, "dist-demo");
 const HOSTILE = join(root, "dist-hostile");
 const EMPTY = join(root, "dist-empty");
 const REAL = join(root, "dist-real");
+// The demo fixture once more, with the e-mail newsletter open.
+const MAIL = join(root, "dist-newsletter");
 // The configured site, as astro.config.mjs reads it; the builds inherit this environment.
 const SITE = process.env.SITE_URL || "https://radar.ozkanyusuf.com";
 const DEMO_DATES =["2026-11-17", "2026-11-18", "2026-11-19", "2026-11-20"];
 
 // The demo build forces the fixture with RADAR_DEMO=1, so a fetched site/.data/stories.json
 // (the owner's real data) is neither read nor touched; the others name their file explicitly.
-function build(outDir: string, storiesFile?: string): void {
+function build(outDir: string, storiesFile?: string, newsletter = false): void {
   const env = { ...process.env };
   delete env.RADAR_STORIES_FILE;
   delete env.RADAR_DEMO;
+  // Said outright either way, so these tests do not depend on the switch's default.
+  env.RADAR_NEWSLETTER = newsletter ? "1" : "0";
   if (storiesFile) env.RADAR_STORIES_FILE = storiesFile;
   else env.RADAR_DEMO = "1";
   execFileSync(process.execPath, [astro, "build", "--outDir", outDir], {
@@ -60,7 +65,8 @@ beforeAll(() => {
   build(HOSTILE, "test/fixtures/hostile.json");
   build(EMPTY, "test/fixtures/empty.json");
   build(REAL, "fixtures/stories.json");
-}, 400_000);
+  build(MAIL, undefined, true);
+}, 500_000);
 
 const page = (dir: string, path: string) => readFileSync(join(dir, path, "index.html"), "utf8");
 
@@ -451,7 +457,8 @@ describe("built site", () => {
     // The bar takes the story's category colour, the accent where a story has none.
     expect(bars.map((d) => `${d.prop}: ${d.value}`)).toContain("border-left: 3px solid var(--cat, var(--accent))");
     // A bar only: no background change; it grows only where motion is welcome.
-    expect(sheet).not.toMatch(/:target \{/);
+    // (The one other target on the site is the subscribe page's notice, which is shown by it.)
+    expect(sheet).not.toMatch(/(?<!\.mail-state):target \{/);
     for (const bar of bars) {
       expect(bar.prop).not.toMatch(/background|transition/);
       if (bar.prop.startsWith("animation") && bar.value !== "none") {
@@ -1722,7 +1729,7 @@ describe("built site", () => {
     const headers = readFileSync(join(DEMO, "_headers"), "utf8");
     expect(headers).toMatch(/^\/\*$/m);
     expect(headers).toContain(
-      "Content-Security-Policy: default-src 'none'; style-src 'self'; script-src 'self'; connect-src 'self'; font-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+      "Content-Security-Policy: default-src 'none'; style-src 'self'; script-src 'self'; connect-src 'self'; font-src 'self'; img-src 'self'; base-uri 'none'; form-action 'self' https://radar-admin.ozkan-development.workers.dev; frame-ancestors 'none'",
     );
     expect(headers).toContain("X-Content-Type-Options: nosniff");
     expect(headers).toContain("Referrer-Policy: strict-origin-when-cross-origin");
@@ -2039,14 +2046,14 @@ describe("built site", () => {
     expect(value(".emblem", "--cat-mid")).toBe("color-mix(in srgb, var(--cat) 55%, var(--cat-soft))");
   });
 
-  it("only the lead card, the scope, the search box, the two buttons and the two dialogs have a box-shadow, and none is blurred", () => {
+  it("only the lead card, the scope, the search box, the newsletter's field, the two buttons and the two dialogs have a box-shadow, and none is blurred", () => {
     const shadows = declarations(sheets()).filter((d) => d.prop === "box-shadow");
     expect(shadows.length).toBeGreaterThan(3);
     for (const shadow of shadows) {
       expect(shadow.value === "none" || /^\d+px \d+px 0 var\(--ink\)$/.test(shadow.value), shadow.value).toBe(true);
       for (const part of shadow.selector.split(",").map((x) => x.trim())) {
         expect(part.replace(/:(hover|focus-visible|active)$/, "").replace(/\[aria-current="page"\]$/, "")).toMatch(
-          /^(\.story-lead \.try|\.hero \.scope|\.(story-lead|scope|search-box|subscribe|try|palette|keys))$/,
+          /^(\.story-lead \.try|\.hero \.scope|\.(story-lead|scope|search-box|mail-box|subscribe|try|palette|keys))$/,
         );
         // In the hero the scope leaves its card behind.
         if (part.startsWith(".story-lead .try") || part === ".hero .scope") expect(shadow.value).toBe("none");
@@ -2315,5 +2322,99 @@ describe("built site", () => {
       }
     }
     expect(checked).toBeGreaterThan(100);
+  });
+});
+
+// The e-mail newsletter is a switch (lib/newsletter.ts). Every build above is made with it off;
+// this one build has it on.
+describe("the e-mail newsletter", () => {
+  const pages = [["abone", "tr"], ["en/subscribe", "en"]] as const;
+  const mainOf = (dir: string, path: string) => page(dir, path).match(/<main[\s\S]*?<\/main>/)![0];
+
+  it("when open, the subscribe pages carry one plain form that posts to the admin Worker", () => {
+    for (const [path, lang] of pages) {
+      const main = mainOf(MAIL, path);
+      const mail = COPY[lang].subscribe.mail;
+      const forms = main.match(/<form[\s\S]*?<\/form>/g)!;
+      expect(forms).toHaveLength(1);
+      const form = forms[0];
+      expect(form).toMatch(new RegExp(`^<form class="mail-form" method="post" action="${NEWSLETTER.action}">`));
+      expect(form).toContain(`<input type="hidden" name="lang" value="${lang}">`);
+      const address = form.match(/<input class="mail-input"[^>]*>/)![0];
+      for (const attr of ['type="email"', 'name="email"', "required", 'maxlength="254"', 'autocomplete="email"', 'id="mail-address"']) {
+        expect(address, attr).toContain(attr);
+      }
+      expect(form).toContain(`<label class="mail-label label" for="mail-address">${mail.emailLabel}</label>`);
+      expect(form.match(/<button[^>]*type="submit"[^>]*>([^<]*)<\/button>/)![1]).toBe(mail.button);
+      expect(form.match(/<button/g)).toHaveLength(1);
+      // The trap: out of the reading order, out of the tab order, never announced.
+      const trap = form.match(/<div class="mail-trap" aria-hidden="true">[\s\S]*?<\/div>/)![0];
+      expect(trap).toContain('name="website"');
+      expect(trap).toContain('tabindex="-1"');
+      expect(trap).toContain('autocomplete="off"');
+      // Nothing inline: the page's CSP allows neither.
+      expect(main).not.toMatch(/\sstyle=|\son[a-z]+=|<script/);
+      expect(text(main)).toContain(mail.notice);
+      expect(text(main)).toContain(mail.intro[0]);
+      expect(text(main)).not.toContain(COPY[lang].subscribe.noNewsletter);
+      expect(text(main)).not.toContain(COPY[lang].subscribe.intro[1]);
+      // The RSS part stays, under its own heading.
+      expect(text(main)).toContain(mail.rssHeading);
+      expect(main).toContain('<code class="feed-url">');
+      expect(page(MAIL, path)).toContain(`<meta name="description" content="${mail.description}">`);
+    }
+    expect(mainOf(MAIL, "abone")).toContain('placeholder="sen@ornek.com"');
+  });
+
+  it("when open, each answer of the Worker has a notice with its id, shown only as the page's target", () => {
+    for (const [path, lang] of pages) {
+      const main = mainOf(MAIL, path);
+      const notices = [...main.matchAll(/<p id="mail-([a-z]+)" class="([^"]+)" role="status">([\s\S]*?)<\/p>/g)];
+      expect(notices.map((m) => m[1])).toEqual([...MAIL_STATES]);
+      for (const [, state, classes, body] of notices) {
+        expect(text(body)).toBe(COPY[lang].subscribe.mail.states[state as (typeof MAIL_STATES)[number]]);
+        expect(classes).toBe(state === "sent" ? "mail-state mail-ok" : "mail-state");
+      }
+    }
+    expect(cssRule(css(), ".mail-state")).toContain("display: none;");
+    expect(cssRule(css(), ".mail-state:target")).toContain("display: block;");
+  });
+
+  it("the form's address is the one origin the CSP lets a form post to, besides the site itself", () => {
+    const headers = readFileSync(join(MAIL, "_headers"), "utf8");
+    const allowed = headers.match(/form-action ([^;]+);/)![1].split(" ");
+    expect(allowed).toEqual(["'self'", new URL(NEWSLETTER.action).origin]);
+    expect(new URL(NEWSLETTER.action).protocol).toBe("https:");
+    expect(new URL(NEWSLETTER.action).pathname).toBe("/api/subscribe");
+  });
+
+  it("when open, the Künye's privacy section says what is stored; when closed it does not", () => {
+    for (const [path, lang] of [["kunye", "tr"], ["en/about", "en"]] as const) {
+      const privacy = COPY[lang].subscribe.mail.privacy;
+      expect(text(mainOf(MAIL, path))).toContain(privacy);
+      expect(text(mainOf(DEMO, path))).not.toContain(privacy);
+      // It is the privacy section's own paragraph, the last of the page.
+      expect(mainOf(MAIL, path).match(/<p>[^<]*<\/p>(?![\s\S]*<p>)/)![0]).toBe(`<p>${privacy.replace(/'/g, "&#39;")}</p>`);
+    }
+    expect(COPY.tr.subscribe.mail.privacy).toMatch(/Resend/);
+    expect(COPY.tr.subscribe.mail.privacy).toMatch(/Cloudflare/);
+  });
+
+  it("when closed, no page has the form, its field or the newsletter's words", () => {
+    for (const dir of [DEMO, HOSTILE, EMPTY, REAL]) {
+      for (const file of htmlFiles(dir)) {
+        const html = readFileSync(file, "utf8");
+        expect(html, file).not.toMatch(/mail-form|mail-state|mail-input|name="email"/);
+      }
+    }
+    expect(text(mainOf(DEMO, "abone"))).not.toContain(COPY.tr.subscribe.mail.heading);
+  });
+
+  it("when open, only the subscribe pages have the form", () => {
+    const withForm = htmlFiles(MAIL).filter((file) => /mail-form|name="email"/.test(readFileSync(file, "utf8")));
+    expect(withForm.map((file) => file.slice(MAIL.length + 1).replace(/\\/g, "/")).sort()).toEqual([
+      "abone/index.html",
+      "en/subscribe/index.html",
+    ]);
   });
 });

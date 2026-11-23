@@ -193,6 +193,8 @@ export interface About {
     after?: readonly string[];
     /** Links that leave the site, in one line under the section. */
     links?: readonly { text: string; href: string }[];
+    /** The privacy section: it gains the newsletter's paragraph when the newsletter is open. */
+    privacy?: true;
   }[];
 }
 
@@ -211,6 +213,28 @@ export interface Subscribe {
   terminalHeading: string;
   terminalText: string;
   terminalTitles: string;
+  /** The e-mail newsletter, shown only when it is open (lib/newsletter.ts). */
+  mail: MailCopy;
+}
+
+/** The newsletter's form on the subscribe page, and its paragraph in the Künye's privacy section. */
+export interface MailCopy {
+  /** Replaces the page's description and its intro when the newsletter is open. */
+  description: string;
+  intro: readonly string[];
+  heading: string;
+  emailLabel: string;
+  placeholder: string;
+  button: string;
+  /** What is stored and why, under the form. */
+  notice: string;
+  /** The line a reader sees after the form, by the answer's name. */
+  states: Record<"sent" | "invalid" | "later" | "error" | "closed", string>;
+  /** The heading of the RSS part, which follows the form. */
+  rssHeading: string;
+  rssIntro: string;
+  /** The Künye's privacy section gains this paragraph. */
+  privacy: string;
 }
 
 const { site: SITE } = OWNER;
@@ -460,6 +484,7 @@ export const COPY: Record<Lang, Copy> = {
         },
         {
           heading: "Gizlilik",
+          privacy: true,
           paragraphs: [
             "Bu site çerez kullanmaz, seni izlemez ve üçüncü taraflardan hiçbir şey yüklemez: analitik, reklam ya da dış yazı tipi yok. Her sayfa statik bir HTML dosyasıdır ve betik olmadan da eksiksiz çalışır.",
             "Sitenin kendi küçük betiği yalnızca bir kolaylık ekler: arşivde arama ve komut paleti (arama verisi bu siteden gelir), klavye kısayolları, kopyalama düğmeleri (panoya yalnızca sen bastığında yazar), radar ekranının eğimi ve okunan haberlerin işareti, ana sayfadaki arama kutusu (yazdığın sözcükleri arşivin aramasına, yani o sayfanın adresine taşır), ana sayfanın başındaki yazının ve radarın açılıştan sonra bir kez yerine oturması, “Neden önemli” satırının belirişi, baskının tarihinin ve sayılarının bir kalkış tabelası gibi yerine oturması, abone ol düğmesinin yazısının üzerine gelince çözülmesi, komut paletine “ping” yazınca radarın bir kez atması ve siteye her girişte oynayan kısa açılış. Sayfanın altındaki ufuk çizimi akşamdan sabaha gece hâline geçer: saati senin cihazının saatinden İstanbul saatine göre hesaplar, hiçbir yere sormaz. Hareketi azaltmayı seçtiysen hareketlerin hiçbiri oynamaz.",
@@ -488,6 +513,30 @@ export const COPY: Record<Lang, Copy> = {
       terminalHeading: "Terminalden",
       terminalText: "Akış düz XML'dir; komut satırından da okunur. Bu komut son başlıkları listeler:",
       terminalTitles: "Son başlıklar",
+      mail: {
+        description: "Radar'a ücretsiz abone ol: günün sayısı her sabah e-posta kutunda. RSS de var.",
+        intro: [
+          "Radar her sabah e-postayla gelir: günün teknoloji ve yapay zekâ haberleri, kısa ve öz. Yeni sayı olmayan gün e-posta da olmaz.",
+          "Ücretsiz. Hesap yok, şifre yok; yalnızca e-posta adresin.",
+        ],
+        heading: "E-postayla",
+        emailLabel: "E-posta adresin",
+        placeholder: "sen@ornek.com",
+        button: "Abone ol",
+        notice:
+          "Adresini yalnızca bu bülteni göndermek için saklarım; kimseyle paylaşmam, reklam göndermem. Önce bir onay e-postası gelir; onaylamadığın adres 7 gün sonra silinir. E-postalarda açılma ya da tıklama takibi yoktur ve her birinin altında tek tıkla çıkış bağlantısı bulunur: çıktığında adresin silinir.",
+        states: {
+          sent: "Tamam. Gelen kutuna bak: onay bağlantısını gönderdim. Görünmüyorsa gereksiz (spam) klasörüne de bak.",
+          invalid: "Bu bir e-posta adresine benzemiyor. Bir daha dener misin?",
+          later: "Şu an çok fazla istek var. Biraz sonra yeniden dene.",
+          error: "Onay e-postası gönderilemedi. Biraz sonra yeniden dene.",
+          closed: "E-posta bülteni henüz açılmadı. Şimdilik RSS ile takip edebilirsin.",
+        },
+        rssHeading: "RSS ile",
+        rssIntro: "E-posta vermek istemiyorsan Radar'ı RSS ile de takip edebilirsin: yeni haberler, yayımlandıkça kullandığın RSS okuyucusunda kendiliğinden belirir.",
+        privacy:
+          "Tek istisna e-posta bülteni: abone olursan e-posta adresin ve seçtiğin dil saklanır, başka hiçbir şey. Adres yalnızca bülteni göndermek için kullanılır; gönderimi Resend, saklamayı Cloudflare yapar. E-postalarda açılma ya da tıklama takibi yoktur. Onaylamadığın adres 7 gün sonra, abonelikten çıktığında ise hemen silinir.",
+      },
     },
   },
   en: {
@@ -736,6 +785,7 @@ export const COPY: Record<Lang, Copy> = {
         },
         {
           heading: "Privacy",
+          privacy: true,
           paragraphs: [
             "This site sets no cookies, does not track you and loads nothing from third parties: no analytics, no ads, no outside fonts. Every page is a static HTML file and is complete without scripts.",
             "The site's own small script only adds conveniences: the archive search and the command palette (their data comes from this site), keyboard shortcuts, copy buttons (they write to your clipboard only when you press them), the radar's tilt and the marks on stories you have read, the home page's search field (it takes your words to the archive search, that is, into that page's address), the home page's words and radar rising into place once after the opening, the way the “Why it matters” line appears, the edition's date and counts settling in like a departure board, the subscribe button's label decoding when you point at it, the radar's single pulse when you type “ping” in the command palette and a short opening each time you enter the site. The horizon at the foot of each page turns to night from evening to morning: it works out Istanbul's time from your own device's clock and asks nothing of anyone. If you have asked for less motion, none of it moves.",
@@ -764,6 +814,30 @@ export const COPY: Record<Lang, Copy> = {
       terminalHeading: "From the terminal",
       terminalText: "The feed is plain XML, so a command line reads it too. This lists the latest headlines:",
       terminalTitles: "Latest headlines",
+      mail: {
+        description: "Subscribe to Radar for free: the day's issue in your inbox every morning. There is RSS too.",
+        intro: [
+          "Radar arrives by e-mail every morning: the day's tech and AI news, short and to the point. A day without a new issue has no e-mail.",
+          "It is free. No account, no password; only your e-mail address.",
+        ],
+        heading: "By e-mail",
+        emailLabel: "Your e-mail address",
+        placeholder: "you@example.com",
+        button: "Subscribe",
+        notice:
+          "I keep your address only to send this newsletter; I share it with no one and send no advertising. A confirmation e-mail comes first; an address you do not confirm is deleted after 7 days. The e-mails have no open or click tracking, and each ends with a one-click unsubscribe link: when you leave, your address is deleted.",
+        states: {
+          sent: "Done. Check your inbox: I have sent the confirmation link. If it is not there, look in the spam folder too.",
+          invalid: "That does not look like an e-mail address. Try once more?",
+          later: "There are too many requests right now. Try again in a little while.",
+          error: "The confirmation e-mail could not be sent. Try again in a little while.",
+          closed: "The e-mail newsletter is not open yet. For now you can follow Radar with RSS.",
+        },
+        rssHeading: "With RSS",
+        rssIntro: "If you would rather not give an e-mail address, you can follow Radar with RSS: new stories appear in your feed reader as they are published.",
+        privacy:
+          "The one exception is the e-mail newsletter: if you subscribe, your e-mail address and the language you chose are stored, and nothing else. The address is used only to send the newsletter; Resend does the sending and Cloudflare the storing. The e-mails have no open or click tracking. An address you do not confirm is deleted after 7 days, and one that unsubscribes is deleted at once.",
+      },
     },
   },
 };

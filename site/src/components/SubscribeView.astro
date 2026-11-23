@@ -1,5 +1,6 @@
 ---
 import { COPY } from "../lib/copy";
+import { MAIL_STATES, NEWSLETTER } from "../lib/newsletter";
 import { routes } from "../lib/routes";
 import type { Lang } from "../lib/schema";
 
@@ -10,6 +11,8 @@ interface Props {
 const { lang } = Astro.props;
 const copy = COPY[lang];
 const page = copy.subscribe;
+const mail = page.mail;
+const open = NEWSLETTER.open;
 const other: Lang = lang === "tr" ? "en" : "tr";
 if (!Astro.site) throw new Error("the subscribe page needs `site` in astro.config.mjs");
 // The feed's absolute address on the configured site is the text a reader copies into a feed
@@ -23,8 +26,55 @@ const command = `curl -s ${feed} | grep -o '<title>[^<]*' | cut -d'>' -f2`;
 
 <div class="prose">
   <section>
-    {page.intro.map((paragraph) => <p>{paragraph}</p>)}
+    {(open ? mail.intro : page.intro).map((paragraph) => <p>{paragraph}</p>)}
   </section>
+  {
+    open && (
+      <section class="mail">
+        <h2>{mail.heading}</h2>
+        {/* The Worker sends the reader back to this page with one of these ids at the end of the
+            address; the notice with that id is the only one shown. No script is involved. */}
+        {MAIL_STATES.map((state) => (
+          <p id={`mail-${state}`} class:list={["mail-state", { "mail-ok": state === "sent" }]} role="status">
+            {mail.states[state]}
+          </p>
+        ))}
+        <form class="mail-form" method="post" action={NEWSLETTER.action}>
+          <input type="hidden" name="lang" value={lang} />
+          <label class="mail-label label" for="mail-address">{mail.emailLabel}</label>
+          <div class="mail-box">
+            <input
+              class="mail-input"
+              id="mail-address"
+              type="email"
+              name="email"
+              required
+              maxlength="254"
+              autocomplete="email"
+              inputmode="email"
+              spellcheck="false"
+              placeholder={mail.placeholder}
+            />
+            <button class="mail-button label" type="submit">{mail.button}</button>
+          </div>
+          {/* A field for programs that fill in every field: no reader sees it or reaches it. */}
+          <div class="mail-trap" aria-hidden="true">
+            <label for="mail-website">Website</label>
+            <input id="mail-website" type="text" name="website" tabindex="-1" autocomplete="off" />
+          </div>
+        </form>
+        <p class="mail-notice">{mail.notice}</p>
+      </section>
+    )
+  }
+  {
+    open && (
+      <section>
+        <h2>{mail.rssHeading}</h2>
+        <p>{mail.rssIntro}</p>
+      </section>
+    )
+  }
   <section>
     <h2>{page.feedHeading}</h2>
     <p>
@@ -43,7 +93,7 @@ const command = `curl -s ${feed} | grep -o '<title>[^<]*' | cut -d'>' -f2`;
       {page.otherFeed}{" "}
       <a href={routes[other].rss} type="application/rss+xml" hreflang={other}>{page.otherFeedLink}</a>
     </p>
-    <p>{page.noNewsletter}</p>
+    {!open && <p>{page.noNewsletter}</p>}
   </section>
   <section>
     <h2>{page.terminalHeading}</h2>

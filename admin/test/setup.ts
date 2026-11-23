@@ -12,5 +12,6 @@ beforeEach(async () => {
     env.DB.prepare("DELETE FROM story_texts"),
     env.DB.prepare("DELETE FROM stories"),
     env.DB.prepare("DELETE FROM run_dispatches"),
+    env.DB.prepare("DELETE FROM subscribers"),
   ]);
 });

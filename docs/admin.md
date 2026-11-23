@@ -10,6 +10,8 @@ It stores, per story: the category, status, the reasons the agent gave for sendi
 
 It does not store: the fetched source articles, the agent's prompts or model output, the spend ledger, or any API key. Those stay in the agent's local SQLite file.
 
+Apart from stories it stores the starts of the daily run made from the run page, and, once the newsletter is in use, its readers' e-mail addresses (see [The e-mail newsletter](#the-e-mail-newsletter)).
+
 ## Story lifecycle
 
 | Action | From | To | Rules |
@@ -98,6 +100,43 @@ The screen is light only: there is no dark theme and no theme switch. It works w
 ## Public read endpoint
 
 `GET /api/stories` is public and needs no sign-in. It returns only `published` stories and only what a reader sees: no reasons, score, fact card, history or e-mail addresses. It is what the static site reads at build time. It leaves out sources without a name and any language with an empty text, and does not return a story that has no usable language left. Parameters, response shape and paging are described in [site.md](site.md#the-public-read-contract-version-1). Responses carry `Cache-Control: public, max-age=60`. Migration `0003_public_feed_index.sql` adds an index on `(status, published_at DESC, uid)`, the endpoint's filter and order. The page cursor's `published_at` is also bound as `published_at <= ?`, so the planner seeks into the index at the cursor instead of reading every newer row; a call, with or without a cursor, reads about the rows of its page. Tests check with `EXPLAIN QUERY PLAN` that the query searches the index with a range and needs no sort, and that paging through stories with equal `published_at` returns each once. Not limited by this: anyone can call the endpoint, and the Worker has no rate limit or edge cache of its own.
+
+## The e-mail newsletter
+
+> **Status:** written and tested, never run for real. No sending service is connected to the live Worker, migration `0005_subscribers.sql` is not applied to the live database, and the site's form is switched off (`OPEN_BY_DEFAULT` in `site/src/lib/newsletter.ts`). No mail has been sent to a real inbox, so how the mails look in real mail clients is unchecked.
+
+A reader gives an e-mail address on the site's subscribe page, confirms it from a mail, and then gets each day's edition by mail once, in Turkish or English. Mail is sent through [Resend](https://resend.com)'s HTTP API.
+
+**What is stored.** One row per address in `subscribers`: the address (trimmed, lower-cased), the language, `pending` or `confirmed`, a random 64-hex token, when it was created and confirmed, when and how often a confirmation mail went out, and the day of the last edition mailed. No IP address, no name, nothing about opening or clicking. A pending row is deleted 7 days after it was created (the hourly job does it); leaving deletes the row at once.
+
+**The addresses.** All are public and none uses a cookie.
+
+| Address | What it does |
+| --- | --- |
+| `POST /api/subscribe` | The site's form (`email`, `lang`, and a trap field `website`). Stores the address as pending, mails the confirmation link, and sends the reader back to the site's subscribe page with `#mail-sent`, `#mail-invalid`, `#mail-later`, `#mail-error` or `#mail-closed` at the end of the address; the page shows the notice with that id. A form body over 4 kB is refused. |
+| `GET /api/subscribe/confirm?token=…` | The link in the confirmation mail: a page with one button. |
+| `POST /api/subscribe/confirm?token=…` | The button: the address becomes `confirmed`. |
+| `GET /api/unsubscribe?token=…` | The link under every daily mail: a page with one button. |
+| `POST /api/unsubscribe?token=…` | The button, and a mail client's own one-click unsubscribe (the daily mail carries `List-Unsubscribe` and `List-Unsubscribe-Post`, RFC 8058): the row is deleted. |
+
+A change needs a `POST`, so a mail scanner that opens every link in a mail neither confirms an address nor removes a reader. The pages are served by the Worker in the site's look, without script, with `Cache-Control: no-store` and `Referrer-Policy: no-referrer` (the token is in their address).
+
+**Limits, instead of a captcha.** The form never says whether an address is already on the list: a confirmed address, and a pending one that has had its mails, get the same "check your inbox" answer and no mail. One pending address gets a confirmation mail at most every 10 minutes and at most 3 in all. All addresses together get at most 20 confirmation mails an hour and 60 a day; past that the form says to try later. A filled trap field gets the usual answer and nothing is stored. These limits are counted in the database, not per visitor: someone who fills the form with many addresses can use up the hour's 20 mails and keep real readers waiting, and each of those addresses gets one unwanted confirmation mail.
+
+**The daily mail.** The hourly job (`17 * * * *`) calls `sendDaily` (`src/daily.ts`). It sends when all of these hold: sending is set up; it is between 07:00 and 22:00 in Istanbul; at least one story was published today (Istanbul day); and a confirmed reader has not been mailed today's edition. So the mail goes out with the first hourly job after 07:00 that finds stories, a reader who confirms later the same day gets that day's edition within the hour, and a day without stories has no mail. Stories published after a reader was mailed are not mailed to them. The mail holds the day's stories in the site's order, with the edition's number counted as the site counts it, and is rendered once per language (`src/email.ts`); only the leave link differs between readers. Readers are sent to Resend in batches of 50, at most 4 batches per job (200 readers an hour); a reader is marked only after Resend accepted their batch, and the batch's idempotency key is the same for the same readers, stories and day, so a job that sent but could not mark does not send twice. If Resend refuses a batch, nobody in it is marked and the next job tries again. The log has counts and the name of a failure, never an address or Resend's answer. Bounces and spam complaints are not read back from Resend: an address that bounces stays on the list.
+
+**The mails** are tables with inline styles: no image, no web font, no script and no remote resource, so nothing can report an opening, and every link goes straight to its address. To look at them, `node --experimental-strip-types scripts/mail-preview.mjs` in `admin/` writes both mails in both languages, from the live stories, to `dev-notes/mail-preview/` (it sends nothing).
+
+### Setting it up
+
+1. At Resend, add and verify the domain mail is sent from (`radar.ozkanyusuf.com` for this project: add the DNS records Resend shows, at the domain's DNS host), and keep the domain's open tracking and click tracking off, or the site's and the mails' "no tracking" lines stop being true.
+2. Create a Resend API key with sending access only and set it as a secret: `npx wrangler secret put RESEND_API_KEY` in `admin/`.
+3. The sender's address and the Worker's own address are not secrets; the `deploy` script in `admin/package.json` passes them (`--var MAIL_FROM:bulten@radar.ozkanyusuf.com --var PUBLIC_URL:https://…workers.dev`). `MAIL_FROM` is a bare address on the verified domain (the mails show it as "Radar"); `PUBLIC_URL` is an https origin, used for the links inside a mail. Optional: `MAIL_REPLY_TO` (where replies go; without it a reply goes to the sender's address, which nobody reads) and `SITE_URL` (the site's origin, if it is not the live site).
+4. Apply the migration and deploy: `npx wrangler d1 migrations apply radar --remote`, then `npm run deploy`.
+5. Subscribe with your own address by posting the form to the Worker, confirm from the mail, and wait for the next daily mail.
+6. Only then open the form on the site: set `OPEN_BY_DEFAULT` to `true` in `site/src/lib/newsletter.ts` and publish the site.
+
+Until the key, `MAIL_FROM` and `PUBLIC_URL` are all set, nothing is ever sent: the form answers `#mail-closed` and the hourly job skips the mail.
 
 ## Ingest contract (version 1)
 

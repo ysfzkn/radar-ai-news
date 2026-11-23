@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- An e-mail newsletter, written and tested but not switched on: no sending service is connected, the migration is not applied to the live database and the site's form is off. Admin: a `subscribers` table (migration `0005`), a subscribe address with double opt-in (a confirmation mail, then a button), one-click unsubscribe that deletes the address, limits on confirmation mails in place of a captcha, and a daily mail of the day's edition sent by the hourly job through Resend between 07:00 and 22:00 Istanbul time, once per reader. The mails are plain tables with no image and no tracking. Site: the subscribe page's form and its notices, and a paragraph in the Künye's privacy section, all behind a switch that is off.
 - Sources: the Hacker News front page (`hn-front`, stories with at least 100 points, any subject; the scorer keeps what is about tech and AI). For the per-source limit a story led by Hacker News counts for the site it points to.
 - Site: the home page opens with a calm hero of about half a screen: the edition's dateline, the slogan "Her sabah. Kısa ve öz." / "Every morning. Short and to the point.", one line saying what Radar is ("Günün teknoloji ve yapay zekâ haberleri.") and a link to how it works, beside the day's radar. On a phone the radar sits under the words, tipped further back so it is wide and low.
 - Site: the home page's toolbar: a search over every story (it opens the archive's search; a link to the archive without script) and topic chips with each topic's count of the day, which show only that topic's stories and grey the radar's other blips without any script. The day's stories follow grouped by topic, each group linking to its topic page, every story keeping its number.
@@ -21,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Site: the Content-Security-Policy's `form-action` is `'self'` and the admin Worker's origin instead of `'none'`, for the newsletter's form.
 - Site: no page links GitHub any more. The footer's GitHub and source code links and the Künye page's two GitHub links are gone, the Künye page no longer says the source code is open, and a wrong story is reported through ozkanyusuf.com instead of a GitHub issue.
 - Agent: no source leads more than two stories of one day's edition, fresh and backlog together; the places a prolific source would have taken go to the next best stories of other sources. `radar run` reports `skipped_source_limit`.
 - Automation: the daily workflow is scheduled for 21:15 UTC (00:15 in Istanbul) instead of 04:15 UTC, so a run that GitHub starts hours late still finishes before morning.
