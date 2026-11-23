@@ -127,6 +127,8 @@ A change needs a `POST`, so a mail scanner that opens every link in a mail neith
 
 **The mails** are tables with inline styles: no image, no web font, no script and no remote resource, so nothing can report an opening, and every link goes straight to its address. To look at them, `node --experimental-strip-types scripts/mail-preview.mjs` in `admin/` writes both mails in both languages, from the live stories, to `dev-notes/mail-preview/` (it sends nothing).
 
+**The readers page** (`/admin/subscribers`, "Aboneler" in the header; behind the same sign-in as the rest of `/admin`) shows how many readers are confirmed and how many are waiting, the confirmed readers by language, the latest edition mailed and to how many, and every address, newest first, a hundred to a page: its state, language, when it was added and confirmed, and the last edition mailed to it. Tokens are never shown. "Sil" opens a confirmation and its button deletes the reader, exactly as leaving the list does; who was deleted is not recorded anywhere. The page warns when the Worker cannot send (key, sender or its own address missing). "Latest edition mailed" is read from the readers' own marks, so readers who have left since are not counted. This page has been tried on a local database only: it is not on the live Worker until the next deploy.
+
 ### Setting it up
 
 1. At Resend, add and verify the domain mail is sent from (`radar.ozkanyusuf.com` for this project: add the DNS records Resend shows, at the domain's DNS host), and keep the domain's open tracking and click tracking off, or the site's and the mails' "no tracking" lines stop being true.

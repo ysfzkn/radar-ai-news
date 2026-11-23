@@ -207,6 +207,17 @@ p { margin: 0; }
 .stat.warn-stat { background: var(--warn-soft); }
 .stat.warn-stat dd { color: var(--warn); }
 
+/* The newsletter's readers */
+.subs { list-style: none; margin: var(--space-2) 0 0; padding: 0; }
+.sub-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-1) var(--space-3); align-items: start;
+  padding: var(--space-3) 0; border-top: 1px solid var(--line);
+}
+.sub-row:last-child { padding-bottom: 0; }
+.sub-email { font-weight: 600; overflow-wrap: anywhere; }
+.sub-row > .chip { margin-top: 0.125rem; white-space: nowrap; }
+.sub-remove { grid-column: 1 / -1; }
+
 /* Search and category chips */
 .search { margin-bottom: var(--space-3); }
 .search-row { display: flex; gap: var(--space-2); }

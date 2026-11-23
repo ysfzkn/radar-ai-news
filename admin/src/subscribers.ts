@@ -162,6 +162,81 @@ export async function markMailed(db: D1Database, ids: readonly number[], day: st
   if (statements.length > 0) await db.batch(statements);
 }
 
+// ---------------------------------------------------------------------------
+// The admin's readers page
+// ---------------------------------------------------------------------------
+
+export const SUBSCRIBERS_PAGE = 100;
+
+export interface SubscriberRow {
+  id: number;
+  email: string;
+  lang: Lang;
+  status: "pending" | "confirmed";
+  created_at: string;
+  confirmed_at: string | null;
+  mailed_day: string | null;
+}
+
+// Newest first. The token is never read here: the page has no use for it.
+export async function listSubscribers(db: D1Database, limit: number, offset: number): Promise<SubscriberRow[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT id, email, lang, status, created_at, confirmed_at, mailed_day FROM subscribers
+        ORDER BY id DESC LIMIT ? OFFSET ?`,
+    )
+    .bind(limit, offset)
+    .all<SubscriberRow>();
+  return results;
+}
+
+export interface SubscriberTotals {
+  confirmed: number;
+  pending: number;
+  /** Confirmed readers by language. */
+  tr: number;
+  en: number;
+}
+
+export async function subscriberTotals(db: D1Database): Promise<SubscriberTotals> {
+  const { results } = await db
+    .prepare("SELECT status, lang, COUNT(*) AS n FROM subscribers GROUP BY status, lang")
+    .all<{ status: string; lang: string; n: number }>();
+  const totals: SubscriberTotals = { confirmed: 0, pending: 0, tr: 0, en: 0 };
+  for (const r of results) {
+    if (r.status === "pending") totals.pending += r.n;
+    if (r.status !== "confirmed") continue;
+    totals.confirmed += r.n;
+    if (r.lang === "tr") totals.tr += r.n;
+    if (r.lang === "en") totals.en += r.n;
+  }
+  return totals;
+}
+
+export interface LastMailing {
+  /** The Istanbul day of the latest edition mailed to anyone. */
+  day: string;
+  /** How many readers still on the list were mailed it. */
+  readers: number;
+}
+
+// Read from the readers' own marks, so a reader who left since is no longer counted.
+export async function lastMailing(db: D1Database): Promise<LastMailing | null> {
+  const row = await db
+    .prepare(
+      `SELECT mailed_day AS day, COUNT(*) AS readers FROM subscribers
+        WHERE mailed_day = (SELECT MAX(mailed_day) FROM subscribers)`,
+    )
+    .first<{ day: string | null; readers: number }>();
+  return row?.day ? { day: row.day, readers: row.readers } : null;
+}
+
+// Deletes one reader by id; false when there is no such row.
+export async function removeById(db: D1Database, id: number): Promise<boolean> {
+  const result = await db.prepare("DELETE FROM subscribers WHERE id = ?").bind(id).run();
+  return (result.meta.changes ?? 0) > 0;
+}
+
 export async function subscriberCounts(db: D1Database): Promise<{ confirmed: number; pending: number }> {
   const { results } = await db
     .prepare("SELECT status, COUNT(*) AS n FROM subscribers GROUP BY status")

@@ -141,6 +141,7 @@ export const COPY = {
     next_approved: "Onaylandı. Sıradaki haber.",
     next_rejected: "Reddedildi. Sıradaki haber.",
     dispatched: "Çalıştırma başlatıldı. GitHub'ın listesinde görünmesi birkaç saniye sürebilir; Yenile ile bak.",
+    subscriber_removed: "Abone silindi.",
   },
 
   // The header.
@@ -148,6 +149,36 @@ export const COPY = {
   siteLinkLabel: "Yayındaki siteyi yeni sekmede aç",
   signedInAs: "Oturum:",
   mainNav: "Ana menü",
+
+  // The newsletter's readers (/admin/subscribers).
+  subscribers: {
+    tab: "Aboneler",
+    title: "Aboneler",
+    intro:
+      "E-posta bültenine kayıtlı adresler, en yenisi üstte. Onay bekleyen adres, onay e-postasındaki düğmeye basılana kadar bülten almaz ve 7 gün sonra kendiliğinden silinir.",
+    notSending: "Bu Worker şu an e-posta gönderemiyor: RESEND_API_KEY, MAIL_FROM ya da PUBLIC_URL eksik. Abone formu “henüz açılmadı” der, günlük bülten gitmez.",
+    stripLabel: "Abone durumu",
+    confirmed: "Onaylı abone",
+    pending: "Onay bekleyen",
+    byLang: "Dil (onaylı)",
+    langSplit: (tr: number, en: number) => `${tr} TR · ${en} EN`,
+    lastSend: "Son gönderim",
+    lastSendValue: (day: string, readers: number) => `${day} · ${readers} okur`,
+    noSendYet: "Henüz yok",
+    listHeading: "Adresler",
+    empty: "Henüz abone yok.",
+    emptyPage: "Bu sayfada adres yok.",
+    statuses: { confirmed: "Onaylı", pending: "Onay bekliyor" } satisfies Record<"confirmed" | "pending", string>,
+    langs: { tr: "Türkçe", en: "İngilizce" } satisfies Record<"tr" | "en", string>,
+    joined: (date: string) => `Kayıt: ${date}`,
+    confirmedAt: (date: string) => `Onay: ${date}`,
+    lastMailed: (day: string) => `Son sayı: ${day}`,
+    neverMailed: "Henüz bülten gitmedi",
+    remove: "Sil",
+    removeHint: "Adres listeden silinir ve bir daha e-posta gitmez. Geri alınamaz; kişi isterse yeniden abone olabilir.",
+    removeConfirm: "Evet, aboneyi sil",
+    notFound: "Bu abone bulunamadı; daha önce silinmiş ya da abonelikten çıkmış olabilir.",
+  },
 
   // Starting the agent from here (/admin/run).
   run: {

@@ -96,8 +96,9 @@ export const RADAR_MARK = html`<svg class="mark" viewBox="0 0 24 24" width="18" 
 // The live site, linked from the header.
 export const SITE_URL = "https://radar.ozkanyusuf.com";
 
-// A page of the admin: one of the list tabs, or the run page ("Çalıştır", in the header).
-export type Page = Tab | "run";
+// A page of the admin: one of the list tabs, or a page of the header: the run page ("Çalıştır")
+// or the newsletter's readers ("Aboneler").
+export type Page = Tab | "run" | "subscribers";
 
 export interface Shell {
   title: string;
@@ -153,6 +154,7 @@ export function layout(p: Shell): View {
 <a class="brand" href="/admin">${RADAR_MARK}<span class="wordmark">${COPY.brand}</span> <span class="brand-suffix">${COPY.brandSuffix}</span></a>
 <nav class="top-links" aria-label="${COPY.mainNav}">
 <a class="top-link run-link" href="/admin/run"${p.active === "run" ? html` aria-current="page"` : ""}>${COPY.run.tab}</a>
+<a class="top-link subs-link" href="/admin/subscribers"${p.active === "subscribers" ? html` aria-current="page"` : ""}>${COPY.subscribers.tab}</a>
 <a class="top-link site-link" href="${SITE_URL}" target="_blank" rel="noopener noreferrer" aria-label="${COPY.siteLinkLabel}">${COPY.siteLink} ↗</a>
 </nav>
 <p class="who"><span class="visually-hidden">${COPY.signedInAs} </span>${p.email}</p>

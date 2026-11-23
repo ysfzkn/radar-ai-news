@@ -7,6 +7,7 @@ import { COPY, failureMessage } from "./copy";
 import type { Env } from "./env";
 import { RUN_MODES, dispatchRun, githubConfig, isActive, listRuns, type RunInputs, type RunsResult } from "./github";
 import { sendDaily } from "./daily";
+import { mailConfig } from "./mail";
 import { ingest } from "./ingest";
 import { newsletter } from "./newsletter";
 import { notifySite, waiter } from "./notify";
@@ -37,13 +38,14 @@ import {
   type StoryFull,
   type Tab,
 } from "./stories";
-import { purgePending } from "./subscribers";
+import { SUBSCRIBERS_PAGE, lastMailing, listSubscribers, purgePending, removeById, subscriberTotals } from "./subscribers";
 import { CSS, JS } from "./views/assets";
 import { editionView } from "./views/edition";
 import { STATUSES, formatDay, layout, listHref, storyPath, type Page, type View } from "./views/layout";
 import { queueView, type QueueStrip } from "./views/queue";
 import { busyMessage, minutesLeft, runView } from "./views/run";
 import { draftFrom, notFoundView, storyView, type Draft } from "./views/story";
+import { subscribersHref, subscribersView } from "./views/subscribers";
 
 type AppEnv = { Bindings: Env; Variables: { identity: Identity } };
 type Ctx = Context<AppEnv>;
@@ -88,7 +90,7 @@ app.get("/admin/app.css", (c) => c.body(CSS, 200, { "Content-Type": "text/css; c
 app.get("/admin/app.js", (c) => c.body(JS, 200, { "Content-Type": "text/javascript; charset=utf-8" }));
 
 // The confirmations a redirect may ask for with ?done=; any other value says nothing.
-const DONE = ["saved", "approved", "rejected", "unpublished", "restored", "next_approved", "next_rejected", "dispatched"] as const;
+const DONE = ["saved", "approved", "rejected", "unpublished", "restored", "next_approved", "next_rejected", "dispatched", "subscriber_removed"] as const;
 type Done = (typeof DONE)[number];
 
 function doneMessage(c: Ctx): string | undefined {
@@ -473,6 +475,41 @@ app.post("/admin/run", async (c) => {
   await finishDispatch(c.env.DB, id, result, new Date());
   if (result.ok) return c.redirect(withDone("/admin/run", "dispatched"), 303);
   return runPage(c, { status: 502, message: COPY.run.dispatchFailed(COPY.run.failures[result.error]), runs, form: inputs });
+});
+
+// ---------------------------------------------------------------------------
+// "Aboneler": the newsletter's readers (see src/subscribers.ts). Read-only but for one action,
+// deleting a reader, which is what leaving the list does too.
+// ---------------------------------------------------------------------------
+
+async function subscribersPage(c: Ctx, p: { status?: ContentfulStatusCode; message?: string } = {}): Promise<Response> {
+  const current = pageNumber(c.req.query("page"));
+  // One row more than a page tells whether a next page exists.
+  const rows = await listSubscribers(c.env.DB, SUBSCRIBERS_PAGE + 1, (current - 1) * SUBSCRIBERS_PAGE);
+  const body = subscribersView({
+    totals: await subscriberTotals(c.env.DB),
+    last: await lastMailing(c.env.DB),
+    rows: rows.slice(0, SUBSCRIBERS_PAGE),
+    page: { current, hasMore: rows.length > SUBSCRIBERS_PAGE },
+    sending: mailConfig(c.env) !== null,
+  });
+  return page(
+    c,
+    { title: COPY.subscribers.title, active: "subscribers", body, done: doneMessage(c), ...(p.message ? { message: p.message } : {}) },
+    p.status ?? 200,
+  );
+}
+
+app.get("/admin/subscribers", (c) => subscribersPage(c));
+
+// The id is digits only; nothing else reaches the database. Who was deleted is not recorded
+// anywhere: keeping the address in a history would defeat the deletion.
+app.post("/admin/subscribers/:id/delete", async (c) => {
+  const raw = c.req.param("id");
+  if (!/^[1-9][0-9]{0,14}$/.test(raw)) return badRequest(c);
+  const removed = await removeById(c.env.DB, Number(raw));
+  if (!removed) return subscribersPage(c, { status: 404, message: COPY.subscribers.notFound });
+  return c.redirect(withDone(subscribersHref(), "subscriber_removed"), 303);
 });
 
 // An error thrown on an admin page (for example a decision whose history row the database refused,
