@@ -2,12 +2,12 @@
 // script that runs in the browser.
 //
 // The form posts to the admin Worker, which stores the address and mails a confirmation link (see
-// docs/admin.md). While the switch is off the subscribe page is RSS only and says that there is no
-// newsletter; nothing on the site asks for an address. Turn it on only once that Worker is
-// deployed with sending set up: an open form whose Worker cannot send answers "not open yet".
+// docs/admin.md). With the switch off the subscribe page is RSS only and says that there is no
+// newsletter; nothing on the site asks for an address. It is on since 2026-11-23, when that Worker
+// was deployed with sending set up: an open form whose Worker cannot send answers "not open yet".
 
 /** The state of a build that does not say otherwise. */
-const OPEN_BY_DEFAULT = false;
+const OPEN_BY_DEFAULT = true;
 
 // RADAR_NEWSLETTER=1 or =0 overrides the default for one build, so the tests can build both.
 const asked = process.env.RADAR_NEWSLETTER;

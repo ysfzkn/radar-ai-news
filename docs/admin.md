@@ -103,7 +103,7 @@ The screen is light only: there is no dark theme and no theme switch. It works w
 
 ## The e-mail newsletter
 
-> **Status:** written and tested, never run for real. No sending service is connected to the live Worker, migration `0005_subscribers.sql` is not applied to the live database, and the site's form is switched off (`OPEN_BY_DEFAULT` in `site/src/lib/newsletter.ts`). No mail has been sent to a real inbox, so how the mails look in real mail clients is unchecked.
+> **Status:** switched on on 2026-11-23: migration `0005_subscribers.sql` is applied to the live database, the live Worker has the Resend key, and the site's form is open (`OPEN_BY_DEFAULT` in `site/src/lib/newsletter.ts`). One confirmation mail was accepted by Resend for its test address (`delivered@resend.dev`). Not yet seen: a mail in a real inbox (how it looks in real mail clients, whether it lands in spam) and a daily mail, which has never been sent.
 
 A reader gives an e-mail address on the site's subscribe page, confirms it from a mail, and then gets each day's edition by mail once, in Turkish or English. Mail is sent through [Resend](https://resend.com)'s HTTP API.
 
