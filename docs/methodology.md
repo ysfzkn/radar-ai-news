@@ -61,15 +61,22 @@ The verifier is a safety net, not proof of accuracy. It does not:
 - accept a number written with different grouping than the source (`10000` against `10,000`); such a story is sent to review rather than passed, which is safe but noisy;
 - check acronyms on a short allowlist (AI, API, SDK, CLI, UI, LLM and similar, and their plurals such as APIs) or month names, in either language, ever.
 
-A human reading remains the real check, which is why anything doubtful is routed to review.
+A human reading remains the real check. Since 2026-11-25 only the findings listed below hold a story for one; the rest are published and the findings are kept with the story as notes.
 
 ## What sends a story to a human
 
-A story is `published` only if it has no verification issue, no risk flag and a primary source. Otherwise it is `review`, with the reasons recorded:
+Most stories are `published` without a person. A story is `review` only when one of these holds (`route` and `holds` in `agent/src/radar/verify.py`):
 
-- any verification issue (`verify: ...`);
-- any risk flag from the scorer (`risk: ...`);
-- no primary source among the cluster's items (`no primary source`).
+- the scorer flagged it `security_incident` or `accusation`;
+- the scorer flagged it `funding_figure`, `third_party_benchmark` or `regulation` **and** the cluster has no primary source;
+- a number in the story's own text (title, summary or developer line, in either language) is not in the source;
+- the injection tripwire found anything (a link or domain, a handle, backticks, command-like text), in the texts or in the fact card's sentence;
+- the "try it" link is not one of the source's links, or its host is not a source host;
+- the text calls an event that is days old today's.
+
+Everything else is recorded and does not stop the story: a text over its length limit, a name that is not in the source, a number or name that is only in the fact card (readers never see the card), an old story that does not say when it happened, a `funding_figure`, `third_party_benchmark` or `regulation` flag on a story with a primary source, and a missing primary source on a story with none of those flags. The reasons are stored with the story in both cases (`verify: ...`, `risk: ...`, `no primary source`); the admin shows them under "Neden onay bekliyor" on a waiting story and under "Otomatik denetimin notları" on any other.
+
+What this costs: the name check and the length check no longer stop anything, so a story that names the wrong company, or one written only from community posts, can go online unread. Until 2026-11-25 every finding sent a story to review. The new rule has run against the tests only; how many stories a real day still holds is not known.
 
 Finished stories are sent to the admin service by `radar push` (or `radar daily`). A `published` story is then served by the public endpoint the site is built from; a `review` story waits until a person approves it, and the daily job sends a notice when one is waiting. See [admin.md](admin.md), [site.md](site.md) and [automation.md](automation.md). Nothing has been deployed yet and the scheduled job has never run, so for now `published` means "passed the automatic checks", not "online".
 

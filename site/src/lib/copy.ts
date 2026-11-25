@@ -414,26 +414,26 @@ export const COPY: Record<Lang, Copy> = {
     },
     about: {
       title: "Künye",
-      description: "Radar'ı kim çıkarıyor; haberler nasıl seçiliyor, yazılıyor ve denetleniyor.",
+      description: "Radar'ın yayıncısı, yayın ilkeleri ve haberlerin seçilme, yazılma ve denetlenme süreci.",
       sections: [
         {
-          heading: "Radar'ı kim çıkarıyor?",
+          heading: "Yayıncı",
           paragraphs: [
-            "Radar, Yusuf Özkan'ın kişisel projesi; onu o yürütüyor.",
+            "Radar, Yusuf Özkan'ın kişisel yayınıdır. Yayının editoryal sorumluluğu Yusuf Özkan'a aittir.",
           ],
           links: [{ text: "ozkanyusuf.com", href: SITE }],
         },
         {
-          heading: "Radar nedir?",
+          heading: "Yayın hakkında",
           paragraphs: [
-            "Radar, her gün çıkan kısa ve numaralı bir teknoloji ve yapay zekâ haberleri baskısıdır. Bir baskıda genellikle beş ile sekiz haber olur; her haber, neden önemli olduğunu söyleyen tek bir satırla biter. Sonra baskı kapanır.",
-            "Türkçe ve İngilizce yayımlanır. İki dil aynı olgu kartından yazılır, bu yüzden aynı şeyi söyler.",
+            "Radar, teknoloji ve yapay zekâ alanındaki gelişmeleri her gün kısa ve numaralı bir baskı hâlinde sunar. Bir baskıda genellikle beş ile sekiz haber yer alır; her haber, gelişmenin neden önemli olduğunu belirten tek bir satırla sona erer. Baskı bu haberlerle tamamlanır.",
+            "Yayın Türkçe ve İngilizce olarak hazırlanır. İki metin aynı olgu kartından yazıldığı için aynı içeriği taşır.",
           ],
         },
         {
-          heading: "Bir haber nasıl hazırlanır?",
+          heading: "Hazırlık süreci",
           paragraphs: [
-            "Haberleri yedi adımlı bir işlem hattı hazırlar. Bu adımlardan yalnızca ikisi bir dil modeli çağırır; diğer beşi sıradan koddur.",
+            "Haberler yedi adımlı bir işlem hattıyla hazırlanır. Bu adımlardan yalnızca ikisinde bir dil modeli kullanılır; diğer beşi kural tabanlı yazılımdır.",
           ],
           steps: [
             { name: "Toplama", text: "Kaynak listesindeki her kaynağı çeker." },
@@ -448,48 +448,49 @@ export const COPY: Record<Lang, Copy> = {
               text: "Orta boyutlu bir model önce kaynaktan bir olgu kartı çıkarır, ardından Türkçe ve İngilizce metni bu karttan yazar.",
             },
             { name: "Doğrulama", text: "Kod, metindeki her sayının, sürümün ve adın kaynakta geçtiğini denetler." },
-            { name: "Yönlendirme", text: "Haber ya otomatik yayımlanır ya da bir insanın incelemesine gönderilir." },
+            { name: "Yönlendirme", text: "Haber otomatik olarak yayımlanır ya da editör incelemesine gönderilir." },
           ],
           after: [
-            "Doğrulama bir güvenlik ağıdır, doğruluğun kanıtı değil: kaynaktaki gerçek bir sayının yanlış bir iddiada kullanıldığını anlayamaz. Bu yüzden şüpheli her şey bir insana gider.",
+            "Doğrulama bir güvenlik önlemidir, doğruluğun kanıtı değildir: kaynakta yer alan gerçek bir sayının yanlış bir iddiada kullanıldığını saptayamaz. Bu nedenle yüksek risk taşıyan haberler yayımlanmadan önce editör tarafından incelenir.",
           ],
         },
         {
           heading: "Yankı ölçer",
           paragraphs: [
-            "Her haberin yanındaki beş yay, haberi kaç bağımsız kaynağın verdiğini gösterir: her kaynak için bir yay yanar, en fazla beş. Kaynak sayısı hemen yanında yazar. Böylece gerçekten ses getiren bir haberi tek bir blogun heyecanından ayırabilirsin.",
+            "Her haberin yanındaki beş yay, haberi kaç bağımsız kaynağın verdiğini gösterir: her kaynak için bir yay yanar, en fazla beş. Kaynak sayısı hemen yanında belirtilir. Böylece geniş yankı uyandıran bir haber, tek bir kaynağın duyurusundan ayırt edilebilir.",
           ],
         },
         {
-          heading: "Haberleri kim yazar?",
+          heading: "Yazım ve editoryal denetim",
           paragraphs: [
-            "Her haberi bir dil modeli, haberin altında bağlantıları verilen kaynaklardan yazar.",
-            "Riskli konulardaki haberler ancak bir insan okuduktan sonra yayımlanır. Geri kalanlar otomatik denetimden geçtikten sonra kendiliğinden yayımlanır.",
-            "Yanlış bir haber düzeltilir ya da yayından kaldırılır.",
+            "Her haber, altında bağlantıları verilen kaynaklara dayanılarak bir dil modeli tarafından yazılır.",
+            "Haberlerin büyük bölümü otomatik denetimin ardından doğrudan yayımlanır. Yüksek risk taşıyan haberler ise yalnızca editör incelemesinden sonra yayımlanır.",
+            "Hatalı olduğu belirlenen haber düzeltilir ya da yayından kaldırılır.",
           ],
         },
         {
-          heading: "Riskli haberler bir insanı bekler",
+          heading: "Editör incelemesi gerektiren haberler",
           paragraphs: [
-            "Bazı haberler hiçbir zaman kendiliğinden yayımlanmaz: güvenlik olayları, suçlamalar, yatırım rakamları, üçüncü tarafların benchmark iddiaları ve düzenlemeler. Doğrulamadan geçemeyen ya da birincil kaynağı bulunamayan haberler de bunlara katılır.",
-            "Bu haberler bir inceleme kuyruğunda bekler. 72 saat içinde incelenmeyen haberin süresi dolar; hiçbir haber varsayılan olarak yayımlanmaz.",
+            "Şu haberler otomatik olarak yayımlanmaz: güvenlik olaylarına ve suçlamalara ilişkin haberler; metninde kaynakta bulunmayan bir sayı yer alan ya da eski bir gelişmeyi bugünün haberi gibi sunan haberler; metninde bağlantı, alan adı ya da komut saptanan veya deneme bağlantısı kaynağa ait olmayan haberler; birincil kaynağı bulunmayan yatırım, benchmark ve düzenleme haberleri.",
+            "Otomatik denetimin diğer bulguları habere not olarak kaydedilir ve yayımı durdurmaz.",
+            "İncelemeye ayrılan haberler bir kuyrukta bekler. 72 saat içinde incelenmeyen haberin süresi dolar; inceleme bekleyen hiçbir haber kendiliğinden yayımlanmaz.",
           ],
         },
         {
-          heading: "Yanlış bir haber mi gördün?",
+          heading: "Düzeltme ve bildirim",
           paragraphs: [
-            "Yanlış ya da yanıltıcı bir haber gördüysen haberin bağlantısıyla birlikte bana yaz. En değerli bildirim budur.",
+            "Hatalı ya da yanıltıcı olduğu düşünülen haberler, haberin bağlantısıyla birlikte aşağıdaki adres üzerinden bildirilebilir.",
           ],
-          links: [{ text: "ozkanyusuf.com üzerinden yaz", href: SITE }],
+          links: [{ text: "ozkanyusuf.com üzerinden iletişim", href: SITE }],
         },
         {
           heading: "Gizlilik",
           privacy: true,
           paragraphs: [
-            "Bu site çerez kullanmaz, seni izlemez ve üçüncü taraflardan hiçbir şey yüklemez: analitik, reklam ya da dış yazı tipi yok. Her sayfa statik bir HTML dosyasıdır ve betik olmadan da eksiksiz çalışır.",
-            "Sitenin kendi küçük betiği yalnızca bir kolaylık ekler: arşivde arama ve komut paleti (arama verisi bu siteden gelir), klavye kısayolları, kopyalama düğmeleri (panoya yalnızca sen bastığında yazar), radar ekranının eğimi ve okunan haberlerin işareti, ana sayfadaki arama kutusu (yazdığın sözcükleri arşivin aramasına, yani o sayfanın adresine taşır), ana sayfanın başındaki yazının ve radarın açılıştan sonra bir kez yerine oturması, “Neden önemli” satırının belirişi, baskının tarihinin ve sayılarının bir kalkış tabelası gibi yerine oturması, abone ol düğmesinin yazısının üzerine gelince çözülmesi, komut paletine “ping” yazınca radarın bir kez atması ve siteye her girişte oynayan kısa açılış. Sayfanın altındaki ufuk çizimi akşamdan sabaha gece hâline geçer: saati senin cihazının saatinden İstanbul saatine göre hesaplar, hiçbir yere sormaz. Hareketi azaltmayı seçtiysen hareketlerin hiçbiri oynamaz.",
-            "Arşivde aradığın sözcükler tarayıcında ve sayfanın adresinde kalır; adres de tarayıcı geçmişine yazılır. Sayfayı yenilediğinde ya da bir sonuca tıkladığında adres yalnızca bu siteye gider; başka kimseye gönderilmez.",
-            "Tarayıcına hiçbir şey yazılmaz: ne çerez ne yerel ya da oturum belleği. Sayfayı yenilediğinde her şey baştan başlar.",
+            "Bu site çerez kullanmaz, ziyaretçileri izlemez ve üçüncü taraflardan hiçbir içerik yüklemez: analitik, reklam ya da dış yazı tipi bulunmaz. Her sayfa statik bir HTML dosyasıdır ve betik olmadan da eksiksiz çalışır.",
+            "Sitenin kendi küçük betiği yalnızca kullanım kolaylığı sağlar: arşivde arama ve komut paleti (arama verisi bu siteden gelir), klavye kısayolları, kopyalama düğmeleri (panoya yalnızca düğmeye basıldığında yazar), radar ekranının eğimi ve okunan haberlerin işareti, ana sayfadaki arama kutusu (yazılan sözcükleri arşivin aramasına, yani o sayfanın adresine taşır), ana sayfanın başındaki yazının ve radarın açılıştan sonra bir kez yerine oturması, “Neden önemli” satırının belirişi, baskının tarihinin ve sayılarının bir kalkış tabelası gibi yerine oturması, abone ol düğmesinin yazısının, imleç üzerine geldiğinde çözülmesi, komut paletine “ping” yazıldığında radarın bir kez atması ve siteye her girişte oynayan kısa açılış. Sayfanın altındaki ufuk çizimi akşamdan sabaha gece hâline geçer: saati ziyaretçinin cihaz saatinden İstanbul saatine göre hesaplar, hiçbir sunucuya sormaz. Hareketi azaltma tercihi açıksa hareketlerin hiçbiri oynamaz.",
+            "Arşivde aranan sözcükler tarayıcıda ve sayfanın adresinde kalır; adres de tarayıcı geçmişine yazılır. Sayfa yenilendiğinde ya da bir sonuca tıklandığında adres yalnızca bu siteye gider; başka kimseye gönderilmez.",
+            "Tarayıcıya hiçbir şey yazılmaz: ne çerez ne yerel ya da oturum belleği. Sayfa yenilendiğinde her şey baştan başlar.",
           ],
         },
       ],
@@ -535,7 +536,7 @@ export const COPY: Record<Lang, Copy> = {
         rssHeading: "RSS ile",
         rssIntro: "E-posta vermek istemiyorsan Radar'ı RSS ile de takip edebilirsin: yeni haberler, yayımlandıkça kullandığın RSS okuyucusunda kendiliğinden belirir.",
         privacy:
-          "Tek istisna e-posta bülteni: abone olursan e-posta adresin ve seçtiğin dil saklanır, başka hiçbir şey. Adres yalnızca bülteni göndermek için kullanılır; gönderimi Resend, saklamayı Cloudflare yapar. E-postalarda açılma ya da tıklama takibi yoktur. Onaylamadığın adres 7 gün sonra, abonelikten çıktığında ise hemen silinir.",
+          "Tek istisna e-posta bültenidir: abone olunduğunda yalnızca e-posta adresi ve seçilen dil saklanır. Adres yalnızca bülteni göndermek için kullanılır; gönderimi Resend, saklamayı Cloudflare yapar. E-postalarda açılma ya da tıklama takibi yoktur. Onaylanmayan adres 7 gün sonra, abonelikten çıkıldığında ise hemen silinir.",
       },
     },
   },
@@ -715,24 +716,24 @@ export const COPY: Record<Lang, Copy> = {
     },
     about: {
       title: "About",
-      description: "Who makes Radar, and how its stories are chosen, written and checked.",
+      description: "Radar's publisher, and how its stories are chosen, written and checked.",
       sections: [
         {
-          heading: "Who makes Radar?",
+          heading: "Publisher",
           paragraphs: [
-            "Radar is a personal project by Yusuf Özkan, who runs it.",
+            "Radar is a personal publication of Yusuf Özkan, who holds editorial responsibility for it.",
           ],
           links: [{ text: "ozkanyusuf.com", href: SITE }],
         },
         {
-          heading: "What Radar is",
+          heading: "About the publication",
           paragraphs: [
             "Radar is a short, numbered daily edition of tech and AI news. An edition usually has five to eight stories, and each one ends with a single line on why it matters. Then the edition closes.",
             "It is published in Turkish and English. Both are written from the same fact card, so they say the same thing.",
           ],
         },
         {
-          heading: "How a story is made",
+          heading: "How a story is prepared",
           paragraphs: [
             "A pipeline of seven steps prepares the stories. Only two of them call a language model; the other five are plain code.",
           ],
@@ -749,10 +750,10 @@ export const COPY: Record<Lang, Copy> = {
               text: "A mid-sized model first builds a fact card from the source, then writes the Turkish and English text from that card.",
             },
             { name: "Verify", text: "Code checks that every number, version and name in the text appears in the source." },
-            { name: "Route", text: "The story is published automatically or sent to a person for review." },
+            { name: "Route", text: "The story is published automatically or sent to the editor for review." },
           ],
           after: [
-            "The check is a safety net, not proof of accuracy: it cannot tell when a real number from the source is used in a wrong claim. That is why anything doubtful goes to a person.",
+            "The check is a safety net, not proof of accuracy: it cannot tell when a real number from the source is used in a wrong claim. That is why high-risk stories are reviewed by the editor before publication.",
           ],
         },
         {
@@ -762,26 +763,27 @@ export const COPY: Record<Lang, Copy> = {
           ],
         },
         {
-          heading: "Who writes the stories?",
+          heading: "Authorship and editorial review",
           paragraphs: [
             "Every story is written by a language model from the sources linked under it.",
-            "Stories on risky subjects are published only after a person has read them. The rest are published automatically once they pass the automatic check.",
-            "A story that is wrong is corrected or taken down.",
+            "Most stories are published automatically after the automatic check. High-risk stories are published only after editorial review.",
+            "A story found to be wrong is corrected or taken down.",
           ],
         },
         {
-          heading: "Risky stories wait for a person",
+          heading: "Stories that require editorial review",
           paragraphs: [
-            "Some stories never publish themselves: security incidents, accusations, funding figures, third-party benchmark claims and regulation. The same goes for stories that fail the check or have no primary source.",
-            "They wait in a review queue. A story nobody reviews within 72 hours expires; nothing is published by default.",
+            "The following are never published automatically: stories about security incidents and accusations; stories whose text contains a number that is not in the source or presents an older event as today's; stories whose text contains a link, a domain name or a command, or whose \"try it\" link does not belong to the source; and funding, benchmark and regulation stories without a primary source.",
+            "Other findings of the automatic check are recorded with the story as notes and do not stop publication.",
+            "Stories held for review wait in a queue. A story not reviewed within 72 hours expires; a story awaiting review is never published by default.",
           ],
         },
         {
-          heading: "Found a wrong story?",
+          heading: "Corrections",
           paragraphs: [
-            "If a story is wrong or misleading, please write to me with the story's link. It is the most valuable report there is.",
+            "A story believed to be wrong or misleading can be reported, with the story's link, through the address below.",
           ],
-          links: [{ text: "Write via ozkanyusuf.com", href: SITE }],
+          links: [{ text: "Contact via ozkanyusuf.com", href: SITE }],
         },
         {
           heading: "Privacy",

@@ -328,9 +328,35 @@ def verify(draft: Draft, doc: SourceDoc) -> list[str]:
     return issues
 
 
+# What keeps a story for a person. Everything else the checks find is recorded with the story
+# and does not stop it.
+HOLD_FLAGS = frozenset({"security_incident", "accusation"})
+# A claim of these kinds waits only when no primary source backs it.
+CLAIM_FLAGS = frozenset({"funding_figure", "third_party_benchmark", "regulation"})
+_HOLDS = re.compile(
+    r"^(?:(?:tr|en)\.(?:title|summary|dev_line): number '"
+    r"|fact_card\.try_url: "
+    r"|dating: \S+ calls a \d+-day-old event today$"
+    r"|[\w.]+: (?:link or domain '|handle '|backticks$|command-like text '))"
+)
+
+
+def holds(issue: str) -> bool:
+    """A verification issue serious enough to wait for a person: a number in the story's
+    own text that the source does not have, anything the injection tripwire found, a try
+    link that is not the source's, and an old event called today's."""
+    return _HOLDS.match(issue) is not None
+
+
 def route(candidate: Candidate, score: Score, issues: list[str]) -> tuple[Status, list[str]]:
     reasons = ["verify: " + i for i in issues]
     reasons += ["risk: " + f for f in score.risk_flags]
     if not candidate.has_primary:
         reasons.append("no primary source")
-    return ("review" if reasons else "published"), reasons
+    flags = set(score.risk_flags)
+    hold = (
+        any(holds(i) for i in issues)
+        or bool(flags & HOLD_FLAGS)
+        or (not candidate.has_primary and bool(flags & CLAIM_FLAGS))
+    )
+    return ("review" if hold else "published"), reasons

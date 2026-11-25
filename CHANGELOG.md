@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Agent: fewer stories wait for a person. Only these hold a story now: a `security_incident` or `accusation` flag; a `funding_figure`, `third_party_benchmark` or `regulation` flag on a story without a primary source; a number in the story's text that is not in the source; anything the injection tripwire finds; a "try it" link that is not the source's; an old event called today's. Other findings (length, names, fact-card-only issues, a missing date, a missing primary source by itself) are kept with the story as notes and it is published. Tried against the tests only.
+- Admin: on a story that is not waiting, the findings are headed "Otomatik denetimin notları".
+- Site: the Künye and About pages are written in a formal, third-person register (headings such as "Yayıncı" and "Hazırlık süreci"), and their account of what waits for the editor follows the new rule.
+
 ### Added
 
 - An e-mail newsletter, switched on on 2026-11-23; no daily mail has gone out yet and no mail has been seen in a real inbox. Admin: a `subscribers` table (migration `0005`), a subscribe address with double opt-in (a confirmation mail, then a button), one-click unsubscribe that deletes the address, limits on confirmation mails in place of a captcha, and a daily mail of the day's edition sent by the hourly job through Resend between 07:00 and 22:00 Istanbul time, once per reader. The mails are plain tables with no image and no tracking. Site: the subscribe page's form and its notices, and a paragraph in the Künye's privacy section, behind a switch.

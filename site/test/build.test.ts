@@ -320,22 +320,30 @@ describe("built site", () => {
   it("the Künye page explains that every story is written by a model and which ones a person reads first", () => {
     const tr = text(page(DEMO, "kunye"));
     const en = text(page(DEMO, "en/about"));
-    expect(tr).toContain("Her haberi bir dil modeli, haberin altında bağlantıları verilen kaynaklardan yazar.");
-    expect(tr).toContain("Riskli konulardaki haberler ancak bir insan okuduktan sonra yayımlanır.");
-    expect(tr).toContain("Geri kalanlar otomatik denetimden geçtikten sonra kendiliğinden yayımlanır.");
-    expect(tr).toContain("Yanlış bir haber düzeltilir ya da yayından kaldırılır.");
+    expect(tr).toContain("Her haber, altında bağlantıları verilen kaynaklara dayanılarak bir dil modeli tarafından yazılır.");
+    expect(tr).toContain("Haberlerin büyük bölümü otomatik denetimin ardından doğrudan yayımlanır.");
+    expect(tr).toContain("Yüksek risk taşıyan haberler ise yalnızca editör incelemesinden sonra yayımlanır.");
+    expect(tr).toContain("Hatalı olduğu belirlenen haber düzeltilir ya da yayından kaldırılır.");
     expect(en).toContain("Every story is written by a language model from the sources linked under it.");
-    expect(en).toContain("Stories on risky subjects are published only after a person has read them.");
-    expect(en).toContain("The rest are published automatically once they pass the automatic check.");
-    expect(en).toContain("A story that is wrong is corrected or taken down.");
+    expect(en).toContain("Most stories are published automatically after the automatic check.");
+    expect(en).toContain("High-risk stories are published only after editorial review.");
+    expect(en).toContain("A story found to be wrong is corrected or taken down.");
+    // What waits for the editor is what the agent's route() holds (agent/src/radar/verify.py).
+    expect(tr).toContain("birincil kaynağı bulunmayan yatırım, benchmark ve düzenleme haberleri");
+    expect(en).toContain("funding, benchmark and regulation stories without a primary source");
+    expect(tr).not.toContain("Doğrulamadan geçemeyen");
+    expect(en).not.toContain("stories that fail the check");
+    // The page is written in the third person: it addresses nobody and nobody speaks in it.
+    expect(tr).not.toMatch(/gördün|bana yaz|ayırabilirsin|\bseni\b/);
+    expect(en).not.toMatch(/write to me/);
     expect(tr).not.toContain("İki etiket");
     expect(en).not.toContain("The two labels");
-    expect(en).toContain("Who writes the stories?");
-    expect(tr).toContain("Haberleri kim yazar?");
+    expect(en).toContain("Authorship and editorial review");
+    expect(tr).toContain("Yazım ve editoryal denetim");
     // The call to report a wrong story stays in its own section further down, not repeated here.
     for (const html of [page(DEMO, "kunye"), page(DEMO, "en/about")]) {
       const sections = [...html.matchAll(/<section>[\s\S]*?<\/section>/g)].map((m) => m[0]);
-      const section = sections.find((x) => /dil modeli,|written by a language model/.test(x));
+      const section = sections.find((x) => /dil modeli tarafından yazılır|written by a language model/.test(x));
       expect(section).toBeDefined();
       expect(section).not.toContain("<a ");
       expect(html).not.toContain("github.com/ysfzkn");
@@ -1213,7 +1221,7 @@ describe("built site", () => {
       expect(body, path).not.toMatch(/hiçbir yere gönderilmez|nothing is sent anywhere/);
       expect(body).toContain(
         lang === "tr"
-          ? "Arşivde aradığın sözcükler tarayıcında ve sayfanın adresinde kalır; adres de tarayıcı geçmişine yazılır."
+          ? "Arşivde aranan sözcükler tarayıcıda ve sayfanın adresinde kalır; adres de tarayıcı geçmişine yazılır."
           : "What you type in the archive search stays in your browser and in the page's address, so it is also in your browser history.",
       );
       expect(body).toContain(lang === "tr" ? "başka kimseye gönderilmez" : "it is sent to no one else");
@@ -1222,11 +1230,11 @@ describe("built site", () => {
       expect(body).not.toContain("radar:");
       expect(body).toContain(
         lang === "tr"
-          ? "Tarayıcına hiçbir şey yazılmaz: ne çerez ne yerel ya da oturum belleği."
+          ? "Tarayıcıya hiçbir şey yazılmaz: ne çerez ne yerel ya da oturum belleği."
           : "Nothing is written to your browser: no cookie, no local or session storage.",
       );
       expect(body).toContain(lang === "tr" ? "betik olmadan da eksiksiz çalışır" : "complete without scripts");
-      expect(body).toContain(lang === "tr" ? "seni izlemez" : "does not track you");
+      expect(body).toContain(lang === "tr" ? "ziyaretçileri izlemez" : "does not track you");
     }
   });
 
@@ -1708,7 +1716,7 @@ describe("built site", () => {
     expect(text(tr)).toContain("72 saat");
     expect(text(en)).toContain("72 hours");
     // The site never caps an edition, so the page does not claim a maximum.
-    expect(text(tr)).toContain("Bir baskıda genellikle beş ile sekiz haber olur");
+    expect(text(tr)).toContain("Bir baskıda genellikle beş ile sekiz haber yer alır");
     expect(text(en)).toContain("An edition usually has five to eight stories");
     expect(text(tr)).not.toContain("en fazla sekiz");
     expect(text(en)).not.toContain("at most eight");
@@ -1775,7 +1783,7 @@ describe("built site", () => {
   });
 
   it("the Künye page opens with who makes Radar and links ozkanyusuf.com, and no GitHub address", () => {
-    for (const [path, heading] of [["kunye", "Radar'ı kim çıkarıyor?"], ["en/about", "Who makes Radar?"]] as const) {
+    for (const [path, heading] of [["kunye", "Yayıncı"], ["en/about", "Publisher"]] as const) {
       const html = page(DEMO, path);
       const first = html.match(/<section>([\s\S]*?)<\/section>/)![1];
       expect(text(first.match(/<h2[^>]*>([\s\S]*?)<\/h2>/)![1])).toBe(heading);
@@ -1786,10 +1794,10 @@ describe("built site", () => {
       expect(text(html), path).not.toMatch(/kaynak kodu|source code/i);
     }
     expect(text(page(DEMO, "kunye"))).toContain(
-      "Radar, Yusuf Özkan'ın kişisel projesi; onu o yürütüyor.",
+      "Radar, Yusuf Özkan'ın kişisel yayınıdır. Yayının editoryal sorumluluğu Yusuf Özkan'a aittir.",
     );
     expect(text(page(DEMO, "en/about"))).toContain(
-      "Radar is a personal project by Yusuf Özkan, who runs it.",
+      "Radar is a personal publication of Yusuf Özkan, who holds editorial responsibility for it.",
     );
     // Most stories publish themselves, so the page does not say he publishes every issue.
     expect(text(page(DEMO, "kunye"))).not.toContain("Her sayıyı o yayımlıyor");

@@ -53,6 +53,8 @@ export const COPY = {
 
   back: "Kuyruğa dön",
   reasonsHeading: "Neden onay bekliyor",
+  // The same findings on a story that is not waiting: what the checks noted about it.
+  notesHeading: "Otomatik denetimin notları",
   factCardHeading: "Bilgi kartı",
   fact: { what: "Ne oldu", who: "Kim", numbers: "Rakamlar", versions: "Sürümler", tryUrl: "Deneme bağlantısı" },
   none: "Yok",

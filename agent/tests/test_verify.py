@@ -291,20 +291,58 @@ def score_with(*flags):
     )
 
 
-def test_route_publishes_only_when_clean():
+def test_route_publishes_a_clean_story():
     assert route(candidate(), score_with(), []) == ("published", [])
 
 
-def test_route_sends_issues_risk_and_missing_primary_to_review():
-    status, reasons = route(
-        candidate(False), score_with("funding_figure"), ["en.title: too long (95 > 90)"]
-    )
-    assert status == "review"
-    assert reasons == [
-        "verify: en.title: too long (95 > 90)",
-        "risk: funding_figure",
-        "no primary source",
+def test_route_publishes_minor_findings_and_keeps_them_as_notes():
+    issues = [
+        "en.title: too long (95 > 90)",
+        "en.title: name 'OpenAI' not in source",
+        "fact_card.numbers: number '40' not in source",
+        "fact_card.who: name 'Acme' not in source",
+        "dating: tr text does not say when (first reported 2026-11-01)",
     ]
+    status, reasons = route(candidate(False), score_with(), issues)
+    assert status == "published"
+    assert reasons == ["verify: " + i for i in issues] + ["no primary source"]
+
+
+@pytest.mark.parametrize("flag", ["funding_figure", "third_party_benchmark", "regulation"])
+def test_route_holds_a_claim_only_without_a_primary_source(flag):
+    assert route(candidate(), score_with(flag), []) == ("published", ["risk: " + flag])
+    assert route(candidate(False), score_with(flag), []) == (
+        "review",
+        ["risk: " + flag, "no primary source"],
+    )
+
+
+@pytest.mark.parametrize("flag", ["security_incident", "accusation"])
+def test_route_always_holds_incidents_and_accusations(flag):
+    assert route(candidate(), score_with(flag), []) == ("review", ["risk: " + flag])
+
+
+@pytest.mark.parametrize(
+    "issue",
+    [
+        "tr.summary: number '40' not in source",
+        "en.dev_line: number '1.5' not in source",
+        "fact_card.try_url: not a source link",
+        "fact_card.try_url: host 'evil.test' is not a source host",
+        "en.summary: link or domain 'evil.test'",
+        "fact_card.what: handle '@evil'",
+        "tr.title: backticks",
+        "en.dev_line: command-like text 'curl -s'",
+        "dating: tr.summary calls a 10-day-old event today",
+    ],
+)
+def test_route_holds_serious_verification_issues(issue):
+    assert route(candidate(), score_with(), [issue]) == ("review", ["verify: " + issue])
+
+
+def test_a_name_that_quotes_a_tripwire_phrase_does_not_hold():
+    issue = "en.title: name 'backticks' not in source"
+    assert route(candidate(), score_with(), [issue])[0] == "published"
 
 
 def test_invented_number_routes_to_review():

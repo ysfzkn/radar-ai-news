@@ -369,7 +369,7 @@ def test_the_writer_is_told_when_the_event_happened(store, now, run_id):
     assert "Edition date: 19 November 2026" in user
 
 
-def test_a_backlog_story_that_does_not_say_when_waits_for_review(store, now, run_id):
+def test_a_backlog_story_that_does_not_say_when_is_published_with_a_note(store, now, run_id):
     old = backlog(store, now, 2)
     dated = draft(
         en_summary="On 10 November the alpha engine added streaming support for agents.",
@@ -380,7 +380,8 @@ def test_a_backlog_story_that_does_not_say_when_waits_for_review(store, now, run
     stories = {s.cluster_id: s for s in store.stories_since(now - timedelta(days=1))}
     assert stories[old[0].cluster_id].status == "published"
     undated = stories[old[1].cluster_id]
-    assert undated.status == "review"
+    # Not saying when is a note, not a reason to wait (see verify.holds).
+    assert undated.status == "published"
     assert any(r.startswith("verify: dating:") for r in undated.reasons)
 
 

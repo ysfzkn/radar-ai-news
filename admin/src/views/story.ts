@@ -56,7 +56,7 @@ function statusChips(s: StoryFull, now: Date): View {
 function reasons(s: StoryFull): View {
   if (s.reasons.length === 0) return html``;
   return html`<section class="panel reasons-panel" aria-labelledby="reasons-h">
-<h2 id="reasons-h">${COPY.reasonsHeading}</h2>
+<h2 id="reasons-h">${s.status === "review" ? COPY.reasonsHeading : COPY.notesHeading}</h2>
 ${reasonList(s.reasons)}
 </section>`;
 }

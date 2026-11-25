@@ -71,9 +71,9 @@ The pipeline has seven steps. **Only two of them call a model.**
 
 ## Principles
 
-- **Primary source or it does not run.** Community buzz is a signal, not a story. If the original announcement cannot be found, a human decides.
+- **Primary sources first.** Community buzz is a signal, not a story. A story about funding, a benchmark or regulation whose original announcement cannot be found waits for a human; other stories without one are published with a note for the editor.
 - **Nothing the source did not say.** A deterministic check rejects any number, version or proper noun that is missing from the source text.
-- **Risky stories wait for a human.** Security incidents, accusations, funding figures, third-party benchmark claims and regulation always go to review. Unreviewed items expire after 72 hours; they are never published by default.
+- **High-risk stories wait for a human.** Security incidents and accusations always go to review, and so does a story whose text has a number, a link or a command that is not in its sources. Most other stories are published automatically. Unreviewed items expire after 72 hours; they are never published by default.
 - **A budget, enforced in code.** The design target is under 30K tokens a day, with a hard daily spend cap. Token use per step is logged for every run.
 - **We do not summarize the summarizers.** Other newsletters are used only to check what we missed, never as text to rewrite.
 - **No ghostwriter.** A model writes every story, and Radar says so. The Künye page shows how it works and which stories a person reads first. When a story is wrong, it is corrected or pulled.

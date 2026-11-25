@@ -753,6 +753,15 @@ describe("review screen", () => {
     }
   });
 
+  it("heads the findings as notes on a story that is not waiting", async () => {
+    const waiting = await seed({ mutate: (s) => (s.reasons = REASONS) });
+    const live = await seed({ status: "published", mutate: (s) => (s.reasons = REASONS) });
+    const heading = async (uid: string) =>
+      /<h2 id="reasons-h">([^<]*)<\/h2>/.exec(await (await get(`/admin/stories/${uid}`)).text())?.[1];
+    expect(await heading(waiting)).toBe("Neden onay bekliyor");
+    expect(await heading(live)).toBe("Otomatik denetimin notları");
+  });
+
   it("escapes a hostile reason inside the new reason markup", async () => {
     const uid = await seed({
       mutate: (s) =>
