@@ -9,7 +9,7 @@ dependencies = [
     "feedparser",
     "pydantic",
     "pyyaml",
-    "anthropic>=2.10.0",
+    "anthropic>=2.14.0",
     "cryptography>=50.0.2",
 ]
 
